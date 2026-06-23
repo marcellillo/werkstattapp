@@ -14,14 +14,15 @@ export default async function KalenderPage() {
     supabase
       .from('auftraege')
       .select(`
-        id, auftrag_nr, status, geplante_fertigstellung, arbeiten,
+        id, auftrag_nr, status, geplante_fertigstellung, geschaetzte_dauer_tage, arbeiten,
         fahrzeug:fahrzeuge(marke, modell, kennzeichen),
         kunde:kunden(vorname, nachname),
         hebebuehne:hebebuehnen(bezeichnung)
       `)
       .not('status', 'eq', 'ausgeliefert')
-      .not('geplante_fertigstellung', 'is', null)
-      .order('geplante_fertigstellung'),
+      .not('status', 'eq', 'storniert')
+      .not('status', 'eq', 'fertig')
+      .order('geplante_fertigstellung', { ascending: true, nullsFirst: false }),
     supabase
       .from('termine')
       .select('id, titel, datum, uhrzeit, dauer_minuten, typ, status, beschreibung, fahrzeug:fahrzeuge(marke, modell, kennzeichen), kunde:kunden(vorname, nachname)')

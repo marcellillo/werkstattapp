@@ -88,7 +88,24 @@ export function NeuFahrzeugForm({ kunden, hebebuehnen }: Props) {
   // Order
   const [arbeiten, setArbeiten] = useState('')
   const [hebebuehneId, setHebebuehneId] = useState('')
+  const [dauerTage, setDauerTage] = useState('')
   const [fertigDatum, setFertigDatum] = useState('')
+  const [datumManuell, setDatumManuell] = useState(false)
+
+  // Auto-Berechnung: Fertigstellung = heute + Dauer (Werktage), solange nicht manuell überschrieben
+  useEffect(() => {
+    if (datumManuell || !dauerTage) return
+    const tage = parseFloat(dauerTage)
+    if (isNaN(tage) || tage <= 0) return
+    const d = new Date()
+    let verbleibend = Math.ceil(tage)
+    while (verbleibend > 0) {
+      d.setDate(d.getDate() + 1)
+      const dow = d.getDay()
+      if (dow !== 0 && dow !== 6) verbleibend-- // Wochenenden überspringen
+    }
+    setFertigDatum(d.toISOString().split('T')[0])
+  }, [dauerTage, datumManuell])
 
   useEffect(() => {
     loadBestand()
@@ -208,6 +225,7 @@ export function NeuFahrzeugForm({ kunden, hebebuehnen }: Props) {
         hebebuehne_id: hebebuehneId || null,
         status: 'angenommen',
         arbeiten: arbeiten || null,
+        geschaetzte_dauer_tage: dauerTage ? parseFloat(dauerTage) : null,
         geplante_fertigstellung: fertigDatum || null,
       }).select().single()
 
@@ -514,6 +532,51 @@ export function NeuFahrzeugForm({ kunden, hebebuehnen }: Props) {
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-orange-400"
               />
             </div>
+            {/* Geschätzte Dauer */}
+            <div>
+              <label className="text-xs text-gray-800 mb-1.5 block">Geschätzte Dauer der Arbeiten</label>
+              <div className="flex flex-wrap gap-2 mb-2">
+                {[
+                  { label: '½ Tag', value: '0.5' },
+                  { label: '1 Tag', value: '1' },
+                  { label: '2 Tage', value: '2' },
+                  { label: '3 Tage', value: '3' },
+                  { label: '1 Woche', value: '5' },
+                  { label: '2 Wochen', value: '10' },
+                ].map(opt => {
+                  const active = dauerTage === opt.value
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => { setDauerTage(opt.value); setDatumManuell(false) }}
+                      className={`px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                        active
+                          ? 'bg-orange-600 text-white border-orange-600'
+                          : 'bg-white text-gray-700 border-gray-300 hover:border-orange-400 hover:text-orange-600'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  )
+                })}
+                <input
+                  type="number"
+                  step="0.5"
+                  min="0"
+                  value={dauerTage}
+                  onChange={e => { setDauerTage(e.target.value); setDatumManuell(false) }}
+                  placeholder="… eigene"
+                  className="w-24 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                />
+              </div>
+              {dauerTage && !datumManuell && fertigDatum && (
+                <p className="text-xs text-orange-600">
+                  Vorschlag: fertig am <strong>{new Date(fertigDatum + 'T00:00:00').toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long' })}</strong> (Wochenenden ausgenommen)
+                </p>
+              )}
+            </div>
+
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-xs text-gray-800 mb-1 block">Hebebühne</label>
@@ -529,11 +592,14 @@ export function NeuFahrzeugForm({ kunden, hebebuehnen }: Props) {
                 </select>
               </div>
               <div>
-                <label className="text-xs text-gray-800 mb-1 block">Geplante Fertigstellung</label>
+                <label className="text-xs text-gray-800 mb-1 block">
+                  Geplante Fertigstellung
+                  {dauerTage && !datumManuell && <span className="text-orange-500 font-normal"> · automatisch</span>}
+                </label>
                 <input
                   type="date"
                   value={fertigDatum}
-                  onChange={e => setFertigDatum(e.target.value)}
+                  onChange={e => { setFertigDatum(e.target.value); setDatumManuell(true) }}
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
                 />
               </div>

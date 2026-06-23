@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useRef, useMemo } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Car, User, Wrench, Package, Calendar, Plus, Trash2, CheckCircle, Clock, Circle, ChevronRight, ShieldCheck, Search, Printer, Receipt, Ban } from 'lucide-react'
+import { ArrowLeft, Car, User, Wrench, Package, Calendar, Plus, Trash2, CheckCircle, Clock, Circle, ChevronRight, ShieldCheck, Search, Printer, Receipt, Ban, UserCheck } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { cn, formatDate, formatDateTime } from '@/lib/utils'
@@ -46,6 +46,7 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie 
   const suchRef = useRef<HTMLDivElement>(null)
   const [arbeiten, setArbeiten] = useState(initialAuftrag.arbeiten ?? '')
   const [fertigDatum, setFertigDatum] = useState(initialAuftrag.geplante_fertigstellung ?? '')
+  const [dauerTage, setDauerTage] = useState(initialAuftrag.geschaetzte_dauer_tage != null ? String(initialAuftrag.geschaetzte_dauer_tage) : '')
   const [tuevKandidat, setTuevKandidat] = useState(initialAuftrag.tuev_kandidat ?? false)
   const [tuevTermin, setTuevTermin] = useState(initialAuftrag.tuev_termin ?? '')
   const [tuevErgebnis, setTuevErgebnis] = useState(initialAuftrag.tuev_ergebnis ?? '')
@@ -53,7 +54,21 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie 
   const [buehneWahl, setBuehneWahl] = useState('')
   const [storniereBestaetigung, setStorniereBestaetigung] = useState(false)
   const [stornieren, setStornieren] = useState(false)
+  const [mitarbeiter, setMitarbeiter] = useState<any[]>([])
+  const [zugewiesenAn, setZugewiesenAn] = useState<string>(initialAuftrag.zugewiesen_an ?? '')
   const supabase = createClient()
+
+  // Lade Mitarbeiter
+  useEffect(() => {
+    supabase.from('profiles').select('id, full_name, role').order('full_name').then(({ data }) => {
+      if (data) setMitarbeiter(data)
+    })
+  }, [])
+
+  async function handleMitarbeiterChange(profileId: string) {
+    setZugewiesenAn(profileId)
+    await supabase.from('auftraege').update({ zugewiesen_an: profileId || null }).eq('id', auftrag.id)
+  }
 
   // Lade bekannte Teile aus der DB für Autocomplete
   useEffect(() => {
@@ -110,8 +125,30 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie 
 
   async function saveArbeiten() {
     setSaving(true)
-    await supabase.from('auftraege').update({ arbeiten, geplante_fertigstellung: fertigDatum || null }).eq('id', auftrag.id)
+    await supabase.from('auftraege').update({
+      arbeiten,
+      geplante_fertigstellung: fertigDatum || null,
+      geschaetzte_dauer_tage: dauerTage ? parseFloat(dauerTage) : null,
+    }).eq('id', auftrag.id)
     setSaving(false)
+  }
+
+  // Heute + N Werktage (Wochenenden überspringen)
+  function berechneFertigDatum(tage: number): string {
+    const d = new Date()
+    let verbleibend = Math.ceil(tage)
+    while (verbleibend > 0) {
+      d.setDate(d.getDate() + 1)
+      const dow = d.getDay()
+      if (dow !== 0 && dow !== 6) verbleibend--
+    }
+    return d.toISOString().split('T')[0]
+  }
+
+  function dauerWaehlen(tage: string) {
+    setDauerTage(tage)
+    const n = parseFloat(tage)
+    if (!isNaN(n) && n > 0) setFertigDatum(berechneFertigDatum(n))
   }
 
   async function saveTuev() {
@@ -422,6 +459,45 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie 
                 rows={4}
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-orange-400"
               />
+              <div>
+                <label className="text-xs text-gray-800 mb-1.5 block">Geschätzte Dauer</label>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { label: '½ Tag', value: '0.5' },
+                    { label: '1 Tag', value: '1' },
+                    { label: '2 Tage', value: '2' },
+                    { label: '3 Tage', value: '3' },
+                    { label: '1 Woche', value: '5' },
+                    { label: '2 Wochen', value: '10' },
+                  ].map(opt => {
+                    const active = dauerTage === opt.value
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => dauerWaehlen(opt.value)}
+                        className={cn(
+                          'px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors',
+                          active
+                            ? 'bg-orange-600 text-white border-orange-600'
+                            : 'bg-white text-gray-700 border-gray-300 hover:border-orange-400 hover:text-orange-600'
+                        )}
+                      >
+                        {opt.label}
+                      </button>
+                    )
+                  })}
+                  <input
+                    type="number"
+                    step="0.5"
+                    min="0"
+                    value={dauerTage}
+                    onChange={e => dauerWaehlen(e.target.value)}
+                    placeholder="… eigene"
+                    className="w-24 px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                  />
+                </div>
+              </div>
               <div className="flex items-center gap-3">
                 <div className="flex-1">
                   <label className="text-xs text-gray-800 mb-1 block">Geplante Fertigstellung</label>
@@ -694,6 +770,68 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie 
                 <p className="text-xs text-gray-800 mt-2">
                   Zugewiesen: <span className="font-medium">{auftrag.hebebuehne.bezeichnung}</span>
                 </p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Mitarbeiter */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <UserCheck className="w-5 h-5 text-indigo-500" />
+                Zuständig
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {mitarbeiter.length === 0 ? (
+                <p className="text-xs text-gray-500">Keine Mitarbeiter angelegt</p>
+              ) : (
+                <div className="space-y-2">
+                  <button
+                    onClick={() => handleMitarbeiterChange('')}
+                    className={cn(
+                      'flex w-full items-center gap-3 px-3 py-2 rounded-lg border text-sm transition-all',
+                      !zugewiesenAn
+                        ? 'bg-gray-100 border-gray-300 font-medium text-gray-700'
+                        : 'bg-gray-50 border-gray-100 text-gray-400 hover:bg-white hover:border-gray-300'
+                    )}
+                  >
+                    <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
+                      <User className="w-4 h-4 text-gray-400" />
+                    </div>
+                    <span>Niemand</span>
+                  </button>
+                  {mitarbeiter.map(m => {
+                    const initials = m.full_name.split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase()
+                    const firstName = m.full_name.split(' ')[0]
+                    const roleLabel = m.role === 'werkstattmeister' ? 'Meister' : m.role === 'mechaniker' ? 'Mechaniker' : 'Admin'
+                    const isSelected = zugewiesenAn === m.id
+                    return (
+                      <button
+                        key={m.id}
+                        onClick={() => handleMitarbeiterChange(m.id)}
+                        className={cn(
+                          'flex w-full items-center gap-3 px-3 py-2 rounded-lg border text-sm transition-all',
+                          isSelected
+                            ? 'bg-indigo-50 border-indigo-300 text-indigo-800 shadow-sm ring-1 ring-indigo-200'
+                            : 'bg-gray-50 border-gray-100 text-gray-600 hover:bg-white hover:border-gray-300 hover:text-gray-900'
+                        )}
+                      >
+                        <div className={cn(
+                          'w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0',
+                          isSelected ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-600'
+                        )}>
+                          {initials}
+                        </div>
+                        <div className="flex-1 text-left">
+                          <p className="font-medium text-sm leading-tight">{firstName}</p>
+                          <p className="text-xs opacity-60">{roleLabel}</p>
+                        </div>
+                        {isSelected && <CheckCircle className="w-4 h-4 text-indigo-500 flex-shrink-0" />}
+                      </button>
+                    )
+                  })}
+                </div>
               )}
             </CardContent>
           </Card>

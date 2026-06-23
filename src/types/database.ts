@@ -121,6 +121,7 @@ export interface Auftrag {
   arbeiten?: string
   bemerkungen?: string
   zugewiesen_an?: string
+  geschaetzte_dauer_tage?: number
   geplante_fertigstellung?: string
   fertiggestellt_am?: string
   einnahmen?: number

@@ -26,8 +26,8 @@ const LIEFERANTEN: { name: string; domains: string[]; absender: string[] }[] = [
     absender: ['pv', 'pv automotive'],
   },
   {
-    name: 'Nora Autoteile',
-    domains: ['nora.de', 'nora-autoteile.de'],
+    name: 'Nora Zentrum',
+    domains: ['nora.de', 'nora-autoteile.de', 'nora-zentrum.de', 'norazentrum.de'],
     absender: ['nora'],
   },
   {

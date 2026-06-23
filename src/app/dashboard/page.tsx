@@ -13,6 +13,7 @@ export default async function DashboardPage() {
     { data: auftraegeRaw },
     { data: termineRaw },
     { count: eigenCount },
+    { data: mitarbeiterRaw },
   ] = await Promise.all([
     supabase.from('hebebuehnen').select('*').order('position').order('nummer'),
     supabase
@@ -23,6 +24,7 @@ export default async function DashboardPage() {
       .order('erstellt_am', { ascending: false }),
     supabase.from('termine').select('*, kunde:kunden(vorname,nachname), fahrzeug:fahrzeuge(kennzeichen,marke,modell)').gte('datum', new Date().toISOString().split('T')[0]).not('status', 'eq', 'abgesagt').order('datum').order('uhrzeit').limit(20),
     supabase.from('fahrzeuge').select('*', { count: 'exact', head: true }).eq('fahrzeug_typ', 'eigen'),
+    supabase.from('profiles').select('id, full_name, role').order('full_name'),
   ])
 
   const hebebuehnen = (hebebuehnenRaw ?? []) as any[]
@@ -72,6 +74,7 @@ export default async function DashboardPage() {
         naechsteTermine={naechsteTermine}
         eigenFahrzeuge={eigenCount ?? 0}
         tuevBuehnenTermine={tuevBuehnenTermine}
+        mitarbeiter={(mitarbeiterRaw ?? []) as any[]}
       />
     </AppLayout>
   )

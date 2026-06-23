@@ -30,6 +30,7 @@ interface Props {
   naechsteTermine: any[]
   eigenFahrzeuge: number
   tuevBuehnenTermine: any[]
+  mitarbeiter: any[]
 }
 
 const STATUS_ORDER: FahrzeugStatus[] = ['angenommen','diagnose','reparatur','warten_teile','fertig','ausgeliefert']
@@ -46,7 +47,7 @@ function isDialog(b: BuehneExt) {
 
 export function DashboardContent({
   hebebuehnen: initBuehnen, auftraege: initAuftraege,
-  offeneAuftraege, wartendeTeile, fertigeHeute, ueberfaellig, naechsteTermine, eigenFahrzeuge, tuevBuehnenTermine
+  offeneAuftraege, wartendeTeile, fertigeHeute, ueberfaellig, naechsteTermine, eigenFahrzeuge, tuevBuehnenTermine, mitarbeiter
 }: Props) {
   const [buehnen, setBuehnen] = useState<BuehneExt[]>(initBuehnen)
   const [auftraege, setAuftraege] = useState<Auftrag[]>(initAuftraege)
@@ -145,6 +146,7 @@ const auftragMap = new Map<string, Auftrag>()
             tuevTermin={tuevMap.get(dialog.id)}
             isOver={dropOver === dialog.id}
             unassigned={unassigned}
+            mitarbeiter={mitarbeiter}
             onAuftragDragOver={e => { e.preventDefault(); if (aufragDragId) setDropOver(dialog.id) }}
             onDragLeave={() => setDropOver(null)}
             onAuftragDrop={() => dropAuftrag(dialog.id)}
@@ -177,6 +179,7 @@ const auftragMap = new Map<string, Auftrag>()
               tuevTermin={tuevMap.get(b.id)}
               isOver={dropOver === b.id}
               unassigned={unassigned}
+              mitarbeiter={mitarbeiter}
               onAuftragDragOver={e => { e.preventDefault(); if (aufragDragId) setDropOver(b.id) }}
               onDragLeave={() => setDropOver(null)}
               onAuftragDrop={() => dropAuftrag(b.id)}
@@ -292,7 +295,7 @@ const auftragMap = new Map<string, Auftrag>()
 
 // â”€â”€ Bay card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function BuehneCard({
-  buehne, auftrag, tuevTermin, isOver, unassigned,
+  buehne, auftrag, tuevTermin, isOver, unassigned, mitarbeiter,
   onAuftragDragOver, onDragLeave,
   onAuftragDrop,
   onFreigeben, onStatusChange, onAuftragDragStart,
@@ -303,6 +306,7 @@ function BuehneCard({
   tuevTermin?: any
   isOver: boolean
   unassigned: Auftrag[]
+  mitarbeiter: any[]
   onAuftragDragOver: (e: React.DragEvent) => void
   onDragLeave: () => void
   onAuftragDrop: () => void
@@ -392,8 +396,8 @@ function BuehneCard({
             className="h-full cursor-grab active:cursor-grabbing"
           >
             {isDialogCard
-              ? <AuftragCardCompact auftrag={auftrag} onStatusChange={s => onStatusChange(auftrag.id, s)} overdue={overdue} />
-              : <AuftragCardFull auftrag={auftrag} onStatusChange={s => onStatusChange(auftrag.id, s)} overdue={overdue} accentColor={accentColor} />
+              ? <AuftragCardCompact auftrag={auftrag} onStatusChange={s => onStatusChange(auftrag.id, s)} overdue={overdue} mitarbeiter={mitarbeiter} />
+              : <AuftragCardFull auftrag={auftrag} onStatusChange={s => onStatusChange(auftrag.id, s)} overdue={overdue} accentColor={accentColor} mitarbeiter={mitarbeiter} />
             }
           </div>
         ) : (
@@ -455,12 +459,13 @@ function EmptyLiftVisual() {
 }
 
 // â”€â”€ Auftrag cards â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-function AuftragCardFull({ auftrag, onStatusChange, overdue, accentColor }: {
-  auftrag: Auftrag; onStatusChange: (s: FahrzeugStatus) => void; overdue: boolean; accentColor: string
+function AuftragCardFull({ auftrag, onStatusChange, overdue, accentColor, mitarbeiter }: {
+  auftrag: Auftrag; onStatusChange: (s: FahrzeugStatus) => void; overdue: boolean; accentColor: string; mitarbeiter: any[]
 }) {
   const [showMenu, setShowMenu] = useState(false)
   const teile = auftrag.ersatzteile ?? []
   const eigen = auftrag.fahrzeug?.fahrzeug_typ === 'eigen'
+  const zustaendig = mitarbeiter.find(m => m.id === (auftrag as any).zugewiesen_an)
 
   return (
     <div className="flex flex-col h-full">
@@ -474,6 +479,14 @@ function AuftragCardFull({ auftrag, onStatusChange, overdue, accentColor }: {
           </div>
           <p className="text-xs font-mono text-gray-800">{auftrag.fahrzeug?.kennzeichen}</p>
           {auftrag.kunde && <p className="text-xs text-gray-600"><User className="w-3 h-3 inline mr-0.5" />{auftrag.kunde.vorname} {auftrag.kunde.nachname}</p>}
+          {zustaendig && (
+            <div className="flex items-center gap-1 mt-1">
+              <div className="w-4 h-4 rounded-full bg-indigo-600 flex items-center justify-center text-white text-[8px] font-bold flex-shrink-0">
+                {zustaendig.full_name.split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase()}
+              </div>
+              <span className="text-xs text-indigo-700 font-medium">{zustaendig.full_name.split(' ')[0]}</span>
+            </div>
+          )}
         </div>
         <Link href={`/fahrzeuge/${auftrag.id}`} onClick={e=>e.stopPropagation()} className="text-gray-300 hover:text-orange-500">
           <ChevronRight className="w-4 h-4" />
@@ -511,15 +524,21 @@ function AuftragCardFull({ auftrag, onStatusChange, overdue, accentColor }: {
   )
 }
 
-function AuftragCardCompact({ auftrag, onStatusChange, overdue }: {
-  auftrag: Auftrag; onStatusChange: (s: FahrzeugStatus) => void; overdue: boolean
+function AuftragCardCompact({ auftrag, onStatusChange, overdue, mitarbeiter }: {
+  auftrag: Auftrag; onStatusChange: (s: FahrzeugStatus) => void; overdue: boolean; mitarbeiter: any[]
 }) {
   const [showMenu, setShowMenu] = useState(false)
   const eigen = auftrag.fahrzeug?.fahrzeug_typ === 'eigen'
+  const zustaendig = mitarbeiter.find(m => m.id === (auftrag as any).zugewiesen_an)
   return (
     <div className="flex items-center gap-4">
-      <div className={cn('w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0', eigen ? 'bg-purple-100' : 'bg-blue-100')}>
+      <div className={cn('w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 relative', eigen ? 'bg-purple-100' : 'bg-blue-100')}>
         <Car className={cn('w-6 h-6', eigen ? 'text-purple-600' : 'text-blue-600')} />
+        {zustaendig && (
+          <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-indigo-600 flex items-center justify-center text-white text-[8px] font-bold border-2 border-white">
+            {zustaendig.full_name.split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase()}
+          </div>
+        )}
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1 flex-wrap">
