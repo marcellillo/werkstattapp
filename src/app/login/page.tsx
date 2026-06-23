@@ -37,7 +37,7 @@ export default function LoginPage() {
           <div className="mb-5">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/logo.avif"
+              src="/logo-v.avif"
               alt="Helios Automobile"
               width={220}
               height={80}

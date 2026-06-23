@@ -46,7 +46,7 @@ export function Sidebar() {
       <div className="flex items-center justify-center px-6 py-4 border-b border-gray-700">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src="/logo.avif"
+          src="/logo-v.avif"
           alt="Helios Automobile"
           width={160}
           height={56}
