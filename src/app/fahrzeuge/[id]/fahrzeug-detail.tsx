@@ -1,0 +1,655 @@
+'use client'
+import { useState, useEffect, useRef, useMemo } from 'react'
+import Link from 'next/link'
+import { ArrowLeft, Car, User, Wrench, Package, Calendar, Plus, Trash2, CheckCircle, Clock, ShieldCheck, Search, Printer, Receipt } from 'lucide-react'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { cn, formatDate, formatDateTime } from '@/lib/utils'
+import {
+  type Auftrag, type Hebebuehne, type Ersatzteil,
+  type FahrzeugStatus, type TeilStatus,
+  FAHRZEUG_STATUS_LABEL, FAHRZEUG_STATUS_COLOR,
+  TEIL_STATUS_LABEL, TEIL_STATUS_COLOR,
+} from '@/types/database'
+import { createClient } from '@/lib/supabase/client'
+
+interface Props {
+  auftrag: Auftrag
+  hebebuehnen: Hebebuehne[]
+  historie: any[]
+}
+
+const STATUS_ORDER: FahrzeugStatus[] = [
+  'angenommen', 'diagnose', 'reparatur', 'warten_teile', 'fertig', 'ausgeliefert'
+]
+
+const TEIL_STATUS_ORDER: TeilStatus[] = [
+  'nicht_bestellt', 'bestellt', 'unterwegs', 'geliefert', 'eingebaut'
+]
+
+interface TeilVorschlag {
+  bezeichnung: string
+  teilenummer: string | null
+  lieferant: string | null
+  einzelpreis: number | null
+}
+
+export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie }: Props) {
+  const [auftrag, setAuftrag] = useState(initialAuftrag)
+  const [teile, setTeile] = useState<Ersatzteil[]>((initialAuftrag.ersatzteile as Ersatzteil[]) ?? [])
+  const [saving, setSaving] = useState(false)
+  const [newTeil, setNewTeil] = useState({ bezeichnung: '', teilenummer: '', lieferant: '', menge: 1, einzelpreis: '' })
+  const [showAddTeil, setShowAddTeil] = useState(false)
+  const [teilVorschlaege, setTeilVorschlaege] = useState<TeilVorschlag[]>([])
+  const [suchbegriff, setSuchbegriff] = useState('')
+  const [showVorschlaege, setShowVorschlaege] = useState(false)
+  const suchRef = useRef<HTMLDivElement>(null)
+  const [arbeiten, setArbeiten] = useState(initialAuftrag.arbeiten ?? '')
+  const [fertigDatum, setFertigDatum] = useState(initialAuftrag.geplante_fertigstellung ?? '')
+  const [tuevKandidat, setTuevKandidat] = useState(initialAuftrag.tuev_kandidat ?? false)
+  const [tuevTermin, setTuevTermin] = useState(initialAuftrag.tuev_termin ?? '')
+  const [tuevErgebnis, setTuevErgebnis] = useState(initialAuftrag.tuev_ergebnis ?? '')
+  const supabase = createClient()
+
+  // Lade bekannte Teile aus der DB für Autocomplete
+  useEffect(() => {
+    supabase
+      .from('ersatzteile')
+      .select('bezeichnung, teilenummer, lieferant, einzelpreis')
+      .order('bezeichnung')
+      .then(({ data }) => {
+        if (!data) return
+        // Deduplizieren nach Bezeichnung+Teilenummer, neuester Preis gewinnt
+        const map = new Map<string, TeilVorschlag>()
+        for (const t of data) {
+          const key = `${t.bezeichnung}||${t.teilenummer ?? ''}`
+          if (!map.has(key)) map.set(key, t as TeilVorschlag)
+        }
+        setTeilVorschlaege(Array.from(map.values()))
+      })
+  }, [])
+
+  // Klick außerhalb schließt Vorschlagsliste
+  useEffect(() => {
+    function onClickOutside(e: MouseEvent) {
+      if (suchRef.current && !suchRef.current.contains(e.target as Node)) {
+        setShowVorschlaege(false)
+      }
+    }
+    document.addEventListener('mousedown', onClickOutside)
+    return () => document.removeEventListener('mousedown', onClickOutside)
+  }, [])
+
+  const gefilterteVorschlaege = useMemo(() => {
+    if (!suchbegriff.trim()) return teilVorschlaege.slice(0, 8)
+    const q = suchbegriff.toLowerCase()
+    return teilVorschlaege
+      .filter(t =>
+        t.bezeichnung.toLowerCase().includes(q) ||
+        (t.teilenummer ?? '').toLowerCase().includes(q) ||
+        (t.lieferant ?? '').toLowerCase().includes(q)
+      )
+      .slice(0, 10)
+  }, [suchbegriff, teilVorschlaege])
+
+  function vorschlagWaehlen(v: TeilVorschlag) {
+    setNewTeil(p => ({
+      ...p,
+      bezeichnung: v.bezeichnung,
+      teilenummer: v.teilenummer ?? '',
+      lieferant: v.lieferant ?? '',
+      einzelpreis: v.einzelpreis != null ? String(v.einzelpreis) : '',
+    }))
+    setSuchbegriff(v.bezeichnung)
+    setShowVorschlaege(false)
+  }
+
+  async function saveArbeiten() {
+    setSaving(true)
+    await supabase.from('auftraege').update({ arbeiten, geplante_fertigstellung: fertigDatum || null }).eq('id', auftrag.id)
+    setSaving(false)
+  }
+
+  async function saveTuev() {
+    await supabase.from('auftraege').update({
+      tuev_kandidat: tuevKandidat,
+      tuev_termin: tuevTermin || null,
+      tuev_ergebnis: tuevErgebnis || null,
+    }).eq('id', auftrag.id)
+  }
+
+  async function handleStatusChange(status: FahrzeugStatus) {
+    setAuftrag(a => ({ ...a, status }))
+    await supabase.from('auftraege').update({ status }).eq('id', auftrag.id)
+  }
+
+  async function handleBuehneChange(hebebuehne_id: string) {
+    const hebebuehne = hebebuehnen.find(h => h.id === hebebuehne_id) ?? undefined
+    setAuftrag(a => ({ ...a, hebebuehne_id: hebebuehne_id || undefined, hebebuehne }))
+    await supabase.from('auftraege').update({
+      hebebuehne_id: hebebuehne_id || null
+    }).eq('id', auftrag.id)
+  }
+
+  async function handleTeilStatusChange(teilId: string, status: TeilStatus) {
+    setTeile(prev => prev.map(t => t.id === teilId ? { ...t, status } : t))
+    await supabase.from('ersatzteile').update({ status }).eq('id', teilId)
+  }
+
+  async function handleAddTeil() {
+    if (!newTeil.bezeichnung.trim()) return
+    const insert = {
+      auftrag_id: auftrag.id,
+      bezeichnung: newTeil.bezeichnung,
+      teilenummer: newTeil.teilenummer || null,
+      lieferant: newTeil.lieferant || null,
+      menge: newTeil.menge,
+      einzelpreis: newTeil.einzelpreis ? parseFloat(newTeil.einzelpreis) : null,
+      status: 'nicht_bestellt' as TeilStatus,
+    }
+    const { data } = await supabase.from('ersatzteile').insert(insert).select().single()
+    if (data) {
+      setTeile(prev => [...prev, data as Ersatzteil])
+      setNewTeil({ bezeichnung: '', teilenummer: '', lieferant: '', menge: 1, einzelpreis: '' })
+      setSuchbegriff('')
+      setShowAddTeil(false)
+    }
+  }
+
+  async function handleDeleteTeil(teilId: string) {
+    setTeile(prev => prev.filter(t => t.id !== teilId))
+    await supabase.from('ersatzteile').delete().eq('id', teilId)
+  }
+
+  const fahrzeug = auftrag.fahrzeug
+  const kunde = auftrag.kunde
+  const overdue = auftrag.geplante_fertigstellung &&
+    auftrag.geplante_fertigstellung < new Date().toISOString().split('T')[0] &&
+    !['fertig', 'ausgeliefert'].includes(auftrag.status)
+
+  return (
+    <div className="space-y-6 max-w-6xl">
+      {/* Back + Header */}
+      <div className="flex items-center justify-between gap-4">
+        <Link href="/fahrzeuge">
+          <Button variant="ghost" size="sm" className="gap-2">
+            <ArrowLeft className="w-4 h-4" /> Zurück
+          </Button>
+        </Link>
+        <div className="flex items-center gap-2">
+          <Link href={`/fahrzeuge/${auftrag.id}/protokoll`} target="_blank">
+            <Button variant="outline" size="sm" className="gap-2">
+              <Printer className="w-4 h-4" /> Protokoll
+            </Button>
+          </Link>
+          <Link href={`/fahrzeuge/${auftrag.id}/rechnung`} target="_blank">
+            <Button variant="outline" size="sm" className="gap-2 border-green-200 text-green-700 hover:border-green-400 hover:bg-green-50">
+              <Receipt className="w-4 h-4" /> Rechnung
+            </Button>
+          </Link>
+        </div>
+      </div>
+
+      <div className="flex flex-col lg:flex-row lg:items-start gap-6">
+        {/* Left column */}
+        <div className="flex-1 space-y-4">
+          {/* Vehicle Info Card */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Car className="w-5 h-5 text-orange-500" />
+                Fahrzeugdaten
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {(() => {
+                const urls: string[] = (() => { try { return (fahrzeug as any)?.bilder_urls ? JSON.parse((fahrzeug as any).bilder_urls) : [] } catch { return [] } })()
+                if (urls.length === 0) return null
+                return (
+                  <div className="mb-4">
+                    <div className="rounded-xl overflow-hidden h-52 bg-gray-100 mb-2">
+                      <img src={urls[0]} alt="Fahrzeug" className="w-full h-full object-cover" />
+                    </div>
+                    {urls.length > 1 && (
+                      <div className="flex gap-2 overflow-x-auto pb-1">
+                        {urls.slice(1).map((url, i) => (
+                          <img key={i} src={url} alt="" className="h-16 w-24 object-cover rounded-lg flex-shrink-0 border border-gray-200" />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
+              <div className="flex items-center gap-4 mb-4">
+                {!(fahrzeug as any)?.bilder_urls && (
+                <div className={`w-16 h-16 rounded-xl flex items-center justify-center ${(fahrzeug as any)?.fahrzeug_typ === 'eigen' ? 'bg-purple-100' : 'bg-orange-100'}`}>
+                  <Car className={`w-8 h-8 ${(fahrzeug as any)?.fahrzeug_typ === 'eigen' ? 'text-purple-500' : 'text-orange-500'}`} />
+                </div>
+                )}
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-xl font-bold text-gray-900">
+                      {fahrzeug?.marke} {fahrzeug?.modell}
+                    </h2>
+                    {(fahrzeug as any)?.fahrzeug_typ === 'eigen' && (
+                      <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">Eigenfahrzeug</span>
+                    )}
+                  </div>
+                  <p className="text-lg font-mono text-gray-600">{fahrzeug?.kennzeichen}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm text-gray-600">{auftrag.auftrag_nr}</p>
+                    {(fahrzeug as any)?.mobile_de_id && (
+                      <span className="text-sm font-mono text-purple-600">{(fahrzeug as any).mobile_de_id}</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                {fahrzeug?.baujahr && (
+                  <div>
+                    <p className="text-gray-600 text-xs">Baujahr</p>
+                    <p className="font-medium">{fahrzeug.baujahr}</p>
+                  </div>
+                )}
+                {fahrzeug?.kilometerstand && (
+                  <div>
+                    <p className="text-gray-600 text-xs">Kilometerstand</p>
+                    <p className="font-medium">{fahrzeug.kilometerstand.toLocaleString('de-DE')} km</p>
+                  </div>
+                )}
+                {(fahrzeug as any)?.farbe && (
+                  <div>
+                    <p className="text-gray-600 text-xs">Farbe</p>
+                    <p className="font-medium">{(fahrzeug as any).farbe}</p>
+                  </div>
+                )}
+                {(fahrzeug as any)?.motortyp && (
+                  <div>
+                    <p className="text-gray-600 text-xs">Kraftstoff</p>
+                    <p className="font-medium">{(fahrzeug as any).motortyp}</p>
+                  </div>
+                )}
+                {(fahrzeug as any)?.leistung_kw && (
+                  <div>
+                    <p className="text-gray-600 text-xs">Leistung</p>
+                    <p className="font-medium">{(fahrzeug as any).leistung_kw} kW ({Math.round((fahrzeug as any).leistung_kw * 1.35962)} PS)</p>
+                  </div>
+                )}
+                {(fahrzeug as any)?.hubraum && (
+                  <div>
+                    <p className="text-gray-600 text-xs">Hubraum</p>
+                    <p className="font-medium">{parseInt((fahrzeug as any).hubraum).toLocaleString('de-DE')} ccm</p>
+                  </div>
+                )}
+                {fahrzeug?.fahrgestellnummer && (
+                  <div className="col-span-2">
+                    <p className="text-gray-600 text-xs">Fahrgestellnummer</p>
+                    <p className="font-mono text-xs">{fahrzeug.fahrgestellnummer}</p>
+                  </div>
+                )}
+                {(fahrzeug as any)?.notizen && (fahrzeug as any).fahrzeug_typ === 'eigen' && (
+                  <div className="col-span-2 bg-purple-50 rounded-lg px-3 py-2">
+                    <p className="text-purple-700 text-sm font-medium">{(fahrzeug as any).notizen}</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Customer Card */}
+          {kunde && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <User className="w-5 h-5 text-blue-500" />
+                  Kunde
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="text-sm space-y-1">
+                <p className="font-medium text-gray-900">{kunde.vorname} {kunde.nachname}</p>
+                {kunde.firma && <p className="text-gray-800">{kunde.firma}</p>}
+                {kunde.telefon && <p className="text-gray-800">📞 {kunde.telefon}</p>}
+                {kunde.mobil && <p className="text-gray-800">📱 {kunde.mobil}</p>}
+                {kunde.ort && <p className="text-gray-800">📍 {kunde.ort}</p>}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Work Description */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Wrench className="w-5 h-5 text-gray-800" />
+                Durchzuführende Arbeiten
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <textarea
+                value={arbeiten}
+                onChange={e => setArbeiten(e.target.value)}
+                placeholder="Beschreibung der Arbeiten..."
+                rows={4}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-orange-400"
+              />
+              <div className="flex items-center gap-3">
+                <div className="flex-1">
+                  <label className="text-xs text-gray-800 mb-1 block">Geplante Fertigstellung</label>
+                  <input
+                    type="date"
+                    value={fertigDatum}
+                    onChange={e => setFertigDatum(e.target.value)}
+                    className={cn(
+                      'w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400',
+                      overdue ? 'border-red-300 bg-red-50' : 'border-gray-200'
+                    )}
+                  />
+                </div>
+                <Button
+                  onClick={saveArbeiten}
+                  disabled={saving}
+                  className="bg-orange-600 hover:bg-orange-700 text-white mt-5"
+                >
+                  {saving ? 'Speichern...' : 'Speichern'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Parts */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Package className="w-5 h-5 text-yellow-500" />
+                Ersatzteile ({teile.length})
+              </CardTitle>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setShowAddTeil(v => !v)}
+                className="gap-1"
+              >
+                <Plus className="w-4 h-4" /> Teil hinzufügen
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {/* Add form */}
+              {showAddTeil && (
+                <div className="bg-gray-50 rounded-lg p-3 space-y-2 border border-gray-200">
+                  {/* Suchfeld mit Autocomplete */}
+                  <div ref={suchRef} className="relative col-span-2">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+                      <input
+                        placeholder="Teil suchen oder neu eingeben…"
+                        value={suchbegriff}
+                        onChange={e => {
+                          setSuchbegriff(e.target.value)
+                          setNewTeil(p => ({ ...p, bezeichnung: e.target.value }))
+                          setShowVorschlaege(true)
+                        }}
+                        onFocus={() => setShowVorschlaege(true)}
+                        className="w-full pl-8 pr-3 py-2 border border-orange-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
+                      />
+                    </div>
+                    {showVorschlaege && gefilterteVorschlaege.length > 0 && (
+                      <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+                        {gefilterteVorschlaege.map((v, i) => (
+                          <button
+                            key={i}
+                            type="button"
+                            onMouseDown={() => vorschlagWaehlen(v)}
+                            className="w-full text-left px-3 py-2.5 hover:bg-orange-50 border-b border-gray-50 last:border-0 transition-colors"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium text-gray-900 truncate">{v.bezeichnung}</p>
+                                <p className="text-xs text-gray-500 mt-0.5">
+                                  {v.teilenummer && <span className="font-mono">{v.teilenummer}</span>}
+                                  {v.teilenummer && v.lieferant && <span> · </span>}
+                                  {v.lieferant && <span>{v.lieferant}</span>}
+                                </p>
+                              </div>
+                              {v.einzelpreis != null && (
+                                <span className="text-sm font-semibold text-orange-700 flex-shrink-0">
+                                  {v.einzelpreis.toFixed(2)} €
+                                </span>
+                              )}
+                            </div>
+                          </button>
+                        ))}
+                        {!suchbegriff.trim() && teilVorschlaege.length > 8 && (
+                          <p className="text-xs text-gray-400 px-3 py-2 text-center">
+                            {teilVorschlaege.length - 8} weitere — tippen zum Filtern
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      placeholder="Teilenummer"
+                      value={newTeil.teilenummer}
+                      onChange={e => setNewTeil(p => ({ ...p, teilenummer: e.target.value }))}
+                      className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                    />
+                    <input
+                      placeholder="Lieferant"
+                      value={newTeil.lieferant}
+                      onChange={e => setNewTeil(p => ({ ...p, lieferant: e.target.value }))}
+                      className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                    />
+                    <input
+                      type="number"
+                      placeholder="Menge"
+                      value={newTeil.menge}
+                      min={1}
+                      onChange={e => setNewTeil(p => ({ ...p, menge: parseInt(e.target.value) || 1 }))}
+                      className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                    />
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder="Einzelpreis (€)"
+                      value={newTeil.einzelpreis}
+                      onChange={e => setNewTeil(p => ({ ...p, einzelpreis: e.target.value }))}
+                      className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button onClick={handleAddTeil} size="sm" className="bg-orange-600 hover:bg-orange-700 text-white">Hinzufügen</Button>
+                    <Button onClick={() => { setShowAddTeil(false); setSuchbegriff(''); setNewTeil({ bezeichnung: '', teilenummer: '', lieferant: '', menge: 1, einzelpreis: '' }) }} size="sm" variant="ghost">Abbrechen</Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Parts list */}
+              {teile.length === 0 && !showAddTeil ? (
+                <div className="text-center py-8 text-gray-600">
+                  <Package className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                  <p className="text-sm">Keine Teile erfasst</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {teile.map(teil => (
+                    <div key={teil.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-100">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900 truncate">{teil.bezeichnung}</p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          {teil.teilenummer && (
+                            <span className="text-xs text-gray-600 font-mono">{teil.teilenummer}</span>
+                          )}
+                          {teil.lieferant && (
+                            <span className="text-xs text-gray-600">• {teil.lieferant}</span>
+                          )}
+                          <span className="text-xs text-gray-600">• {teil.menge}x</span>
+                          {teil.einzelpreis && (
+                            <span className="text-xs text-gray-600">• {(teil.einzelpreis * teil.menge).toFixed(2)} €</span>
+                          )}
+                        </div>
+                      </div>
+                      <select
+                        value={teil.status}
+                        onChange={e => handleTeilStatusChange(teil.id, e.target.value as TeilStatus)}
+                        className={cn(
+                          'text-xs px-2.5 py-1.5 rounded-full border font-medium focus:outline-none cursor-pointer',
+                          TEIL_STATUS_COLOR[teil.status as TeilStatus]
+                        )}
+                      >
+                        {TEIL_STATUS_ORDER.map(s => (
+                          <option key={s} value={s}>{TEIL_STATUS_LABEL[s]}</option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={() => handleDeleteTeil(teil.id)}
+                        className="p-1 text-gray-300 hover:text-red-500 transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Right column */}
+        <div className="lg:w-72 space-y-4">
+          {/* Status */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Arbeitsstatus</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {STATUS_ORDER.map(s => (
+                <button
+                  key={s}
+                  onClick={() => handleStatusChange(s)}
+                  className={cn(
+                    'flex w-full items-center gap-3 px-3 py-2.5 rounded-lg border text-sm font-medium transition-all',
+                    auftrag.status === s
+                      ? cn(FAHRZEUG_STATUS_COLOR[s], 'border-current shadow-sm')
+                      : 'bg-gray-50 text-gray-800 border-gray-100 hover:border-gray-300'
+                  )}
+                >
+                  {auftrag.status === s ? (
+                    <CheckCircle className="w-4 h-4 flex-shrink-0" />
+                  ) : (
+                    <Clock className="w-4 h-4 flex-shrink-0 opacity-40" />
+                  )}
+                  {FAHRZEUG_STATUS_LABEL[s]}
+                </button>
+              ))}
+            </CardContent>
+          </Card>
+
+          {/* Bay Assignment */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Hebebühne</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <select
+                value={auftrag.hebebuehne_id ?? ''}
+                onChange={e => handleBuehneChange(e.target.value)}
+                className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-400"
+              >
+                <option value="">— Keine Bühne —</option>
+                {hebebuehnen.map(h => (
+                  <option key={h.id} value={h.id}>{h.bezeichnung}</option>
+                ))}
+              </select>
+              {auftrag.hebebuehne && (
+                <p className="text-xs text-gray-800 mt-2">
+                  Zugewiesen: <span className="font-medium">{auftrag.hebebuehne.bezeichnung}</span>
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* TÜV */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <ShieldCheck className="w-5 h-5 text-green-600" />
+                TÜV
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={tuevKandidat}
+                  onChange={e => setTuevKandidat(e.target.checked)}
+                  className="w-4 h-4 rounded border-gray-300 text-green-600"
+                />
+                <span className="text-sm font-medium text-gray-700">TÜV-Kandidat</span>
+              </label>
+              <div>
+                <label className="text-xs text-gray-800 mb-1 block">TÜV-Termin</label>
+                <input
+                  type="date"
+                  value={tuevTermin}
+                  onChange={e => setTuevTermin(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-800 mb-1 block">TÜV-Ergebnis</label>
+                <select
+                  value={tuevErgebnis}
+                  onChange={e => setTuevErgebnis(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+                >
+                  <option value="">— Ausstehend —</option>
+                  <option value="bestanden">✅ Bestanden</option>
+                  <option value="maengel">⚠️ Mängel</option>
+                  <option value="nicht_bestanden">❌ Nicht bestanden</option>
+                </select>
+              </div>
+              <Button onClick={saveTuev} size="sm" className="w-full bg-green-600 hover:bg-green-700 text-white">
+                TÜV speichern
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* History */}
+          {historie.length > 0 && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Statusverlauf</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {historie.map((h: any) => (
+                  <div key={h.id} className="text-xs text-gray-800">
+                    <div className="flex items-center gap-1">
+                      {h.status_alt && (
+                        <>
+                          <span className={cn(
+                            'inline-flex px-1.5 py-0.5 rounded text-xs border',
+                            FAHRZEUG_STATUS_COLOR[h.status_alt as FahrzeugStatus]
+                          )}>
+                            {FAHRZEUG_STATUS_LABEL[h.status_alt as FahrzeugStatus] ?? h.status_alt}
+                          </span>
+                          <span>→</span>
+                        </>
+                      )}
+                      <span className={cn(
+                        'inline-flex px-1.5 py-0.5 rounded text-xs border',
+                        FAHRZEUG_STATUS_COLOR[h.status_neu as FahrzeugStatus]
+                      )}>
+                        {FAHRZEUG_STATUS_LABEL[h.status_neu as FahrzeugStatus] ?? h.status_neu}
+                      </span>
+                    </div>
+                    <p className="text-gray-600 mt-0.5">{formatDateTime(h.erstellt_am)}</p>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
