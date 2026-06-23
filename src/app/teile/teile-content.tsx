@@ -160,7 +160,7 @@ export function TeileContent({ teile: initialTeile }: { teile: any[] }) {
                     <td className="px-4 py-3.5 hidden xl:table-cell">
                       <span className="text-sm text-gray-600">
                         {teil.menge}x
-                        {teil.einzelpreis && ` · ${(teil.einzelpreis * teil.menge).toFixed(2)} â‚¬`}
+                        {teil.einzelpreis && ` · ${(teil.einzelpreis * teil.menge).toLocaleString('de-DE', { minimumFractionDigits: 2 })} €`}
                       </span>
                     </td>
                     <td className="px-4 py-3.5">
