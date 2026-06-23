@@ -16,6 +16,7 @@ export type FahrzeugStatus =
   | 'warten_teile'
   | 'fertig'
   | 'ausgeliefert'
+  | 'storniert'
 
 export type TeilStatus =
   | 'nicht_bestellt'
@@ -196,6 +197,7 @@ export const FAHRZEUG_STATUS_LABEL: Record<FahrzeugStatus, string> = {
   warten_teile: 'Warten auf Teile',
   fertig: 'Fertig',
   ausgeliefert: 'Ausgeliefert',
+  storniert: 'Storniert',
 }
 
 export const FAHRZEUG_STATUS_COLOR: Record<FahrzeugStatus, string> = {
@@ -205,6 +207,7 @@ export const FAHRZEUG_STATUS_COLOR: Record<FahrzeugStatus, string> = {
   warten_teile: 'bg-yellow-100 text-yellow-700 border-yellow-300',
   fertig: 'bg-green-100 text-green-700 border-green-300',
   ausgeliefert: 'bg-purple-100 text-purple-700 border-purple-300',
+  storniert: 'bg-red-100 text-red-700 border-red-300',
 }
 
 export const TEIL_STATUS_LABEL: Record<TeilStatus, string> = {

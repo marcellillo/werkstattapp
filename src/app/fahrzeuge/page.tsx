@@ -12,6 +12,7 @@ export default async function FahrzeugePage() {
     supabase
       .from('auftraege')
       .select(`*, fahrzeug:fahrzeuge(*), kunde:kunden(*), ersatzteile(*)`)
+      .neq('status', 'storniert')
       .order('erstellt_am', { ascending: false }),
     supabase.from('hebebuehnen').select('*').order('nummer'),
   ])

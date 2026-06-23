@@ -26,7 +26,7 @@ export default async function HebebuehnenPage() {
       .from('auftraege')
       .select('*, fahrzeug:fahrzeuge(*), kunde:kunden(vorname, nachname, firma), ersatzteile(*)')
       .not('hebebuehne_id', 'is', null)
-      .not('status', 'in', '("fertig","ausgeliefert")'),
+      .not('status', 'in', '("fertig","ausgeliefert","storniert")'),
   ])
 
   return (

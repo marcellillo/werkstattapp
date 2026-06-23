@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useRef, useMemo } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Car, User, Wrench, Package, Calendar, Plus, Trash2, CheckCircle, Clock, Circle, ChevronRight, ShieldCheck, Search, Printer, Receipt } from 'lucide-react'
+import { ArrowLeft, Car, User, Wrench, Package, Calendar, Plus, Trash2, CheckCircle, Clock, Circle, ChevronRight, ShieldCheck, Search, Printer, Receipt, Ban } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { cn, formatDate, formatDateTime } from '@/lib/utils'
@@ -51,6 +51,8 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie 
   const [tuevErgebnis, setTuevErgebnis] = useState(initialAuftrag.tuev_ergebnis ?? '')
   const [buehneWarnung, setBuehneWarnung] = useState<FahrzeugStatus | null>(null)
   const [buehneWahl, setBuehneWahl] = useState('')
+  const [storniereBestaetigung, setStorniereBestaetigung] = useState(false)
+  const [stornieren, setStornieren] = useState(false)
   const supabase = createClient()
 
   // Lade bekannte Teile aus der DB für Autocomplete
@@ -131,6 +133,25 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie 
     fetch('/api/benachrichtigungen/generieren', { method: 'POST' }).catch(() => {})
   }
 
+  async function handleStornieren() {
+    setStornieren(true)
+    // Teile zurück ins Lager (geliefert), außer nicht_bestellt
+    const teileZurueck = teile.filter(t => t.status !== 'nicht_bestellt')
+    if (teileZurueck.length > 0) {
+      await supabase.from('ersatzteile')
+        .update({ status: 'geliefert' })
+        .in('id', teileZurueck.map(t => t.id))
+      setTeile(prev => prev.map(t => t.status !== 'nicht_bestellt' ? { ...t, status: 'geliefert' } : t))
+    }
+    // Auftrag stornieren + Bühne freigeben
+    await supabase.from('auftraege')
+      .update({ status: 'storniert', hebebuehne_id: null })
+      .eq('id', auftrag.id)
+    setAuftrag(a => ({ ...a, status: 'storniert', hebebuehne_id: undefined, hebebuehne: undefined }))
+    setStorniereBestaetigung(false)
+    setStornieren(false)
+  }
+
   async function handleBuehneUndStatus(hebebuehne_id: string) {
     if (!hebebuehne_id || !buehneWarnung) return
     const hebebuehne = hebebuehnen.find(h => h.id === hebebuehne_id) ?? undefined
@@ -194,6 +215,19 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie 
           </Button>
         </Link>
         <div className="flex items-center gap-2">
+          {auftrag.status === 'storniert' && (
+            <span className="flex items-center gap-1.5 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 px-3 py-1.5 rounded-lg">
+              <Ban className="w-3.5 h-3.5" /> Storniert
+            </span>
+          )}
+          {auftrag.status !== 'storniert' && (
+            <button
+              onClick={() => setStorniereBestaetigung(true)}
+              className="flex items-center gap-1.5 text-xs font-medium text-red-600 hover:text-red-700 hover:bg-red-50 border border-red-200 hover:border-red-300 px-3 py-1.5 rounded-lg transition-colors"
+            >
+              <Ban className="w-3.5 h-3.5" /> Stornieren
+            </button>
+          )}
           <Link href={`/fahrzeuge/${auftrag.id}/protokoll`} target="_blank">
             <Button variant="outline" size="sm" className="gap-2">
               <Printer className="w-4 h-4" /> Protokoll
@@ -206,6 +240,46 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie 
           </Link>
         </div>
       </div>
+
+      {/* Stornieren-Bestätigung */}
+      {storniereBestaetigung && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
+                <Ban className="w-5 h-5 text-red-600" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-900">Auftrag stornieren?</h3>
+                <p className="text-sm text-gray-500">Das kann rückgängig gemacht werden.</p>
+              </div>
+            </div>
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-sm text-amber-800 space-y-1">
+              <p className="font-medium">Folgendes passiert:</p>
+              <p>• Der Auftrag wird als <strong>Storniert</strong> markiert</p>
+              <p>• Die Bühne wird <strong>freigegeben</strong></p>
+              {teile.filter(t => t.status !== 'nicht_bestellt').length > 0 && (
+                <p>• <strong>{teile.filter(t => t.status !== 'nicht_bestellt').length} Teile</strong> kommen zurück ins Lager</p>
+              )}
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setStorniereBestaetigung(false)}
+                className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                Abbrechen
+              </button>
+              <button
+                onClick={handleStornieren}
+                disabled={stornieren}
+                className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 disabled:opacity-50 rounded-xl text-sm font-medium text-white transition-colors"
+              >
+                {stornieren ? 'Wird storniert…' : 'Ja, stornieren'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-col lg:flex-row lg:items-start gap-6">
         {/* Left column */}

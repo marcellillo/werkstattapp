@@ -19,6 +19,7 @@ export default async function DashboardPage() {
       .from('auftraege')
       .select(`*, fahrzeug:fahrzeuge(*), kunde:kunden(*), ersatzteile(*)`)
       .not('status', 'eq', 'ausgeliefert')
+      .not('status', 'eq', 'storniert')
       .order('erstellt_am', { ascending: false }),
     supabase.from('termine').select('*, kunde:kunden(vorname,nachname), fahrzeug:fahrzeuge(kennzeichen,marke,modell)').gte('datum', new Date().toISOString().split('T')[0]).not('status', 'eq', 'abgesagt').order('datum').order('uhrzeit').limit(20),
     supabase.from('fahrzeuge').select('*', { count: 'exact', head: true }).eq('fahrzeug_typ', 'eigen'),
