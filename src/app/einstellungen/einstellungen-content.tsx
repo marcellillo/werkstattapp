@@ -33,13 +33,7 @@ export function EinstellungenContent({ initialConfig, profile, userEmail }: {
   profile: any
   userEmail: string
 }) {
-  const [config, setConfig] = useState<Config>({
-    firma_name: '', firma_strasse: '', firma_plz: '', firma_ort: '',
-    firma_telefon: '', firma_email: '', firma_ust_id: '', firma_steuernummer: '',
-    firma_iban: '', firma_bic: '', firma_bank: '', firma_stundensatz: '',
-    firma_kleinunternehmer: 'nein', firma_logo: '',
-    ...initialConfig,
-  })
+  const [config, setConfig] = useState<Config>(initialConfig)
   const [logoUploading, setLogoUploading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
