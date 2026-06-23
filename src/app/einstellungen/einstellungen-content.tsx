@@ -495,7 +495,7 @@ export function EinstellungenContent({ initialConfig, profile, userEmail }: {
                 <thead>
                   <tr className="border-b border-gray-200">
                     <th className="text-left py-2 pr-4 text-xs font-semibold text-gray-700 w-40">Bereich</th>
-                    {(['admin', 'werkstattmeister', 'mechaniker'] as Rolle[]).map(r => (
+                    {(['admin', 'werkstattmeister', 'mechaniker', 'buchhalter'] as Rolle[]).map(r => (
                       <th key={r} className="text-center py-2 px-3 text-xs font-semibold text-gray-700 capitalize">{r}</th>
                     ))}
                   </tr>
@@ -519,7 +519,7 @@ export function EinstellungenContent({ initialConfig, profile, userEmail }: {
                   ]).map(({ key, label }) => (
                     <tr key={key} className="border-b border-gray-50 hover:bg-gray-50/50">
                       <td className="py-2.5 pr-4 text-sm text-gray-700 font-medium">{label}</td>
-                      {(['admin', 'werkstattmeister', 'mechaniker'] as Rolle[]).map(rolle => {
+                      {(['admin', 'werkstattmeister', 'mechaniker', 'buchhalter'] as Rolle[]).map(rolle => {
                         const checked = (rollenBerechtigungen[rolle] ?? []).includes(key)
                         const isAdmin = rolle === 'admin'
                         return (

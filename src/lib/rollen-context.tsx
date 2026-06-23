@@ -2,7 +2,7 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
-export type Rolle = 'admin' | 'werkstattmeister' | 'mechaniker'
+export type Rolle = 'admin' | 'werkstattmeister' | 'mechaniker' | 'buchhalter'
 
 export const DEFAULT_BERECHTIGUNGEN: Record<Rolle, string[]> = {
   admin: [
@@ -16,6 +16,9 @@ export const DEFAULT_BERECHTIGUNGEN: Record<Rolle, string[]> = {
   ],
   mechaniker: [
     'dashboard', 'hebebuehnen', 'fahrzeuge', 'termine', 'teile', 'benachrichtigungen',
+  ],
+  buchhalter: [
+    'dashboard', 'buchhaltung', 'rechnungen', 'statistiken', 'benachrichtigungen',
   ],
 }
 
