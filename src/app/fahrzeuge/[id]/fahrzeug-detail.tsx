@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useRef, useMemo } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Car, User, Wrench, Package, Calendar, Plus, Trash2, CheckCircle, Clock, ShieldCheck, Search, Printer, Receipt } from 'lucide-react'
+import { ArrowLeft, Car, User, Wrench, Package, Calendar, Plus, Trash2, CheckCircle, Clock, Circle, ChevronRight, ShieldCheck, Search, Printer, Receipt } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { cn, formatDate, formatDateTime } from '@/lib/utils'
@@ -520,6 +520,7 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie 
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base">Arbeitsstatus</CardTitle>
+              <p className="text-xs text-gray-500 mt-0.5">Status anklicken zum Ändern</p>
             </CardHeader>
             <CardContent className="space-y-2">
               {STATUS_ORDER.map(s => (
@@ -527,18 +528,19 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie 
                   key={s}
                   onClick={() => handleStatusChange(s)}
                   className={cn(
-                    'flex w-full items-center gap-3 px-3 py-2.5 rounded-lg border text-sm font-medium transition-all',
+                    'flex w-full items-center gap-3 px-3 py-2.5 rounded-lg border text-sm font-medium transition-all cursor-pointer',
                     auftrag.status === s
-                      ? cn(FAHRZEUG_STATUS_COLOR[s], 'border-current shadow-sm')
-                      : 'bg-gray-50 text-gray-800 border-gray-100 hover:border-gray-300'
+                      ? cn(FAHRZEUG_STATUS_COLOR[s], 'border-current shadow-sm ring-2 ring-offset-1 ring-current/30')
+                      : 'bg-gray-50 text-gray-500 border-gray-100 hover:bg-white hover:border-gray-400 hover:text-gray-900 hover:shadow-sm'
                   )}
                 >
                   {auftrag.status === s ? (
                     <CheckCircle className="w-4 h-4 flex-shrink-0" />
                   ) : (
-                    <Clock className="w-4 h-4 flex-shrink-0 opacity-40" />
+                    <Circle className="w-4 h-4 flex-shrink-0 opacity-30" />
                   )}
-                  {FAHRZEUG_STATUS_LABEL[s]}
+                  <span className="flex-1 text-left">{FAHRZEUG_STATUS_LABEL[s]}</span>
+                  {auftrag.status !== s && <ChevronRight className="w-3.5 h-3.5 opacity-30" />}
                 </button>
               ))}
             </CardContent>
@@ -575,6 +577,7 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie 
                 <ShieldCheck className="w-5 h-5 text-green-600" />
                 TÜV
               </CardTitle>
+              <p className="text-xs text-gray-500 mt-0.5">Termin buchen &amp; Prüfergebnis festhalten</p>
             </CardHeader>
             <CardContent className="space-y-3">
               <label className="flex items-center gap-2 cursor-pointer">
