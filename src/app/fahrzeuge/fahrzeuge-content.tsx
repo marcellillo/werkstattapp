@@ -3,7 +3,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
-import { Car, Search, Plus, ChevronRight, Package, Tag, Gauge, Palette, Fuel, ArrowUpDown } from 'lucide-react'
+import { Car, Search, Plus, ChevronRight, Package, Tag, Gauge, Palette, Fuel, ArrowUpDown, Wrench, Euro } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { cn, formatDate } from '@/lib/utils'
@@ -68,7 +68,7 @@ export function FahrzeugeContent({ auftraege }: { auftraege: Auftrag[] }) {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Fahrzeuge</h1>
           <p className="text-sm text-gray-800 mt-0.5">
-            {fremdAuftraege.length} Fremd · {eigenAuftraege.length} Eigen
+            {fremdAuftraege.length} Kunden · {eigenAuftraege.length} Lager
           </p>
         </div>
         <Link href="/fahrzeuge/neu">
@@ -88,7 +88,7 @@ export function FahrzeugeContent({ auftraege }: { auftraege: Auftrag[] }) {
             tab === 'fremd' ? 'bg-white text-orange-600 shadow-sm' : 'text-gray-600 hover:text-gray-800'
           )}
         >
-          Fremdfahrzeuge
+          Kundenfahrzeuge
           <span className="ml-1.5 text-xs bg-gray-200 text-gray-700 px-1.5 py-0.5 rounded-full">
             {fremdAuftraege.length}
           </span>
@@ -100,7 +100,7 @@ export function FahrzeugeContent({ auftraege }: { auftraege: Auftrag[] }) {
             tab === 'eigen' ? 'bg-white text-purple-600 shadow-sm' : 'text-gray-600 hover:text-gray-800'
           )}
         >
-          Eigenfahrzeuge
+          Lagerbestand
           <span className="ml-1.5 text-xs bg-gray-200 text-gray-700 px-1.5 py-0.5 rounded-full">
             {eigenAuftraege.length}
           </span>
@@ -286,8 +286,8 @@ export function FahrzeugeContent({ auftraege }: { auftraege: Auftrag[] }) {
           <Card>
             <CardContent className="py-16 text-center">
               <Car className="w-12 h-12 mx-auto mb-3 text-purple-200" />
-              <p className="text-gray-800">Keine Eigenfahrzeuge erfasst</p>
-              <p className="text-sm text-gray-600 mt-1">Lege ein neues Fahrzeug an und wähle "Eigenfahrzeug"</p>
+              <p className="text-gray-800">Kein Lagerbestand erfasst</p>
+              <p className="text-sm text-gray-600 mt-1">Lege ein neues Fahrzeug an und wähle "Eigenfahrzeug" (Lagerbestand)</p>
               <Link href="/fahrzeuge/neu">
                 <Button className="mt-4 bg-purple-600 hover:bg-purple-700 text-white">
                   <Plus className="w-4 h-4 mr-2" /> Eigenfahrzeug anlegen
@@ -300,9 +300,12 @@ export function FahrzeugeContent({ auftraege }: { auftraege: Auftrag[] }) {
             {filteredEigen.map(auftrag => {
               const fz = auftrag.fahrzeug as any
               const preisMatch = fz?.notizen?.match(/Verkaufspreis:\s*([\d.,]+)\s*€/)
-              const preis = preisMatch ? preisMatch[1] : null
+              const verkaufspreis = preisMatch ? preisMatch[1] : null
               const bilderUrls: string[] = (() => { try { return fz?.bilder_urls ? JSON.parse(fz.bilder_urls) : [] } catch { return [] } })()
               const hauptbild = bilderUrls[0] ?? null
+              const teile = (auftrag.ersatzteile ?? []) as any[]
+              const teileKosten = teile.reduce((s: number, t: any) => s + (t.einzelpreis ?? 0) * (t.menge ?? 1), 0)
+              const einnahmen: number = (auftrag as any).einnahmen ?? 0
 
               return (
                 <Link key={auftrag.id} href={`/fahrzeuge/${auftrag.id}`}>
@@ -313,70 +316,102 @@ export function FahrzeugeContent({ auftraege }: { auftraege: Auftrag[] }) {
                       </div>
                     )}
                     <div className="p-4">
-                    {/* Header */}
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        {!hauptbild && (
-                          <div className="w-9 h-9 bg-purple-100 rounded-lg flex items-center justify-center">
-                            <Car className="w-4 h-4 text-purple-500" />
+
+                      {/* Header */}
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          {!hauptbild && (
+                            <div className="w-9 h-9 bg-purple-100 rounded-lg flex items-center justify-center">
+                              <Car className="w-4 h-4 text-purple-500" />
+                            </div>
+                          )}
+                          <div>
+                            <p className="font-semibold text-gray-900 text-sm group-hover:text-purple-700 transition-colors">
+                              {fz?.marke} {fz?.modell}
+                            </p>
+                            {fz?.mobile_de_id && (
+                              <p className="text-xs font-mono text-purple-500">{fz.mobile_de_id}</p>
+                            )}
+                          </div>
+                        </div>
+                        <span className={cn(
+                          'text-xs font-semibold px-2 py-0.5 rounded-full border',
+                          FAHRZEUG_STATUS_COLOR[auftrag.status]
+                        )}>
+                          {FAHRZEUG_STATUS_LABEL[auftrag.status]}
+                        </span>
+                      </div>
+
+                      {/* Fahrzeugdaten */}
+                      <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs text-gray-600 mb-3">
+                        {fz?.baujahr && (
+                          <div className="flex items-center gap-1">
+                            <Tag className="w-3 h-3" />
+                            <span>{fz.baujahr}</span>
                           </div>
                         )}
-                        <div>
-                          <p className="font-semibold text-gray-900 text-sm group-hover:text-purple-700 transition-colors">
-                            {fz?.marke} {fz?.modell}
-                          </p>
-                          {fz?.mobile_de_id && (
-                            <p className="text-xs font-mono text-purple-500">{fz.mobile_de_id}</p>
+                        {fz?.kilometerstand && (
+                          <div className="flex items-center gap-1">
+                            <Gauge className="w-3 h-3" />
+                            <span>{fz.kilometerstand.toLocaleString('de-DE')} km</span>
+                          </div>
+                        )}
+                        {fz?.farbe && (
+                          <div className="flex items-center gap-1">
+                            <Palette className="w-3 h-3" />
+                            <span>{fz.farbe}</span>
+                          </div>
+                        )}
+                        {fz?.motortyp && (
+                          <div className="flex items-center gap-1">
+                            <Fuel className="w-3 h-3" />
+                            <span>{fz.motortyp}{fz.leistung_kw ? ` · ${fz.leistung_kw} kW` : ''}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Arbeiten */}
+                      {auftrag.arbeiten && (
+                        <div className="flex items-start gap-1.5 text-xs text-gray-600 mb-3 bg-gray-50 rounded-lg px-2.5 py-2">
+                          <Wrench className="w-3 h-3 mt-0.5 flex-shrink-0 text-gray-400" />
+                          <span className="line-clamp-2">{auftrag.arbeiten}</span>
+                        </div>
+                      )}
+
+                      {/* Kosten-Zeile */}
+                      {(einnahmen > 0 || teile.length > 0) && (
+                        <div className="flex items-center gap-3 mb-3 text-xs">
+                          {einnahmen > 0 && (
+                            <div className="flex items-center gap-1 text-purple-700 font-semibold">
+                              <Euro className="w-3 h-3" />
+                              <span>{einnahmen.toLocaleString('de-DE', { minimumFractionDigits: 2 })} Gesamtkosten</span>
+                            </div>
+                          )}
+                          {teile.length > 0 && (
+                            <div className="flex items-center gap-1 text-gray-500">
+                              <Package className="w-3 h-3" />
+                              <span>{teile.length} {teile.length === 1 ? 'Teil' : 'Teile'}</span>
+                              {teileKosten > 0 && (
+                                <span className="text-gray-400">· {teileKosten.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €</span>
+                              )}
+                            </div>
                           )}
                         </div>
-                      </div>
-                      <span className={cn(
-                        'text-xs font-semibold px-2 py-0.5 rounded-full border',
-                        FAHRZEUG_STATUS_COLOR[auftrag.status]
-                      )}>
-                        {FAHRZEUG_STATUS_LABEL[auftrag.status]}
-                      </span>
-                    </div>
+                      )}
 
-                    {/* Details */}
-                    <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs text-gray-600 mb-3">
-                      {fz?.baujahr && (
-                        <div className="flex items-center gap-1">
-                          <Tag className="w-3 h-3" />
-                          <span>{fz.baujahr}</span>
-                        </div>
-                      )}
-                      {fz?.kilometerstand && (
-                        <div className="flex items-center gap-1">
-                          <Gauge className="w-3 h-3" />
-                          <span>{fz.kilometerstand.toLocaleString('de-DE')} km</span>
-                        </div>
-                      )}
-                      {fz?.farbe && (
-                        <div className="flex items-center gap-1">
-                          <Palette className="w-3 h-3" />
-                          <span>{fz.farbe}</span>
-                        </div>
-                      )}
-                      {fz?.motortyp && (
-                        <div className="flex items-center gap-1">
-                          <Fuel className="w-3 h-3" />
-                          <span>{fz.motortyp}{fz.leistung_kw ? ` · ${fz.leistung_kw} kW` : ''}</span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Kennzeichen + Preis */}
-                    <div className="flex items-center justify-between pt-3 border-t border-gray-100">
-                      <span className="text-xs font-mono text-gray-500">
-                        {fz?.kennzeichen || 'Kein KZ'}
-                      </span>
-                      {preis && (
-                        <span className="text-sm font-bold text-purple-700">
-                          {preis} €
+                      {/* Kennzeichen + Verkaufspreis */}
+                      <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+                        <span className="text-xs font-mono text-gray-500">
+                          {fz?.kennzeichen || 'Kein KZ'}
                         </span>
-                      )}
-                    </div>
+                        {verkaufspreis && (
+                          <div className="text-right">
+                            <p className="text-[10px] text-gray-400 leading-none mb-0.5">Verkaufspreis</p>
+                            <p className="text-sm font-bold text-purple-700">{verkaufspreis} €</p>
+                          </div>
+                        )}
+                      </div>
+
                     </div>{/* /p-4 */}
                   </div>
                 </Link>

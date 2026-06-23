@@ -3,13 +3,14 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Car, Users, Package, Calendar,
-  Bell, Settings, LogOut, Wrench, ChevronRight, BarChart2,
+  Bell, Settings, LogOut, ChevronRight, BarChart2,
   Mail, CalendarClock, Layers, Receipt, History, BookOpen
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { useRollen } from '@/lib/rollen-context'
+import Image from 'next/image'
 
 const navItems = [
   { href: '/dashboard',         label: 'Dashboard',        icon: LayoutDashboard, key: 'dashboard' },
@@ -42,14 +43,15 @@ export function Sidebar() {
 
   return (
     <aside className="flex flex-col h-full w-64 bg-gray-900 text-white">
-      <div className="flex items-center gap-3 px-6 py-5 border-b border-gray-700">
-        <div className="w-9 h-9 bg-orange-500 rounded-lg flex items-center justify-center">
-          <Wrench className="w-5 h-5 text-white" />
-        </div>
-        <div>
-          <p className="font-bold text-sm">Werkstatt</p>
-          <p className="text-xs text-gray-600">Manager</p>
-        </div>
+      <div className="flex items-center justify-center px-6 py-4 border-b border-gray-700">
+        <Image
+          src="/logo.avif"
+          alt="Helios Automobile"
+          width={160}
+          height={56}
+          className="object-contain"
+          priority
+        />
       </div>
 
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">

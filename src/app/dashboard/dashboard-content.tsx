@@ -106,7 +106,7 @@ const auftragMap = new Map<string, Auftrag>()
     { label: 'Wartende Teile', value: wartendeTeile, icon: Package, color: 'text-yellow-600', bg: 'bg-yellow-50', href: '/fahrzeuge' },
     { label: 'Heute fertig', value: fertigeHeute, icon: CheckCircle, color: 'text-green-600', bg: 'bg-green-50', href: '/fahrzeuge' },
     { label: 'Überfällig', value: ueberfaellig, icon: AlertTriangle, color: 'text-red-600', bg: 'bg-red-50', href: '/fahrzeuge' },
-    { label: 'Eigenfahrzeuge', value: eigenFahrzeuge, icon: Tag, color: 'text-purple-600', bg: 'bg-purple-50', href: '/fahrzeuge' },
+    { label: 'Lagerbestand', value: eigenFahrzeuge, icon: Tag, color: 'text-purple-600', bg: 'bg-purple-50', href: '/fahrzeuge' },
   ]
 
   return (
@@ -136,6 +136,7 @@ const auftragMap = new Map<string, Auftrag>()
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
               <ClipboardList className="w-5 h-5 text-blue-500" /> Dialogannahme
+              <span className="ml-2 text-xs font-normal text-gray-500">(Fahrzeugannahme direkt beim Kunden)</span>
             </h2>
           </div>
           <BuehneCard
@@ -211,7 +212,7 @@ const auftragMap = new Map<string, Auftrag>()
                     <p className="font-medium text-sm text-gray-900 truncate">{a.fahrzeug?.marke} {a.fahrzeug?.modell}</p>
                     <div className="flex items-center gap-1">
                       <p className="text-xs text-gray-600 font-mono">{a.fahrzeug?.kennzeichen}</p>
-                      {a.fahrzeug?.fahrzeug_typ === 'eigen' && <span className="text-xs bg-purple-100 text-purple-700 px-1.5 rounded">Eigen</span>}
+                      {a.fahrzeug?.fahrzeug_typ === 'eigen' && <span className="text-xs bg-purple-100 text-purple-700 px-1.5 rounded">Lager</span>}
                     </div>
                   </div>
                   <span className={cn('text-xs px-2 py-0.5 rounded-full border', FAHRZEUG_STATUS_COLOR[a.status])}>
@@ -463,7 +464,7 @@ function AuftragCardFull({ auftrag, onStatusChange, overdue, accentColor }: {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1 flex-wrap">
             <p className="font-bold text-gray-900 text-sm truncate">{auftrag.fahrzeug?.marke} {auftrag.fahrzeug?.modell}</p>
-            {eigen && <span className="text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded border border-purple-200">Eigen</span>}
+            {eigen && <span className="text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded border border-purple-200">Lager</span>}
             {auftrag.tuev_kandidat && <span className="text-xs bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded border border-yellow-200">TÜV</span>}
           </div>
           <p className="text-xs font-mono text-gray-800">{auftrag.fahrzeug?.kennzeichen}</p>
@@ -656,7 +657,7 @@ function BuehneDetailDrawer({
             <div className="bg-gray-50 rounded-xl p-4">
               <div className="flex items-center justify-between mb-1">
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Fahrzeug</p>
-                {eigen && <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">Eigenfahrzeug</span>}
+                {eigen && <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">Lagerbestand</span>}
               </div>
               <p className="text-xl font-bold text-gray-900">{(auftrag.fahrzeug as any)?.marke} {(auftrag.fahrzeug as any)?.modell}</p>
               <p className="text-sm font-mono text-gray-600 mt-0.5">{(auftrag.fahrzeug as any)?.kennzeichen}</p>

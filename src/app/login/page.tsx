@@ -4,7 +4,8 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Wrench, Loader2 } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
+import Image from 'next/image'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -33,11 +34,17 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 to-blue-950">
       <div className="w-full max-w-sm">
         <div className="flex flex-col items-center mb-8">
-          <div className="w-14 h-14 bg-orange-500 rounded-2xl flex items-center justify-center mb-4 shadow-lg">
-            <Wrench className="w-8 h-8 text-white" />
+          <div className="mb-5">
+            <Image
+              src="/logo.avif"
+              alt="Helios Automobile"
+              width={220}
+              height={80}
+              className="object-contain drop-shadow-lg"
+              priority
+            />
           </div>
-          <h1 className="text-2xl font-bold text-white">Kfz-Werkstatt Manager</h1>
-          <p className="text-gray-600 text-sm mt-1">Melden Sie sich an, um fortzufahren</p>
+          <p className="text-gray-400 text-sm mt-1">Melden Sie sich an, um fortzufahren</p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-2xl p-8">
@@ -75,8 +82,8 @@ export default function LoginPage() {
           </form>
         </div>
 
-        <p className="text-center text-gray-600 text-xs mt-6">
-          © 2026 Kfz-Werkstatt Manager · DSGVO-konform
+        <p className="text-center text-gray-500 text-xs mt-6">
+          © 2026 Helios Automobile · DSGVO-konform
         </p>
       </div>
     </div>

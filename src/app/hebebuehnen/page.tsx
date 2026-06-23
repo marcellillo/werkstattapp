@@ -12,7 +12,7 @@ export default async function HebebuehnenPage() {
 
   const today = new Date().toISOString().split('T')[0]
 
-  const [{ data: hebebuehnen }, { data: termine }] = await Promise.all([
+  const [{ data: hebebuehnen }, { data: termine }, { data: auftraege }] = await Promise.all([
     supabase.from('hebebuehnen').select('*').order('position'),
     supabase
       .from('termine')
@@ -22,6 +22,11 @@ export default async function HebebuehnenPage() {
       .neq('status', 'abgesagt')
       .order('datum')
       .order('uhrzeit'),
+    supabase
+      .from('auftraege')
+      .select('*, fahrzeug:fahrzeuge(*), kunde:kunden(vorname, nachname, firma), ersatzteile(*)')
+      .not('hebebuehne_id', 'is', null)
+      .not('status', 'in', '("fertig","ausgeliefert")'),
   ])
 
   return (
@@ -29,6 +34,7 @@ export default async function HebebuehnenPage() {
       <HebebuehnenContent
         hebebuehnen={(hebebuehnen ?? []) as any[]}
         termine={(termine ?? []) as any[]}
+        auftraege={(auftraege ?? []) as any[]}
       />
     </AppLayout>
   )
