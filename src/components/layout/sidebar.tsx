@@ -44,13 +44,13 @@ export function Sidebar() {
   return (
     <aside className="flex flex-col h-full w-64 bg-gray-900 text-white">
       <div className="flex items-center justify-center px-6 py-4 border-b border-gray-700">
-        <Image
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
           src="/logo.avif"
           alt="Helios Automobile"
           width={160}
           height={56}
           className="object-contain"
-          priority
         />
       </div>
 

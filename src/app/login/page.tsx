@@ -35,13 +35,13 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         <div className="flex flex-col items-center mb-8">
           <div className="mb-5">
-            <Image
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
               src="/logo.avif"
               alt="Helios Automobile"
               width={220}
               height={80}
               className="object-contain drop-shadow-lg"
-              priority
             />
           </div>
           <p className="text-gray-400 text-sm mt-1">Melden Sie sich an, um fortzufahren</p>
