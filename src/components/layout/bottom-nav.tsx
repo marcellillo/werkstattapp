@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { useRollen } from '@/lib/rollen-context'
+import { useBenachrichtigungenAnzahl } from '@/hooks/use-benachrichtigungen-anzahl'
 
 const mainItemDefs = [
   { href: '/dashboard',   label: 'Dashboard', icon: LayoutDashboard, key: 'dashboard' },
@@ -38,6 +39,7 @@ export function BottomNav() {
   const supabase = createClient()
   const [drawerOpen, setDrawerOpen] = useState(false)
   const { kannZugreifen, loading } = useRollen()
+  const benAnzahl = useBenachrichtigungenAnzahl()
 
   const mainItems = loading ? [] : mainItemDefs.filter(i => kannZugreifen(i.key))
   const moreItems = loading ? [] : moreItemDefs.filter(i => kannZugreifen(i.key))
@@ -70,8 +72,9 @@ export function BottomNav() {
             </button>
           </div>
           <div className="grid grid-cols-3 gap-2">
-            {moreItems.map(({ href, label, icon: Icon }) => {
+            {moreItems.map(({ href, label, icon: Icon, key }) => {
               const active = pathname === href || pathname.startsWith(href + '/')
+              const isBell = key === 'benachrichtigungen'
               return (
                 <Link
                   key={href}
@@ -82,7 +85,14 @@ export function BottomNav() {
                     active ? 'bg-orange-50 text-orange-600' : 'text-gray-600 hover:bg-gray-50'
                   )}
                 >
-                  <Icon className="w-6 h-6" />
+                  <div className="relative">
+                    <Icon className="w-6 h-6" />
+                    {isBell && benAnzahl > 0 && (
+                      <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-0.5">
+                        {benAnzahl > 99 ? '99+' : benAnzahl}
+                      </span>
+                    )}
+                  </div>
                   <span className="text-center leading-tight">{label}</span>
                 </Link>
               )

@@ -128,6 +128,7 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie 
     setBuehneWarnung(null)
     setAuftrag(a => ({ ...a, status }))
     await supabase.from('auftraege').update({ status }).eq('id', auftrag.id)
+    fetch('/api/benachrichtigungen/generieren', { method: 'POST' }).catch(() => {})
   }
 
   async function handleBuehneUndStatus(hebebuehne_id: string) {

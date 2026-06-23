@@ -230,7 +230,12 @@ const auftragMap = new Map<string, Auftrag>()
             <h2 className="text-base font-semibold text-gray-700 flex items-center gap-2">
               <Calendar className="w-4 h-4 text-blue-500" /> Nächste Termine
             </h2>
-            <Link href="/termine" className="text-xs text-orange-600 hover:text-orange-700 font-medium">Alle anzeigen</Link>
+            <div className="flex items-center gap-2">
+              <Link href="/termine?neu=1" className="flex items-center gap-1 text-xs bg-blue-600 hover:bg-blue-700 text-white font-medium px-2.5 py-1.5 rounded-lg transition-colors">
+                <Plus className="w-3 h-3" /> Neuer Termin
+              </Link>
+              <Link href="/termine" className="text-xs text-orange-600 hover:text-orange-700 font-medium">Alle</Link>
+            </div>
           </div>
           {naechsteTermine.length === 0 ? (
             <div className="bg-gray-50 border border-gray-100 rounded-xl p-6 text-center text-gray-600">

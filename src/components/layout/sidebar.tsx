@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { useRollen } from '@/lib/rollen-context'
+import { useBenachrichtigungenAnzahl } from '@/hooks/use-benachrichtigungen-anzahl'
 import Image from 'next/image'
 
 const navItems = [
@@ -33,6 +34,7 @@ export function Sidebar() {
   const router = useRouter()
   const supabase = createClient()
   const { kannZugreifen, loading } = useRollen()
+  const benAnzahl = useBenachrichtigungenAnzahl()
 
   async function handleSignOut() {
     await supabase.auth.signOut()
@@ -55,8 +57,9 @@ export function Sidebar() {
       </div>
 
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-        {sichtbareItems.map(({ href, label, icon: Icon }) => {
+        {sichtbareItems.map(({ href, label, icon: Icon, key }) => {
           const active = pathname === href || pathname.startsWith(href + '/')
+          const isBell = key === 'benachrichtigungen'
           return (
             <Link
               key={href}
@@ -68,7 +71,14 @@ export function Sidebar() {
                   : 'text-gray-600 hover:bg-gray-800 hover:text-white'
               )}
             >
-              <Icon className="w-5 h-5 flex-shrink-0" />
+              <div className="relative flex-shrink-0">
+                <Icon className="w-5 h-5" />
+                {isBell && benAnzahl > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-0.5">
+                    {benAnzahl > 99 ? '99+' : benAnzahl}
+                  </span>
+                )}
+              </div>
               <span className="flex-1">{label}</span>
               {active && <ChevronRight className="w-4 h-4" />}
             </Link>

@@ -1,5 +1,6 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Calendar, Plus, ShieldCheck, Globe, Phone, Clock, Car, User, Trash2, CheckCircle, X } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -30,6 +31,11 @@ export function TermineContent({ termine: initialTermine, kunden, fahrzeuge, heb
   const [filter, setFilter] = useState<'alle' | TerminTyp>('alle')
   const [saving, setSaving] = useState(false)
   const supabase = createClient()
+  const searchParams = useSearchParams()
+
+  useEffect(() => {
+    if (searchParams.get('neu') === '1') setShowForm(true)
+  }, [])
 
   const [form, setForm] = useState({
     titel: '', beschreibung: '', datum: today, uhrzeit: '09:00',
