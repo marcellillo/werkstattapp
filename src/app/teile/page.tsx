@@ -21,7 +21,7 @@ export default async function TeilePage() {
     .order('erstellt_am', { ascending: false })
 
   return (
-    <AppLayout title="Ersatzteile">
+    <AppLayout title="Lager">
       <TeileContent teile={(teileRaw ?? []) as any[]} />
     </AppLayout>
   )

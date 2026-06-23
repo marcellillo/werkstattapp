@@ -22,7 +22,7 @@ const mainItemDefs = [
 
 const moreItemDefs = [
   { href: '/kunden',             label: 'Kunden',          icon: Users,    key: 'kunden' },
-  { href: '/teile',              label: 'Ersatzteile',     icon: Package,  key: 'teile' },
+  { href: '/teile',              label: 'Lager',           icon: Package,  key: 'teile' },
   { href: '/kalender',           label: 'Kalender',        icon: Calendar, key: 'kalender' },
   { href: '/rechnungen',         label: 'Rechnungen',      icon: Receipt,  key: 'rechnungen' },
   { href: '/buchhaltung',        label: 'Buchhaltung',     icon: BookOpen, key: 'buchhaltung' },

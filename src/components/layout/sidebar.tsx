@@ -19,7 +19,7 @@ const navItems = [
   { href: '/fahrzeuge',         label: 'Fahrzeuge',         icon: Car,             key: 'fahrzeuge' },
   { href: '/termine',           label: 'Termine',           icon: CalendarClock,   key: 'termine' },
   { href: '/kunden',            label: 'Kunden',            icon: Users,           key: 'kunden' },
-  { href: '/teile',             label: 'Ersatzteile',       icon: Package,         key: 'teile' },
+  { href: '/teile',             label: 'Lager',             icon: Package,         key: 'teile' },
   { href: '/kalender',          label: 'Kalender',          icon: Calendar,        key: 'kalender' },
   { href: '/rechnungen',        label: 'Rechnungen',        icon: Receipt,         key: 'rechnungen' },
   { href: '/buchhaltung',       label: 'Buchhaltung',       icon: BookOpen,        key: 'buchhaltung' },
