@@ -38,7 +38,7 @@ export default function LoginPage() {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/logo-v.png"
-              alt="Helios Automobile"
+              alt="Vyora"
               width={220}
               height={80}
               className="object-contain drop-shadow-lg"
@@ -83,7 +83,7 @@ export default function LoginPage() {
         </div>
 
         <p className="text-center text-gray-500 text-xs mt-6">
-          © 2026 Helios Automobile · DSGVO-konform
+          © 2026 Vyora · DSGVO-konform
         </p>
       </div>
     </div>

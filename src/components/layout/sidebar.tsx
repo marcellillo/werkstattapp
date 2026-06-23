@@ -47,7 +47,7 @@ export function Sidebar() {
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/logo-v.png"
-          alt="Helios Automobile"
+          alt="Vyora"
           width={160}
           height={56}
           className="object-contain"
