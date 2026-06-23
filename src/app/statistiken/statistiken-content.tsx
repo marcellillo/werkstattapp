@@ -1,5 +1,5 @@
 'use client'
-import { Car, Package, Clock, TrendingUp, CheckCircle, Wrench, Receipt, ShieldCheck } from 'lucide-react'
+import { Car, Package, Clock, TrendingUp, CheckCircle, Wrench, Receipt, ShieldCheck, Warehouse, Truck, Euro, AlertCircle } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -96,6 +96,43 @@ export function StatistikenContent({ auftraege, teile, rechnungen, hebebuehnen }
   // ── Teile-Status ────────────────────────────────────────────────────────────
   const teilStatusCounts: Record<string, number> = {}
   for (const t of teile) teilStatusCounts[t.status] = (teilStatusCounts[t.status] ?? 0) + 1
+
+  // ── Lager-Kosten ────────────────────────────────────────────────────────────
+  const teilWert = (t: any) => (t.einzelpreis ?? 0) * (t.menge ?? 1)
+  const lagerWert     = teile.filter(t => t.status === 'geliefert').reduce((s, t) => s + teilWert(t), 0)
+  const bestelltWert  = teile.filter(t => ['bestellt','unterwegs','nicht_bestellt'].includes(t.status)).reduce((s, t) => s + teilWert(t), 0)
+  const verbautWert   = teile.filter(t => t.status === 'eingebaut').reduce((s, t) => s + teilWert(t), 0)
+  const gesamtTeilWert = teile.reduce((s, t) => s + teilWert(t), 0)
+
+  const lagerAnzahl    = teile.filter(t => t.status === 'geliefert').length
+  const bestelltAnzahl = teile.filter(t => ['bestellt','unterwegs','nicht_bestellt'].includes(t.status)).length
+  const verbautAnzahl  = teile.filter(t => t.status === 'eingebaut').length
+
+  // Top Teile nach Wert (auf Lager)
+  const topLagerTeile = [...teile.filter(t => t.status === 'geliefert')]
+    .sort((a, b) => teilWert(b) - teilWert(a))
+    .slice(0, 8)
+
+  // Teilekosten pro Monat (nach bestellt_am)
+  const teileProMonat = months.map(m => {
+    const summe = teile
+      .filter(t => t.bestellt_am?.startsWith(m.key))
+      .reduce((s, t) => s + teilWert(t), 0)
+    return { monat: m.label, Teilekosten: Math.round(summe) }
+  })
+
+  // Top Lieferanten nach Teilewert
+  const lieferantenTeilMap: Record<string, { wert: number; anzahl: number }> = {}
+  for (const t of teile) {
+    const l = t.lieferant ?? 'Unbekannt'
+    if (!lieferantenTeilMap[l]) lieferantenTeilMap[l] = { wert: 0, anzahl: 0 }
+    lieferantenTeilMap[l].wert   += teilWert(t)
+    lieferantenTeilMap[l].anzahl += 1
+  }
+  const topTeilLieferanten = Object.entries(lieferantenTeilMap)
+    .sort((a, b) => b[1].wert - a[1].wert)
+    .slice(0, 6)
+    .map(([name, { wert, anzahl }]) => ({ name, Wert: Math.round(wert), Anzahl: anzahl }))
 
   // ── Top Lieferanten (nach Einkaufswert) ─────────────────────────────────────
   const lieferantenMap: Record<string, number> = {}
@@ -260,18 +297,131 @@ export function StatistikenContent({ auftraege, teile, rechnungen, hebebuehnen }
         </Card>
       )}
 
+      {/* ── Lager-Analyse ───────────────────────────────────────────────────── */}
+      <div>
+        <h2 className="text-base font-semibold text-gray-800 flex items-center gap-2 mb-4">
+          <Warehouse className="w-4 h-4 text-green-600" /> Lager-Analyse
+        </h2>
+
+        {/* Lager KPI-Karten */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+          {[
+            { label: 'Gesamtwert Teile',  value: gesamtTeilWert,  count: teile.length,    icon: Package,   color: 'text-gray-600',   bg: 'bg-gray-50',   border: 'border-gray-200' },
+            { label: 'Auf Lager',         value: lagerWert,       count: lagerAnzahl,     icon: Warehouse, color: 'text-green-700',  bg: 'bg-green-50',  border: lagerWert > 0 ? 'border-green-300' : 'border-gray-200' },
+            { label: 'Bestellt / Weg',    value: bestelltWert,    count: bestelltAnzahl,  icon: Truck,     color: 'text-blue-700',   bg: 'bg-blue-50',   border: 'border-blue-200' },
+            { label: 'Verbaut',           value: verbautWert,     count: verbautAnzahl,   icon: CheckCircle, color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-200' },
+          ].map(({ label, value, count, icon: Icon, color, bg, border }) => (
+            <Card key={label} className={`border-2 ${border}`}>
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div className={`w-9 h-9 ${bg} rounded-lg flex items-center justify-center`}>
+                    <Icon className={`w-4 h-4 ${color}`} />
+                  </div>
+                  <span className="text-xs text-gray-400">{count} Teile</span>
+                </div>
+                <p className="text-xl font-bold text-gray-900">{value.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</p>
+                <p className="text-xs text-gray-500 mt-0.5">{label}</p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {/* Teilekosten pro Monat + Top Lieferanten */}
+        <div className="grid lg:grid-cols-2 gap-6 mb-6">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                <Euro className="w-4 h-4 text-orange-500" /> Teilekosten pro Monat (€)
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={teileProMonat} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                  <XAxis dataKey="monat" tick={{ fontSize: 11 }} />
+                  <YAxis tick={{ fontSize: 11 }} tickFormatter={v => `${v} €`} />
+                  <Tooltip formatter={(v: any) => [`${v.toLocaleString('de-DE')} €`, 'Teilekosten']} />
+                  <Bar dataKey="Teilekosten" fill="#10b981" radius={[3, 3, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                <Truck className="w-4 h-4 text-blue-500" /> Top Lieferanten nach Teilewert
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {topTeilLieferanten.length === 0 ? (
+                <div className="h-[220px] flex items-center justify-center text-gray-300 text-sm">Keine Daten</div>
+              ) : (
+                <ResponsiveContainer width="100%" height={220}>
+                  <BarChart data={topTeilLieferanten} layout="vertical" margin={{ top: 0, right: 60, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+                    <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={v => `${v} €`} />
+                    <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={110} />
+                    <Tooltip formatter={(v: any) => [`${v.toLocaleString('de-DE')} €`, 'Wert']} />
+                    <Bar dataKey="Wert" radius={[0, 3, 3, 0]}>
+                      {topTeilLieferanten.map((_, i) => <Cell key={i} fill={PALETTE[i % PALETTE.length]} />)}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Teile auf Lager */}
+        {lagerAnzahl > 0 && (
+          <Card className="border-green-200">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-amber-500" />
+                Teile auf Lager — noch nicht verbaut
+                <span className="ml-auto text-xs font-normal text-gray-400">Gesamtwert: {lagerWert.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {topLagerTeile.map(t => (
+                  <div key={t.id} className="flex items-center gap-3 px-3 py-2.5 bg-green-50/50 border border-green-100 rounded-lg">
+                    <Package className="w-4 h-4 text-green-600 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">{t.bezeichnung}</p>
+                      <p className="text-xs text-gray-500">
+                        {t.menge}× {t.einzelpreis != null ? `${Number(t.einzelpreis).toFixed(2)} €` : '—'}
+                        {t.lieferant ? ` · ${t.lieferant}` : ''}
+                      </p>
+                    </div>
+                    <span className="text-sm font-semibold text-green-800 flex-shrink-0">
+                      {teilWert(t).toLocaleString('de-DE', { minimumFractionDigits: 2 })} €
+                    </span>
+                  </div>
+                ))}
+                {lagerAnzahl > 8 && (
+                  <p className="text-xs text-gray-400 text-center pt-1">+ {lagerAnzahl - 8} weitere Teile</p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
       {/* Ersatzteile Status + Hebebühnen */}
       <div className="grid lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-              <Package className="w-4 h-4 text-yellow-500" /> Ersatzteile nach Status
+              <Package className="w-4 h-4 text-yellow-500" /> Lager nach Status (Anzahl)
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
               {(['nicht_bestellt', 'bestellt', 'unterwegs', 'geliefert', 'eingebaut'] as TeilStatus[]).map(s => {
                 const count = teilStatusCounts[s] ?? 0
+                const wert  = teile.filter(t => t.status === s).reduce((sum, t) => sum + teilWert(t), 0)
                 return (
                   <div key={s} className="text-center p-3 bg-gray-50 rounded-xl">
                     <p className="text-2xl font-bold text-gray-900">{count}</p>
@@ -279,6 +429,7 @@ export function StatistikenContent({ auftraege, teile, rechnungen, hebebuehnen }
                       style={{ backgroundColor: TEIL_COLORS[s] + '20', color: TEIL_COLORS[s] }}>
                       {TEIL_STATUS_LABEL[s]}
                     </span>
+                    {wert > 0 && <p className="text-xs text-gray-400 mt-1">{wert.toLocaleString('de-DE', { maximumFractionDigits: 0 })} €</p>}
                   </div>
                 )
               })}
