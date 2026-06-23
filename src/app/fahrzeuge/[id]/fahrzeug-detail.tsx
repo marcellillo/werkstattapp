@@ -49,6 +49,8 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie 
   const [tuevKandidat, setTuevKandidat] = useState(initialAuftrag.tuev_kandidat ?? false)
   const [tuevTermin, setTuevTermin] = useState(initialAuftrag.tuev_termin ?? '')
   const [tuevErgebnis, setTuevErgebnis] = useState(initialAuftrag.tuev_ergebnis ?? '')
+  const [buehneWarnung, setBuehneWarnung] = useState<FahrzeugStatus | null>(null)
+  const [buehneWahl, setBuehneWahl] = useState('')
   const supabase = createClient()
 
   // Lade bekannte Teile aus der DB für Autocomplete
@@ -119,8 +121,22 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie 
   }
 
   async function handleStatusChange(status: FahrzeugStatus) {
+    if ((status === 'diagnose' || status === 'reparatur') && !auftrag.hebebuehne_id) {
+      setBuehneWarnung(status)
+      return
+    }
+    setBuehneWarnung(null)
     setAuftrag(a => ({ ...a, status }))
     await supabase.from('auftraege').update({ status }).eq('id', auftrag.id)
+  }
+
+  async function handleBuehneUndStatus(hebebuehne_id: string) {
+    if (!hebebuehne_id || !buehneWarnung) return
+    const hebebuehne = hebebuehnen.find(h => h.id === hebebuehne_id) ?? undefined
+    const status = buehneWarnung
+    setBuehneWarnung(null)
+    setAuftrag(a => ({ ...a, hebebuehne_id, hebebuehne, status }))
+    await supabase.from('auftraege').update({ hebebuehne_id, status }).eq('id', auftrag.id)
   }
 
   async function handleBuehneChange(hebebuehne_id: string) {
@@ -543,6 +559,43 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie 
                   {auftrag.status !== s && <ChevronRight className="w-3.5 h-3.5 opacity-30" />}
                 </button>
               ))}
+
+              {buehneWarnung && (
+                <div className="mt-2 bg-yellow-50 border border-yellow-300 rounded-xl p-4 space-y-3">
+                  <div className="flex items-start gap-2">
+                    <span className="text-xl leading-none">⚠️</span>
+                    <div>
+                      <p className="text-sm font-semibold text-yellow-800">Kein Stellplatz zugewiesen</p>
+                      <p className="text-xs text-yellow-700 mt-0.5">Auf welcher Bühne steht das Fahrzeug?</p>
+                    </div>
+                  </div>
+                  <select
+                    value={buehneWahl}
+                    onChange={e => setBuehneWahl(e.target.value)}
+                    className="w-full px-3 py-2 border border-yellow-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                  >
+                    <option value="">— Bühne auswählen —</option>
+                    {hebebuehnen.map(h => (
+                      <option key={h.id} value={h.id}>{h.bezeichnung}</option>
+                    ))}
+                  </select>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleBuehneUndStatus(buehneWahl)}
+                      disabled={!buehneWahl}
+                      className="flex-1 bg-yellow-500 hover:bg-yellow-600 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium py-2 rounded-lg transition-colors"
+                    >
+                      Zuweisen & Status setzen
+                    </button>
+                    <button
+                      onClick={() => setBuehneWarnung(null)}
+                      className="px-3 py-2 text-sm text-yellow-700 hover:text-yellow-900"
+                    >
+                      Abbrechen
+                    </button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 
