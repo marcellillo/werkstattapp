@@ -38,8 +38,8 @@ export async function POST(req: NextRequest) {
         role: 'user',
         content: [
           isPdf
-            ? { type: 'document', source: { type: 'base64', media_type: mediaType, data: base64 } }
-            : { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } },
+            ? { type: 'document' as const, source: { type: 'base64' as const, media_type: 'application/pdf' as const, data: base64 } }
+            : { type: 'image' as const, source: { type: 'base64' as const, media_type: mediaType as 'image/jpeg' | 'image/png' | 'image/webp', data: base64 } },
           {
             type: 'text',
             text: `Analysiere diese Lieferantenrechnung und extrahiere alle relevanten Daten.
