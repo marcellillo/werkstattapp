@@ -4,40 +4,44 @@ import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Car, Users, Package, Calendar,
   Bell, Settings, LogOut, Wrench, ChevronRight, BarChart2,
-  Mail, CalendarClock, ShieldCheck, Layers, Receipt, History
+  Mail, CalendarClock, Layers, Receipt, History, BookOpen
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
+import { useRollen } from '@/lib/rollen-context'
 
 const navItems = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/hebebuehnen', label: 'Hebebühnen', icon: Layers },
-  { href: '/fahrzeuge', label: 'Fahrzeuge', icon: Car },
-  { href: '/termine', label: 'Termine', icon: CalendarClock },
-  { href: '/kunden', label: 'Kunden', icon: Users },
-  { href: '/teile', label: 'Ersatzteile', icon: Package },
-  { href: '/kalender', label: 'Kalender', icon: Calendar },
-  { href: '/rechnungen', label: 'Rechnungen', icon: Receipt },
-  { href: '/emails', label: 'E-Mails', icon: Mail },
-  { href: '/verlauf', label: 'Verlauf', icon: History },
-  { href: '/statistiken', label: 'Statistiken', icon: BarChart2 },
-  { href: '/benachrichtigungen', label: 'Benachrichtigungen', icon: Bell },
+  { href: '/dashboard',         label: 'Dashboard',        icon: LayoutDashboard, key: 'dashboard' },
+  { href: '/hebebuehnen',       label: 'Hebebühnen',        icon: Layers,          key: 'hebebuehnen' },
+  { href: '/fahrzeuge',         label: 'Fahrzeuge',         icon: Car,             key: 'fahrzeuge' },
+  { href: '/termine',           label: 'Termine',           icon: CalendarClock,   key: 'termine' },
+  { href: '/kunden',            label: 'Kunden',            icon: Users,           key: 'kunden' },
+  { href: '/teile',             label: 'Ersatzteile',       icon: Package,         key: 'teile' },
+  { href: '/kalender',          label: 'Kalender',          icon: Calendar,        key: 'kalender' },
+  { href: '/rechnungen',        label: 'Rechnungen',        icon: Receipt,         key: 'rechnungen' },
+  { href: '/buchhaltung',       label: 'Buchhaltung',       icon: BookOpen,        key: 'buchhaltung' },
+  { href: '/emails',            label: 'E-Mails',           icon: Mail,            key: 'emails' },
+  { href: '/verlauf',           label: 'Verlauf',           icon: History,         key: 'verlauf' },
+  { href: '/statistiken',       label: 'Statistiken',       icon: BarChart2,       key: 'statistiken' },
+  { href: '/benachrichtigungen',label: 'Benachrichtigungen',icon: Bell,            key: 'benachrichtigungen' },
 ]
 
 export function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
+  const { kannZugreifen, loading } = useRollen()
 
   async function handleSignOut() {
     await supabase.auth.signOut()
     router.push('/login')
   }
 
+  const sichtbareItems = loading ? [] : navItems.filter(i => kannZugreifen(i.key))
+
   return (
     <aside className="flex flex-col h-full w-64 bg-gray-900 text-white">
-      {/* Logo */}
       <div className="flex items-center gap-3 px-6 py-5 border-b border-gray-700">
         <div className="w-9 h-9 bg-orange-500 rounded-lg flex items-center justify-center">
           <Wrench className="w-5 h-5 text-white" />
@@ -48,9 +52,8 @@ export function Sidebar() {
         </div>
       </div>
 
-      {/* Navigation */}
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-        {navItems.map(({ href, label, icon: Icon }) => {
+        {sichtbareItems.map(({ href, label, icon: Icon }) => {
           const active = pathname === href || pathname.startsWith(href + '/')
           return (
             <Link
@@ -71,15 +74,16 @@ export function Sidebar() {
         })}
       </nav>
 
-      {/* Bottom */}
       <div className="px-3 py-4 border-t border-gray-700 space-y-0.5">
-        <Link
-          href="/einstellungen"
-          className="flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-800 hover:text-white transition-colors"
-        >
-          <Settings className="w-5 h-5" />
-          <span>Einstellungen</span>
-        </Link>
+        {kannZugreifen('einstellungen') && (
+          <Link
+            href="/einstellungen"
+            className="flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-800 hover:text-white transition-colors"
+          >
+            <Settings className="w-5 h-5" />
+            <span>Einstellungen</span>
+          </Link>
+        )}
         <button
           onClick={handleSignOut}
           className="flex w-full items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium text-gray-600 hover:bg-red-900/50 hover:text-red-300 transition-colors"
@@ -91,4 +95,3 @@ export function Sidebar() {
     </aside>
   )
 }
-

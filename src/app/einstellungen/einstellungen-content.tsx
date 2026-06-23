@@ -1,11 +1,12 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Settings, Mail, Bell, Users, Database, Building2,
-  CheckCircle, ExternalLink, Save, Loader2, Bot, Eye, EyeOff, Wifi, WifiOff, Receipt
+  CheckCircle, ExternalLink, Save, Loader2, Bot, Eye, EyeOff, Wifi, WifiOff, Receipt, Shield
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { createClient } from '@/lib/supabase/client'
+import { DEFAULT_BERECHTIGUNGEN, type Rolle } from '@/lib/rollen-context'
 
 interface Config {
   imap_email: string
@@ -36,6 +37,9 @@ export function EinstellungenContent({ initialConfig, profile, userEmail }: {
   const [config, setConfig] = useState<Config>(initialConfig)
   const [logoUploading, setLogoUploading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [rollenBerechtigungen, setRollenBerechtigungen] = useState<Record<Rolle, string[]>>(DEFAULT_BERECHTIGUNGEN)
+  const [rollenSaving, setRollenSaving] = useState(false)
+  const [rollenSaved, setRollenSaved] = useState(false)
   const [saved, setSaved] = useState(false)
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'ok' | 'fehler'>('idle')
   const [testMsg, setTestMsg] = useState('')
@@ -44,6 +48,40 @@ export function EinstellungenContent({ initialConfig, profile, userEmail }: {
   const supabase = createClient()
 
   const isKonfiguriert = !!(config.imap_email && config.imap_password)
+
+  useEffect(() => {
+    async function ladenRollen() {
+      const { data } = await supabase
+        .from('werkstatt_einstellungen')
+        .select('wert')
+        .eq('schluessel', 'rollen_berechtigungen')
+        .single()
+      if (data?.wert) {
+        try { setRollenBerechtigungen(JSON.parse(data.wert)) } catch {}
+      }
+    }
+    ladenRollen()
+  }, [])
+
+  async function rollenSpeichern() {
+    setRollenSaving(true)
+    setRollenSaved(false)
+    await supabase.from('werkstatt_einstellungen').upsert(
+      { schluessel: 'rollen_berechtigungen', wert: JSON.stringify(rollenBerechtigungen) },
+      { onConflict: 'schluessel' }
+    )
+    setRollenSaving(false)
+    setRollenSaved(true)
+    setTimeout(() => setRollenSaved(false), 3000)
+  }
+
+  function toggleBerechtigung(rolle: Rolle, key: string) {
+    setRollenBerechtigungen(prev => {
+      const aktuell = prev[rolle] ?? []
+      const neu = aktuell.includes(key) ? aktuell.filter(k => k !== key) : [...aktuell, key]
+      return { ...prev, [rolle]: neu }
+    })
+  }
 
   async function speichern() {
     setSaving(true)
@@ -438,6 +476,89 @@ export function EinstellungenContent({ initialConfig, profile, userEmail }: {
           </div>
         </CardContent>
       </Card>
+
+      {/* Rollen & Rechte */}
+      {profile?.role === 'admin' && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Shield className="w-5 h-5 text-indigo-500" /> Rollen & Rechte
+              <span className="ml-auto text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">Nur Admin</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-xs text-gray-500">
+              Lege fest, welche Bereiche welche Rolle sehen darf. Admin hat immer vollen Zugriff.
+            </p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm border-collapse">
+                <thead>
+                  <tr className="border-b border-gray-200">
+                    <th className="text-left py-2 pr-4 text-xs font-semibold text-gray-700 w-40">Bereich</th>
+                    {(['admin', 'werkstattmeister', 'mechaniker'] as Rolle[]).map(r => (
+                      <th key={r} className="text-center py-2 px-3 text-xs font-semibold text-gray-700 capitalize">{r}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {([
+                    { key: 'dashboard',          label: 'Dashboard' },
+                    { key: 'hebebuehnen',         label: 'Hebebühnen' },
+                    { key: 'fahrzeuge',           label: 'Fahrzeuge' },
+                    { key: 'termine',             label: 'Termine' },
+                    { key: 'kunden',              label: 'Kunden' },
+                    { key: 'teile',               label: 'Ersatzteile' },
+                    { key: 'kalender',            label: 'Kalender' },
+                    { key: 'rechnungen',          label: 'Rechnungen' },
+                    { key: 'buchhaltung',         label: 'Buchhaltung' },
+                    { key: 'emails',              label: 'E-Mails' },
+                    { key: 'verlauf',             label: 'Verlauf' },
+                    { key: 'statistiken',         label: 'Statistiken' },
+                    { key: 'benachrichtigungen',  label: 'Benachrichtigungen' },
+                    { key: 'einstellungen',       label: 'Einstellungen' },
+                  ]).map(({ key, label }) => (
+                    <tr key={key} className="border-b border-gray-50 hover:bg-gray-50/50">
+                      <td className="py-2.5 pr-4 text-sm text-gray-700 font-medium">{label}</td>
+                      {(['admin', 'werkstattmeister', 'mechaniker'] as Rolle[]).map(rolle => {
+                        const checked = (rollenBerechtigungen[rolle] ?? []).includes(key)
+                        const isAdmin = rolle === 'admin'
+                        return (
+                          <td key={rolle} className="text-center py-2.5 px-3">
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              disabled={isAdmin}
+                              onChange={() => !isAdmin && toggleBerechtigung(rolle, key)}
+                              className="w-4 h-4 accent-indigo-600 cursor-pointer disabled:cursor-default disabled:opacity-60"
+                            />
+                          </td>
+                        )
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                onClick={rollenSpeichern}
+                disabled={rollenSaving}
+                className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-medium transition-colors disabled:opacity-50"
+              >
+                {rollenSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                {rollenSaved ? 'Gespeichert!' : 'Berechtigungen speichern'}
+              </button>
+              <button
+                onClick={() => setRollenBerechtigungen(DEFAULT_BERECHTIGUNGEN)}
+                className="text-xs text-gray-500 hover:text-gray-700 border border-gray-200 hover:border-gray-300 px-3 py-2 rounded-xl transition-colors"
+              >
+                Zurücksetzen
+              </button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Datenbank */}
       <Card>

@@ -4,27 +4,32 @@ import { usePathname } from 'next/navigation'
 import { useState } from 'react'
 import {
   LayoutDashboard, Car, Layers, CalendarClock, Menu, X,
-  Users, Package, Calendar, Bell, BarChart2, Mail, Settings, LogOut
+  Users, Package, Calendar, Bell, BarChart2, Mail, Settings,
+  LogOut, Receipt, History, BookOpen
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
+import { useRollen } from '@/lib/rollen-context'
 
-const mainItems = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/hebebuehnen', label: 'Bühnen', icon: Layers },
-  { href: '/fahrzeuge', label: 'Fahrzeuge', icon: Car },
-  { href: '/termine', label: 'Termine', icon: CalendarClock },
+const mainItemDefs = [
+  { href: '/dashboard',   label: 'Dashboard', icon: LayoutDashboard, key: 'dashboard' },
+  { href: '/hebebuehnen', label: 'Bühnen',    icon: Layers,           key: 'hebebuehnen' },
+  { href: '/fahrzeuge',   label: 'Fahrzeuge', icon: Car,              key: 'fahrzeuge' },
+  { href: '/termine',     label: 'Termine',   icon: CalendarClock,    key: 'termine' },
 ]
 
-const moreItems = [
-  { href: '/kunden', label: 'Kunden', icon: Users },
-  { href: '/teile', label: 'Ersatzteile', icon: Package },
-  { href: '/kalender', label: 'Kalender', icon: Calendar },
-  { href: '/emails', label: 'E-Mails', icon: Mail },
-  { href: '/statistiken', label: 'Statistiken', icon: BarChart2 },
-  { href: '/benachrichtigungen', label: 'Benachrichtigungen', icon: Bell },
-  { href: '/einstellungen', label: 'Einstellungen', icon: Settings },
+const moreItemDefs = [
+  { href: '/kunden',             label: 'Kunden',          icon: Users,    key: 'kunden' },
+  { href: '/teile',              label: 'Ersatzteile',     icon: Package,  key: 'teile' },
+  { href: '/kalender',           label: 'Kalender',        icon: Calendar, key: 'kalender' },
+  { href: '/rechnungen',         label: 'Rechnungen',      icon: Receipt,  key: 'rechnungen' },
+  { href: '/buchhaltung',        label: 'Buchhaltung',     icon: BookOpen, key: 'buchhaltung' },
+  { href: '/emails',             label: 'E-Mails',         icon: Mail,     key: 'emails' },
+  { href: '/verlauf',            label: 'Verlauf',         icon: History,  key: 'verlauf' },
+  { href: '/statistiken',        label: 'Statistiken',     icon: BarChart2,key: 'statistiken' },
+  { href: '/benachrichtigungen', label: 'Benachrichtigungen', icon: Bell,  key: 'benachrichtigungen' },
+  { href: '/einstellungen',      label: 'Einstellungen',   icon: Settings, key: 'einstellungen' },
 ]
 
 export function BottomNav() {
@@ -32,6 +37,10 @@ export function BottomNav() {
   const router = useRouter()
   const supabase = createClient()
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const { kannZugreifen, loading } = useRollen()
+
+  const mainItems = loading ? [] : mainItemDefs.filter(i => kannZugreifen(i.key))
+  const moreItems = loading ? [] : moreItemDefs.filter(i => kannZugreifen(i.key))
 
   const isMoreActive = moreItems.some(i => pathname === i.href || pathname.startsWith(i.href + '/'))
 
@@ -42,7 +51,6 @@ export function BottomNav() {
 
   return (
     <>
-      {/* Drawer overlay */}
       {drawerOpen && (
         <div
           className="fixed inset-0 bg-black/50 z-40 lg:hidden"
@@ -50,7 +58,6 @@ export function BottomNav() {
         />
       )}
 
-      {/* Mehr-Drawer */}
       {drawerOpen && (
         <div className="fixed bottom-20 left-0 right-0 z-50 lg:hidden bg-white rounded-t-2xl shadow-2xl border-t border-gray-100 p-4">
           <div className="flex items-center justify-between mb-3 px-2">
@@ -91,7 +98,6 @@ export function BottomNav() {
         </div>
       )}
 
-      {/* Bottom Bar */}
       <nav className="fixed bottom-0 left-0 right-0 z-30 lg:hidden bg-white border-t border-gray-200 safe-area-pb">
         <div className="flex items-stretch h-16">
           {mainItems.map(({ href, label, icon: Icon }) => {
@@ -111,7 +117,6 @@ export function BottomNav() {
             )
           })}
 
-          {/* Mehr-Button */}
           <button
             onClick={() => setDrawerOpen(v => !v)}
             className={cn(
