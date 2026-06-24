@@ -54,9 +54,16 @@ export async function POST() {
           inhalt,
         })
 
-        // Nur bekannte Lieferanten verarbeiten
-        if (parsed.lieferant === 'Unbekannt' || parsed.status === 'unbekannt') {
+        // Nur E-Mails mit erkennbarem Status verarbeiten (Lieferant egal)
+        if ((parsed.status as string) === 'unbekannt') {
+          await markMessageAsRead(accessToken, msg.id)
           continue
+        }
+
+        // Lieferantenname aus Absender ableiten falls unbekannt
+        if (parsed.lieferant === 'Unbekannt') {
+          const absenderName = msg.from.emailAddress.name || msg.from.emailAddress.address.split('@')[1]?.split('.')[0] || 'Lieferant'
+          parsed.lieferant = absenderName
         }
 
         // Auftrag finden
