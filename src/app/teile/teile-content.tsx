@@ -1,7 +1,11 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Package, Search, ChevronRight, Car, Truck, CheckCircle2, Archive, Boxes, AlertCircle, ClipboardList, Minus, Plus, ShoppingCart, PackageCheck, Wrench, RefreshCw } from 'lucide-react'
+import {
+  Package, Search, ChevronRight, Car, Truck, CheckCircle2, Archive, Boxes,
+  ClipboardList, Minus, Plus, ShoppingCart, PackageCheck, Wrench, RefreshCw,
+  AlertTriangle, X, BarChart2, Euro, Warehouse, PenLine, Trash2,
+} from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { cn, formatDate } from '@/lib/utils'
 import { type TeilStatus, TEIL_STATUS_LABEL, TEIL_STATUS_COLOR } from '@/types/database'
@@ -38,8 +42,430 @@ function getAction(tab: Tab): { label: string; nextStatus: TeilStatus; color: st
   return null
 }
 
-export function TeileContent({ teile: initialTeile }: { teile: any[] }) {
-  const [teile, setTeile] = useState(initialTeile)
+export function TeileContent({ teile: initialTeile, lagerArtikel: initialLager = [] }: { teile: any[]; lagerArtikel?: any[] }) {
+  const [mode, setMode] = useState<'bestellungen' | 'lagerbestand'>('bestellungen')
+
+  return (
+    <div className="space-y-5">
+      {/* Modus-Toggle */}
+      <div className="flex bg-gray-100 rounded-xl p-1 gap-1 w-fit">
+        <button
+          onClick={() => setMode('bestellungen')}
+          className={cn('px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2',
+            mode === 'bestellungen' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700')}
+        >
+          <Truck className="w-4 h-4" /> Bestellungen
+        </button>
+        <button
+          onClick={() => setMode('lagerbestand')}
+          className={cn('px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2',
+            mode === 'lagerbestand' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700')}
+        >
+          <Warehouse className="w-4 h-4" /> Lagerbestand
+        </button>
+      </div>
+
+      {mode === 'bestellungen'
+        ? <BestellungenSection teile={initialTeile} />
+        : <LagerbestandSection artikel={initialLager} />}
+    </div>
+  )
+}
+
+// ── Lagerbestand ─────────────────────────────────────────────────────────────
+
+const EINHEITEN = ['Stück', 'Liter', 'kg', 'm', 'Paar', 'Satz', 'Dose', 'Rolle']
+const KATEGORIEN = ['Allgemein', 'Öle & Flüssigkeiten', 'Filter', 'Bremsen', 'Zündung', 'Riemen & Ketten', 'Dichtungen', 'Elektrik', 'Karosserie', 'Sonstiges']
+
+type LagerFilter = 'alle' | 'kritisch' | 'ok'
+
+function ArtikelPanel({
+  open,
+  artikel,
+  onClose,
+  onSaved,
+  onDeleted,
+}: {
+  open: boolean
+  artikel: any | null
+  onClose: () => void
+  onSaved: (a: any, isNew: boolean) => void
+  onDeleted: (id: string) => void
+}) {
+  const supabase = createClient()
+  const [bezeichnung, setBezeichnung] = useState('')
+  const [artikelnummer, setArtikelnummer] = useState('')
+  const [kategorie, setKategorie] = useState('Allgemein')
+  const [bestand, setBestand] = useState('0')
+  const [mindestbestand, setMindestbestand] = useState('0')
+  const [einheit, setEinheit] = useState('Stück')
+  const [einzelpreis, setEinzelpreis] = useState('')
+  const [lieferant, setLieferant] = useState('')
+  const [notizen, setNotizen] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [error, setError] = useState('')
+
+  const isEdit = !!artikel
+
+  useEffect(() => {
+    if (artikel) {
+      setBezeichnung(artikel.bezeichnung ?? '')
+      setArtikelnummer(artikel.artikelnummer ?? '')
+      setKategorie(artikel.kategorie ?? 'Allgemein')
+      setBestand(String(artikel.bestand ?? 0))
+      setMindestbestand(String(artikel.mindestbestand ?? 0))
+      setEinheit(artikel.einheit ?? 'Stück')
+      setEinzelpreis(artikel.einzelpreis != null ? String(artikel.einzelpreis) : '')
+      setLieferant(artikel.lieferant ?? '')
+      setNotizen(artikel.notizen ?? '')
+    } else {
+      setBezeichnung(''); setArtikelnummer(''); setKategorie('Allgemein')
+      setBestand('0'); setMindestbestand('0'); setEinheit('Stück')
+      setEinzelpreis(''); setLieferant(''); setNotizen('')
+    }
+    setError('')
+  }, [artikel, open])
+
+  useEffect(() => {
+    if (!open) return
+    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', h)
+    return () => window.removeEventListener('keydown', h)
+  }, [open])
+
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault()
+    if (!bezeichnung.trim()) { setError('Bezeichnung ist erforderlich'); return }
+    setSaving(true); setError('')
+    const payload = {
+      bezeichnung: bezeichnung.trim(),
+      artikelnummer: artikelnummer.trim() || null,
+      kategorie,
+      bestand: parseFloat(bestand) || 0,
+      mindestbestand: parseFloat(mindestbestand) || 0,
+      einheit,
+      einzelpreis: einzelpreis ? parseFloat(einzelpreis) : null,
+      lieferant: lieferant.trim() || null,
+      notizen: notizen.trim() || null,
+      aktualisiert_am: new Date().toISOString(),
+    }
+    try {
+      if (isEdit) {
+        const { data } = await supabase.from('lager_artikel').update(payload).eq('id', artikel.id).select().single()
+        onSaved(data, false)
+      } else {
+        const { data } = await supabase.from('lager_artikel').insert(payload).select().single()
+        onSaved(data, true)
+      }
+      onClose()
+    } catch (err: any) {
+      setError(err.message ?? 'Fehler beim Speichern')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleDelete() {
+    if (!artikel || !confirm(`„${artikel.bezeichnung}" wirklich löschen?`)) return
+    setDeleting(true)
+    await supabase.from('lager_artikel').delete().eq('id', artikel.id)
+    onDeleted(artikel.id)
+    onClose()
+    setDeleting(false)
+  }
+
+  return (
+    <>
+      {open && <div className="fixed inset-0 bg-black/20 z-40" onClick={onClose} />}
+      <div className={cn(
+        'fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-2xl z-50 flex flex-col transition-transform duration-300',
+        open ? 'translate-x-0' : 'translate-x-full',
+      )}>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 flex-shrink-0">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+              <Package className="w-4 h-4 text-blue-600" />
+            </div>
+            <h2 className="font-semibold text-gray-900">{isEdit ? 'Artikel bearbeiten' : 'Neuer Artikel'}</h2>
+          </div>
+          <button type="button" onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg">
+            <X className="w-5 h-5 text-gray-500" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSave} className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1.5">Bezeichnung *</label>
+            <input value={bezeichnung} onChange={e => setBezeichnung(e.target.value)} placeholder="z. B. Motoröl 5W-30" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1.5">Artikelnummer</label>
+              <input value={artikelnummer} onChange={e => setArtikelnummer(e.target.value)} placeholder="Optional" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1.5">Einheit</label>
+              <select value={einheit} onChange={e => setEinheit(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white">
+                {EINHEITEN.map(u => <option key={u}>{u}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1.5">Kategorie</label>
+            <select value={kategorie} onChange={e => setKategorie(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white">
+              {KATEGORIEN.map(k => <option key={k}>{k}</option>)}
+            </select>
+          </div>
+
+          <div className="border-t border-gray-100 pt-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1.5">Bestand</label>
+                <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-orange-400">
+                  <button type="button" onClick={() => setBestand(v => String(Math.max(0, parseFloat(v||'0') - 1)))} className="px-3 py-2 text-gray-500 hover:bg-gray-50 border-r border-gray-200">
+                    <Minus className="w-3.5 h-3.5" />
+                  </button>
+                  <input type="number" min="0" step="0.5" value={bestand} onChange={e => setBestand(e.target.value)} className="flex-1 text-center text-sm font-bold focus:outline-none px-1 py-2" />
+                  <button type="button" onClick={() => setBestand(v => String(parseFloat(v||'0') + 1))} className="px-3 py-2 text-gray-500 hover:bg-gray-50 border-l border-gray-200">
+                    <Plus className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1.5">Mindestbestand</label>
+                <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-orange-400">
+                  <button type="button" onClick={() => setMindestbestand(v => String(Math.max(0, parseFloat(v||'0') - 1)))} className="px-3 py-2 text-gray-500 hover:bg-gray-50 border-r border-gray-200">
+                    <Minus className="w-3.5 h-3.5" />
+                  </button>
+                  <input type="number" min="0" step="0.5" value={mindestbestand} onChange={e => setMindestbestand(e.target.value)} className="flex-1 text-center text-sm font-bold focus:outline-none px-1 py-2" />
+                  <button type="button" onClick={() => setMindestbestand(v => String(parseFloat(v||'0') + 1))} className="px-3 py-2 text-gray-500 hover:bg-gray-50 border-l border-gray-200">
+                    <Plus className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            </div>
+            <p className="text-xs text-gray-400 mt-1.5">Warnung erscheint wenn Bestand ≤ Mindestbestand</p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1.5">Einzelpreis (€)</label>
+              <input type="number" min="0" step="0.01" value={einzelpreis} onChange={e => setEinzelpreis(e.target.value)} placeholder="0,00" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1.5">Lieferant</label>
+              <input value={lieferant} onChange={e => setLieferant(e.target.value)} placeholder="Optional" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1.5">Notizen</label>
+            <textarea value={notizen} onChange={e => setNotizen(e.target.value)} rows={2} placeholder="Optional" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-orange-400" />
+          </div>
+
+          {error && <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</div>}
+        </form>
+
+        <div className="px-5 py-4 border-t border-gray-200 flex-shrink-0">
+          {isEdit && (
+            <button type="button" onClick={handleDelete} disabled={deleting} className="w-full mb-3 py-2 rounded-lg border border-red-200 text-red-500 text-sm font-medium hover:bg-red-50 transition-colors disabled:opacity-60 flex items-center justify-center gap-2">
+              <Trash2 className="w-4 h-4" /> {deleting ? 'Löschen…' : 'Artikel löschen'}
+            </button>
+          )}
+          <div className="flex gap-3">
+            <button type="button" onClick={onClose} className="flex-1 py-2.5 rounded-lg border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50">Abbrechen</button>
+            <button type="button" onClick={handleSave} disabled={saving} className="flex-1 py-2.5 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-sm font-medium disabled:opacity-60">
+              {saving ? 'Speichern…' : isEdit ? 'Speichern' : 'Anlegen'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
+
+function LagerbestandSection({ artikel: initialArtikel }: { artikel: any[] }) {
+  const supabase = createClient()
+  const [artikel, setArtikel] = useState(initialArtikel)
+  const [filter, setFilter] = useState<LagerFilter>('alle')
+  const [search, setSearch] = useState('')
+  const [panelOpen, setPanelOpen] = useState(false)
+  const [editArtikel, setEditArtikel] = useState<any | null>(null)
+  const [savingBestand, setSavingBestand] = useState<string | null>(null)
+
+  const kritisch = artikel.filter(a => a.bestand <= a.mindestbestand)
+  const lagerwert = artikel.reduce((sum, a) => sum + (a.bestand ?? 0) * (a.einzelpreis ?? 0), 0)
+
+  const filtered = artikel.filter(a => {
+    if (filter === 'kritisch' && a.bestand > a.mindestbestand) return false
+    if (filter === 'ok' && a.bestand <= a.mindestbestand) return false
+    if (search) {
+      const q = search.toLowerCase()
+      return a.bezeichnung?.toLowerCase().includes(q) ||
+        a.artikelnummer?.toLowerCase().includes(q) ||
+        a.lieferant?.toLowerCase().includes(q) ||
+        a.kategorie?.toLowerCase().includes(q)
+    }
+    return true
+  })
+
+  async function adjustBestand(a: any, delta: number) {
+    const newBestand = Math.max(0, parseFloat(a.bestand ?? 0) + delta)
+    setSavingBestand(a.id)
+    setArtikel(prev => prev.map(x => x.id === a.id ? { ...x, bestand: newBestand } : x))
+    await supabase.from('lager_artikel').update({ bestand: newBestand, aktualisiert_am: new Date().toISOString() }).eq('id', a.id)
+    setSavingBestand(null)
+  }
+
+  return (
+    <div className="space-y-5">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Lagerbestand</h1>
+          <p className="text-sm text-gray-500 mt-0.5">{artikel.length} Artikel · {kritisch.length > 0 && <span className="text-red-600 font-medium">{kritisch.length} kritisch</span>}</p>
+        </div>
+        <button
+          onClick={() => { setEditArtikel(null); setPanelOpen(true) }}
+          className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white text-sm font-medium px-4 py-2 rounded-xl transition-colors shadow-sm"
+        >
+          <Plus className="w-4 h-4" /> Neuer Artikel
+        </button>
+      </div>
+
+      {/* KPI */}
+      <div className="grid grid-cols-3 gap-3">
+        <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-1"><BarChart2 className="w-4 h-4 text-blue-500" /><span className="text-xs text-gray-500">Artikel</span></div>
+          <p className="text-2xl font-bold text-gray-900">{artikel.length}</p>
+        </div>
+        <div className={cn('border rounded-xl p-4', kritisch.length > 0 ? 'bg-red-50 border-red-200' : 'bg-white border-gray-200')}>
+          <div className="flex items-center gap-2 mb-1"><AlertTriangle className={cn('w-4 h-4', kritisch.length > 0 ? 'text-red-500' : 'text-gray-400')} /><span className="text-xs text-gray-500">Kritisch</span></div>
+          <p className={cn('text-2xl font-bold', kritisch.length > 0 ? 'text-red-600' : 'text-gray-900')}>{kritisch.length}</p>
+        </div>
+        <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-1"><Euro className="w-4 h-4 text-green-500" /><span className="text-xs text-gray-500">Lagerwert</span></div>
+          <p className="text-2xl font-bold text-gray-900">{lagerwert.toLocaleString('de-DE', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} €</p>
+        </div>
+      </div>
+
+      {/* Kritisch-Banner */}
+      {kritisch.length > 0 && filter !== 'kritisch' && (
+        <button onClick={() => setFilter('kritisch')} className="w-full bg-red-50 border border-red-200 rounded-xl p-3 flex items-center gap-3 hover:border-red-300 transition-colors text-left">
+          <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0" />
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-red-800">{kritisch.length} Artikel unter Mindestbestand</p>
+            <p className="text-xs text-red-600">{kritisch.slice(0, 3).map(a => a.bezeichnung).join(', ')}{kritisch.length > 3 ? ` +${kritisch.length - 3} weitere` : ''}</p>
+          </div>
+          <span className="text-xs text-red-500 font-medium">Anzeigen →</span>
+        </button>
+      )}
+
+      {/* Filter + Suche */}
+      <div className="flex gap-3 items-center">
+        <div className="flex bg-gray-100 rounded-lg p-1 gap-1 flex-shrink-0">
+          {(['alle', 'kritisch', 'ok'] as LagerFilter[]).map(f => (
+            <button key={f} onClick={() => setFilter(f)}
+              className={cn('px-3 py-1.5 rounded-md text-xs font-medium transition-colors capitalize',
+                filter === f ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700')}>
+              {f === 'alle' ? 'Alle' : f === 'kritisch' ? '⚠ Kritisch' : '✓ OK'}
+            </button>
+          ))}
+        </div>
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Artikel, Nummer, Lieferant …"
+            className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
+        </div>
+      </div>
+
+      {/* Liste */}
+      {filtered.length === 0 ? (
+        <Card><CardContent className="py-16 text-center">
+          <Warehouse className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+          <p className="text-gray-500">{artikel.length === 0 ? 'Noch keine Artikel angelegt' : 'Keine Artikel gefunden'}</p>
+          {artikel.length === 0 && <button onClick={() => { setEditArtikel(null); setPanelOpen(true) }} className="mt-3 text-sm text-orange-500 hover:underline">+ Ersten Artikel anlegen</button>}
+        </CardContent></Card>
+      ) : (
+        <div className="space-y-2">
+          {filtered.map(a => {
+            const istKritisch = a.bestand <= a.mindestbestand
+            const pct = a.mindestbestand > 0 ? Math.min(100, (a.bestand / (a.mindestbestand * 2)) * 100) : 100
+            return (
+              <div key={a.id} className={cn('bg-white border rounded-xl px-4 py-3.5 transition-colors', istKritisch ? 'border-red-200' : 'border-gray-200')}>
+                <div className="flex items-start gap-4">
+                  {/* Status-Dot */}
+                  <div className={cn('w-2.5 h-2.5 rounded-full mt-1.5 flex-shrink-0', istKritisch ? 'bg-red-500' : 'bg-green-500')} />
+
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="font-semibold text-gray-900 text-sm">{a.bezeichnung}</p>
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-0.5">
+                          {a.artikelnummer && <span className="text-xs text-gray-400 font-mono">{a.artikelnummer}</span>}
+                          <span className="text-xs text-gray-400 bg-gray-100 rounded-full px-2 py-0.5">{a.kategorie}</span>
+                          {a.lieferant && <span className="text-xs text-gray-500">{a.lieferant}</span>}
+                          {a.einzelpreis != null && <span className="text-xs text-gray-500">{Number(a.einzelpreis).toLocaleString('de-DE', { minimumFractionDigits: 2 })} €/Stk.</span>}
+                        </div>
+
+                        {/* Bestand-Balken */}
+                        <div className="mt-2 flex items-center gap-3">
+                          <div className="flex-1 max-w-32 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                            <div className={cn('h-full rounded-full transition-all', istKritisch ? 'bg-red-400' : 'bg-green-400')} style={{ width: `${pct}%` }} />
+                          </div>
+                          <span className={cn('text-xs font-semibold', istKritisch ? 'text-red-600' : 'text-gray-700')}>
+                            {Number(a.bestand).toLocaleString('de-DE')} {a.einheit}
+                          </span>
+                          <span className="text-xs text-gray-400">/ min. {Number(a.mindestbestand).toLocaleString('de-DE')}</span>
+                          {istKritisch && <span className="text-xs text-red-600 font-medium flex items-center gap-0.5"><AlertTriangle className="w-3 h-3" /> Nachbestellen</span>}
+                        </div>
+                      </div>
+
+                      {/* Aktionen */}
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <button onClick={() => adjustBestand(a, -1)} disabled={a.bestand <= 0 || savingBestand === a.id}
+                          className="w-7 h-7 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:border-orange-300 hover:text-orange-600 disabled:opacity-30 transition-colors">
+                          <Minus className="w-3 h-3" />
+                        </button>
+                        <span className="text-sm font-bold text-gray-900 w-10 text-center tabular-nums">
+                          {Number(a.bestand).toLocaleString('de-DE')}
+                        </span>
+                        <button onClick={() => adjustBestand(a, +1)} disabled={savingBestand === a.id}
+                          className="w-7 h-7 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:border-orange-300 hover:text-orange-600 transition-colors">
+                          <Plus className="w-3 h-3" />
+                        </button>
+                        <button onClick={() => { setEditArtikel(a); setPanelOpen(true) }}
+                          className="ml-1 w-7 h-7 rounded-lg border border-gray-200 flex items-center justify-center text-gray-400 hover:border-blue-300 hover:text-blue-600 transition-colors">
+                          <PenLine className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      <ArtikelPanel
+        open={panelOpen}
+        artikel={editArtikel}
+        onClose={() => { setPanelOpen(false); setEditArtikel(null) }}
+        onSaved={(a, isNew) => setArtikel(prev => isNew ? [...prev, a].sort((x,y) => x.bezeichnung.localeCompare(y.bezeichnung)) : prev.map(x => x.id === a.id ? a : x))}
+        onDeleted={id => setArtikel(prev => prev.filter(x => x.id !== id))}
+      />
+    </div>
+  )
+}
+
+// ── Bestellungen ─────────────────────────────────────────────────────────────
+function BestellungenSection({ teile: initialTeile }: { teile: any[] }) {
+  const [teile, setTeile] = useState<any[]>(initialTeile)
   const [search, setSearch] = useState('')
   const [tab, setTab] = useState<Tab>('aktiv')
   const [editingMenge, setEditingMenge] = useState<string | null>(null)
