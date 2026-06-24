@@ -12,6 +12,11 @@ export const metadata: Metadata = {
     capable: true,
     statusBarStyle: "black-translucent",
     title: "Werkstatt",
+    startupImage: "/icon-512.png",
+  },
+  icons: {
+    apple: "/icon-192.png",
+    icon: "/icon-192.png",
   },
 };
 

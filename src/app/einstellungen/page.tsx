@@ -48,6 +48,8 @@ export default async function EinstellungenPage() {
           firma_kleinunternehmer: cfg.firma_kleinunternehmer ?? 'nein',
           firma_logo: cfg.firma_logo ?? '',
           firma_paypal: cfg.firma_paypal ?? '',
+          firma_sumup: cfg.firma_sumup ?? '',
+          firma_stripe: cfg.firma_stripe ?? '',
         }}
       />
     </AppLayout>

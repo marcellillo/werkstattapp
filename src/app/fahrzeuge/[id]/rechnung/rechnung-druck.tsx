@@ -23,6 +23,8 @@ export function RechnungDruck({ auftrag, firma }: { auftrag: any; firma: Record<
     : null
   const giroQr = useQrDataUrl(giroCode ?? '')
   const paypalQr = useQrDataUrl(firma.firma_paypal ?? '')
+  const sumupQr = useQrDataUrl(firma.firma_sumup ?? '')
+  const stripeQr = useQrDataUrl(firma.firma_stripe ?? '')
   const fz = auftrag.fahrzeug ?? {}
   const kd = auftrag.kunde ?? {}
   const teile = (auftrag.ersatzteile ?? []) as any[]
@@ -297,7 +299,7 @@ export function RechnungDruck({ auftrag, firma }: { auftrag: any; firma: Record<
         </table>
 
         {/* Zahlungsinfo + QR in einer Zeile */}
-        <div className={`zahlung ${(giroQr || paypalQr) ? 'zahlung-3' : 'zahlung-2'}`}>
+        <div className={`zahlung ${(giroQr || paypalQr || sumupQr || stripeQr) ? 'zahlung-3' : 'zahlung-2'}`}>
           <div className="zahlung-box">
             <div className="zahlung-titel">Zahlungsinformationen</div>
             <div className="zahlung-wert">
@@ -315,24 +317,42 @@ export function RechnungDruck({ auftrag, firma }: { auftrag: any; firma: Record<
               {!firma.firma_iban && <span style={{color:'#94a3b8'}}>Bitte IBAN in Einstellungen eintragen</span>}
             </div>
           </div>
-          {(giroQr || paypalQr) && (
+          {(giroQr || paypalQr || sumupQr || stripeQr) && (
             <div className="qr-box">
               <div className="zahlung-titel" style={{marginBottom: 6}}>Jetzt bezahlen</div>
               {giroQr && (
                 <div className="qr-item">
-                  <img src={giroQr} alt="GiroCode" style={{width: 52, height: 52, borderRadius: 3, flexShrink: 0}} />
+                  <img src={giroQr} alt="GiroCode" style={{width: 48, height: 48, borderRadius: 3, flexShrink: 0}} />
                   <div>
-                    <div className="qr-label">GiroCode</div>
-                    <div className="qr-hint">Banking-App scannen<br />für Überweisung</div>
+                    <div className="qr-label">Überweisung</div>
+                    <div className="qr-hint">Banking-App scannen</div>
                   </div>
                 </div>
               )}
               {paypalQr && (
                 <div className="qr-item">
-                  <img src={paypalQr} alt="PayPal" style={{width: 52, height: 52, borderRadius: 3, flexShrink: 0}} />
+                  <img src={paypalQr} alt="PayPal" style={{width: 48, height: 48, borderRadius: 3, flexShrink: 0}} />
                   <div>
                     <div className="qr-label">PayPal</div>
-                    <div className="qr-hint">PayPal-App scannen<br />für Online-Zahlung</div>
+                    <div className="qr-hint">Kamera scannen</div>
+                  </div>
+                </div>
+              )}
+              {sumupQr && (
+                <div className="qr-item">
+                  <img src={sumupQr} alt="SumUp" style={{width: 48, height: 48, borderRadius: 3, flexShrink: 0}} />
+                  <div>
+                    <div className="qr-label">SumUp</div>
+                    <div className="qr-hint">Karte / Apple Pay</div>
+                  </div>
+                </div>
+              )}
+              {stripeQr && (
+                <div className="qr-item">
+                  <img src={stripeQr} alt="Stripe" style={{width: 48, height: 48, borderRadius: 3, flexShrink: 0}} />
+                  <div>
+                    <div className="qr-label">Stripe</div>
+                    <div className="qr-hint">Karte / Apple Pay</div>
                   </div>
                 </div>
               )}

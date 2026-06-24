@@ -35,6 +35,8 @@ interface Config {
   firma_kleinunternehmer: string
   firma_logo: string
   firma_paypal: string
+  firma_sumup: string
+  firma_stripe: string
 }
 
 export function EinstellungenContent({ initialConfig, profile, userEmail }: {
@@ -288,7 +290,7 @@ export function EinstellungenContent({ initialConfig, profile, userEmail }: {
         </CardHeader>
         <CardContent className="space-y-5">
           <p className="text-xs text-gray-500">
-            QR-Codes erscheinen auf der Rechnung neben der Bankverbindung. Kunden können damit direkt per Banking-App oder PayPal bezahlen.
+            QR-Codes erscheinen auf der Rechnung. Kunden scannen einfach mit der Kamera — kein Banking-App nötig. Trage jetzt schon die Links ein, aktiviere den Dienst später.
           </p>
 
           {/* GiroCode / IBAN */}
@@ -320,34 +322,41 @@ export function EinstellungenContent({ initialConfig, profile, userEmail }: {
             </div>
           )}
 
-          {/* PayPal */}
-          <div className="space-y-2">
-            <label className="text-xs font-medium text-slate-700 block">PayPal.me-Link (optional)</label>
-            <input
-              type="text"
-              value={config.firma_paypal}
-              onChange={e => setConfig(c => ({ ...c, firma_paypal: e.target.value }))}
-              placeholder="https://paypal.me/deinname"
-              className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
-            />
-          </div>
-
-          {config.firma_paypal && (
-            <div className="border border-slate-200 rounded-xl p-4 flex items-center gap-5">
-              <QrCode value={config.firma_paypal} size={96} className="rounded-lg flex-shrink-0" />
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-sm text-slate-900">PayPal-QR-Code</p>
-                <p className="text-xs text-slate-500 mt-0.5">Öffnet direkt die PayPal-App beim Scannen</p>
-                <p className="text-xs font-mono text-slate-400 mt-1 truncate">{config.firma_paypal}</p>
-                <button
-                  onClick={() => downloadQr(config.firma_paypal, 'paypal-qr.png')}
-                  className="mt-2 flex items-center gap-1.5 text-xs text-violet-700 hover:text-violet-900 font-medium border border-violet-200 hover:border-violet-400 px-2.5 py-1.5 rounded-lg transition-colors"
-                >
-                  <Download className="w-3.5 h-3.5" /> QR herunterladen
-                </button>
+          {/* Zahlungslinks */}
+          <div className="space-y-3">
+            {([
+              { key: 'firma_paypal', label: 'PayPal.me-Link', placeholder: 'https://paypal.me/deinname', hint: 'Öffnet direkt die PayPal-App', filename: 'paypal-qr.png', color: '#0070ba' },
+              { key: 'firma_sumup',  label: 'SumUp Zahlungslink', placeholder: 'https://pay.sumup.com/b2c/...', hint: 'Karte, Apple Pay, Google Pay', filename: 'sumup-qr.png', color: '#00b9ff' },
+              { key: 'firma_stripe', label: 'Stripe Zahlungslink', placeholder: 'https://buy.stripe.com/...', hint: 'Karte, Apple Pay, Google Pay', filename: 'stripe-qr.png', color: '#635bff' },
+            ] as { key: keyof Config; label: string; placeholder: string; hint: string; filename: string; color: string }[]).map(({ key, label, placeholder, hint, filename, color }) => (
+              <div key={key} className="space-y-2">
+                <label className="text-xs font-medium text-slate-700 block">{label} <span className="text-slate-400 font-normal">(optional)</span></label>
+                <input
+                  type="text"
+                  value={config[key]}
+                  onChange={e => setConfig(c => ({ ...c, [key]: e.target.value }))}
+                  placeholder={placeholder}
+                  className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
+                />
+                {config[key] && (
+                  <div className="border border-slate-200 rounded-xl p-4 flex items-center gap-5">
+                    <QrCode value={config[key]} size={88} className="rounded-lg flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-sm text-slate-900">{label}</p>
+                      <p className="text-xs text-slate-500 mt-0.5">{hint} — Kamera scannen reicht</p>
+                      <p className="text-xs font-mono text-slate-400 mt-1 truncate">{config[key]}</p>
+                      <button
+                        onClick={() => downloadQr(config[key], filename)}
+                        className="mt-2 flex items-center gap-1.5 text-xs text-violet-700 hover:text-violet-900 font-medium border border-violet-200 hover:border-violet-400 px-2.5 py-1.5 rounded-lg transition-colors"
+                      >
+                        <Download className="w-3.5 h-3.5" /> QR herunterladen
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
-          )}
+            ))}
+          </div>
 
           <button
             onClick={speichern}
