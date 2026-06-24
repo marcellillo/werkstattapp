@@ -56,62 +56,63 @@ export function RechnungDruck({ auftrag, firma }: { auftrag: any; firma: Record<
       <style>{`
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { background: white; font-family: Arial, sans-serif; font-size: 11px; color: #1a1a1a; }
-        @page { size: A4; margin: 20mm 15mm 20mm 25mm; }
+        @page { size: A4; margin: 18mm 15mm 18mm 20mm; }
         @media print { .no-print { display: none !important; } body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
-        .page { max-width: 794px; margin: 0 auto; padding: 24px; }
+        .page { max-width: 794px; margin: 0 auto; padding: 20px; }
 
         /* Briefkopf */
-        .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; }
-        .firma-block { }
-        .firma-name { font-size: 18px; font-weight: 700; color: #ea580c; }
-        .firma-details { font-size: 10px; color: #555; margin-top: 4px; line-height: 1.6; }
+        .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; }
+        .firma-name { font-size: 17px; font-weight: 700; color: #ea580c; }
+        .firma-details { font-size: 9.5px; color: #555; margin-top: 3px; line-height: 1.55; }
         .rechnung-block { text-align: right; }
-        .rechnung-titel { font-size: 22px; font-weight: 700; color: #1e293b; }
-        .rechnung-nr { font-size: 12px; color: #64748b; margin-top: 4px; }
-        .rechnung-datum { font-size: 10px; color: #94a3b8; margin-top: 2px; }
+        .rechnung-titel { font-size: 20px; font-weight: 700; color: #1e293b; }
+        .rechnung-nr { font-size: 11px; color: #64748b; margin-top: 3px; }
+        .rechnung-datum { font-size: 9.5px; color: #94a3b8; margin-top: 2px; }
 
         /* Trennlinie */
-        .trennlinie { border: none; border-top: 2px solid #ea580c; margin: 16px 0; }
+        .trennlinie { border: none; border-top: 2px solid #ea580c; margin: 10px 0; }
 
         /* Adressblock */
-        .adressen { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
-        .adresse-box { }
-        .adresse-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #94a3b8; margin-bottom: 6px; }
-        .adresse-wert { font-size: 11px; line-height: 1.7; }
-        .adresse-wert strong { font-size: 12px; }
+        .adressen { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 14px; }
+        .adresse-label { font-size: 8.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #94a3b8; margin-bottom: 4px; }
+        .adresse-wert { font-size: 10.5px; line-height: 1.6; }
+        .adresse-wert strong { font-size: 11px; }
 
         /* Fahrzeug-Info */
-        .fz-box { background: #f1f5f9; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-        .fz-feld { border-right: 1px solid #e2e8f0; padding-right: 8px; }
+        .fz-box { background: #f1f5f9; border: 1.5px solid #cbd5e1; border-radius: 7px; padding: 8px 12px; margin-bottom: 14px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+        .fz-feld { border-right: 1px solid #e2e8f0; padding-right: 6px; }
         .fz-feld:last-child { border-right: none; }
-        .fz-label { font-size: 8px; text-transform: uppercase; color: #64748b; letter-spacing: 0.06em; font-weight: 700; }
-        .fz-wert { font-size: 11px; font-weight: 700; color: #0f172a; margin-top: 3px; }
+        .fz-label { font-size: 7.5px; text-transform: uppercase; color: #64748b; letter-spacing: 0.06em; font-weight: 700; }
+        .fz-wert { font-size: 10.5px; font-weight: 700; color: #0f172a; margin-top: 2px; }
 
         /* Positionen-Tabelle */
-        table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
         thead tr { background: #1e293b; color: white; }
-        th { padding: 7px 10px; text-align: left; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
+        th { padding: 6px 8px; text-align: left; font-size: 8.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
         th.ta-right { text-align: right; }
-        td { padding: 6px 10px; font-size: 10px; border-bottom: 1px solid #f1f5f9; }
+        td { padding: 5px 8px; font-size: 9.5px; border-bottom: 1px solid #f1f5f9; }
         td.ta-right { text-align: right; }
-        tr.section-header td { background: #f8fafc; font-weight: 700; font-size: 10px; color: #475569; padding: 5px 10px; }
-        tr.summen td { padding: 5px 10px; font-size: 11px; }
-        tr.gesamt td { font-weight: 700; font-size: 13px; border-top: 2px solid #1e293b; background: #f8fafc; }
-        tr.mwst-hinweis td { font-size: 9px; color: #64748b; font-style: italic; padding: 8px 10px; }
+        tr.section-header td { background: #f8fafc; font-weight: 700; font-size: 9.5px; color: #475569; padding: 4px 8px; }
+        tr.summen td { padding: 4px 8px; font-size: 10.5px; }
+        tr.gesamt td { font-weight: 700; font-size: 12px; border-top: 2px solid #1e293b; background: #f8fafc; }
+        tr.mwst-hinweis td { font-size: 8.5px; color: #64748b; font-style: italic; padding: 6px 8px; }
 
-        /* Zahlungsinfo */
-        .zahlung { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 20px; }
-        .zahlung-box { background: #f1f5f9; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 12px 16px; }
-        .zahlung-titel { font-size: 9px; font-weight: 700; text-transform: uppercase; color: #475569; letter-spacing: 0.06em; margin-bottom: 8px; border-bottom: 1px solid #cbd5e1; padding-bottom: 6px; }
-        .zahlung-wert { font-size: 11px; line-height: 1.8; }
+        /* Zahlungsinfo — 3 Spalten wenn QR vorhanden, sonst 2 */
+        .zahlung { display: grid; gap: 12px; margin-top: 14px; }
+        .zahlung-2 { grid-template-columns: 1fr 1fr; }
+        .zahlung-3 { grid-template-columns: 1fr 1fr auto; }
+        .zahlung-box { background: #f1f5f9; border: 1.5px solid #cbd5e1; border-radius: 7px; padding: 10px 13px; }
+        .zahlung-titel { font-size: 8.5px; font-weight: 700; text-transform: uppercase; color: #475569; letter-spacing: 0.06em; margin-bottom: 6px; border-bottom: 1px solid #cbd5e1; padding-bottom: 5px; }
+        .zahlung-wert { font-size: 10.5px; line-height: 1.75; }
         .zahlung-wert strong { color: #ea580c; }
-        .qr-row { display: flex; align-items: flex-start; gap: 16px; margin-top: 16px; }
-        .qr-item { background: #f8fafc; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 10px 12px; display: flex; align-items: center; gap: 12px; flex: 1; }
-        .qr-label { font-size: 9px; font-weight: 700; text-transform: uppercase; color: #475569; letter-spacing: 0.06em; margin-bottom: 2px; }
-        .qr-hint { font-size: 8px; color: #94a3b8; line-height: 1.4; }
+        /* QR-Spalte */
+        .qr-box { background: #f1f5f9; border: 1.5px solid #cbd5e1; border-radius: 7px; padding: 10px 13px; display: flex; flex-direction: column; gap: 8px; }
+        .qr-item { display: flex; align-items: center; gap: 8px; }
+        .qr-label { font-size: 8.5px; font-weight: 700; text-transform: uppercase; color: #475569; letter-spacing: 0.05em; }
+        .qr-hint { font-size: 7.5px; color: #94a3b8; line-height: 1.35; margin-top: 1px; }
 
         /* Fußzeile */
-        .footer { margin-top: 24px; border-top: 1px solid #e2e8f0; padding-top: 10px; font-size: 9px; color: #94a3b8; text-align: center; line-height: 1.6; }
+        .footer { margin-top: 14px; border-top: 1px solid #e2e8f0; padding-top: 8px; font-size: 8.5px; color: #94a3b8; text-align: center; line-height: 1.6; }
 
         .print-btn { position: fixed; top: 16px; right: 16px; background: #ea580c; color: white; border: none; border-radius: 6px; padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer; z-index: 999; }
         .back-btn { position: fixed; top: 16px; left: 16px; background: white; color: #334155; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer; z-index: 999; }
@@ -295,8 +296,8 @@ export function RechnungDruck({ auftrag, firma }: { auftrag: any; firma: Record<
           </tbody>
         </table>
 
-        {/* Zahlungsinfo */}
-        <div className="zahlung">
+        {/* Zahlungsinfo + QR in einer Zeile */}
+        <div className={`zahlung ${(giroQr || paypalQr) ? 'zahlung-3' : 'zahlung-2'}`}>
           <div className="zahlung-box">
             <div className="zahlung-titel">Zahlungsinformationen</div>
             <div className="zahlung-wert">
@@ -314,31 +315,30 @@ export function RechnungDruck({ auftrag, firma }: { auftrag: any; firma: Record<
               {!firma.firma_iban && <span style={{color:'#94a3b8'}}>Bitte IBAN in Einstellungen eintragen</span>}
             </div>
           </div>
+          {(giroQr || paypalQr) && (
+            <div className="qr-box">
+              <div className="zahlung-titel" style={{marginBottom: 6}}>Jetzt bezahlen</div>
+              {giroQr && (
+                <div className="qr-item">
+                  <img src={giroQr} alt="GiroCode" style={{width: 52, height: 52, borderRadius: 3, flexShrink: 0}} />
+                  <div>
+                    <div className="qr-label">GiroCode</div>
+                    <div className="qr-hint">Banking-App scannen<br />für Überweisung</div>
+                  </div>
+                </div>
+              )}
+              {paypalQr && (
+                <div className="qr-item">
+                  <img src={paypalQr} alt="PayPal" style={{width: 52, height: 52, borderRadius: 3, flexShrink: 0}} />
+                  <div>
+                    <div className="qr-label">PayPal</div>
+                    <div className="qr-hint">PayPal-App scannen<br />für Online-Zahlung</div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
-
-        {/* QR-Codes */}
-        {(giroQr || paypalQr) && (
-          <div className="qr-row">
-            {giroQr && (
-              <div className="qr-item">
-                <img src={giroQr} alt="GiroCode" style={{width: 64, height: 64, borderRadius: 4}} />
-                <div>
-                  <div className="qr-label">GiroCode</div>
-                  <div className="qr-hint">Banking-App scannen<br />für Sofortüberweisung</div>
-                </div>
-              </div>
-            )}
-            {paypalQr && (
-              <div className="qr-item">
-                <img src={paypalQr} alt="PayPal" style={{width: 64, height: 64, borderRadius: 4}} />
-                <div>
-                  <div className="qr-label">PayPal</div>
-                  <div className="qr-hint">PayPal-App scannen<br />für Online-Zahlung</div>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
 
         {/* Fußzeile */}
         <div className="footer">
