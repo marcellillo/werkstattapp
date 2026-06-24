@@ -2,6 +2,111 @@
 
 export type ErkannterStatus = 'bestellt' | 'unterwegs' | 'geliefert' | 'unbekannt'
 
+// ── Rechnungs-Erkennung ──────────────────────────────────────
+
+export interface ParsedRechnung {
+  istRechnung: true
+  lieferant: string
+  rechnungsnummer: string | null
+  datum: string | null
+  faelligAm: string | null
+  gesamt: number | null
+  positionen: { bezeichnung: string; teilenummer: string | null; menge: number; einzelpreis: number | null; gesamtpreis: number | null }[]
+}
+
+const RECHNUNG_PATTERNS = [
+  /ihre\s+rechnung/i, /rechnung\s+nr/i, /rechnungsnummer/i, /invoice\s+no/i,
+  /invoice\s+number/i, /zu\s+zahlen/i, /zahlungsziel/i, /fälligk/i,
+  /bitte\s+überweisen/i, /zahlbar\s+bis/i, /rechnungsbetrag/i,
+]
+
+const RECHNUNGSNR_PATTERNS = [
+  /re(?:chnungs)?(?:[-.\s]?nr\.?|nummer)[:\s]+([A-Z0-9\-\/]{3,20})/i,
+  /invoice\s+(?:no\.?|number)[:\s]+([A-Z0-9\-\/]{3,20})/i,
+  /\b(RE[-\/]?\d{4,10})\b/i,
+]
+
+const FAELLIG_PATTERNS = [
+  /(?:zahlungsziel|zahlbar bis|fällig am|fälligkeit|due date)[:\s]+(\d{1,2}[.\/-]\d{1,2}[.\/-]\d{2,4})/i,
+]
+
+const DATUM_PATTERNS = [
+  /(?:rechnungsdatum|datum|date)[:\s]+(\d{1,2}[.\/-]\d{1,2}[.\/-]\d{2,4})/i,
+  /(\d{1,2}\.\d{1,2}\.\d{4})/,
+]
+
+const GESAMT_PATTERNS = [
+  /(?:gesamt(?:betrag)?|total|summe|zu\s+zahlen|rechnungsbetrag)[:\s]*(\d+[.,]\d{2})\s*€/i,
+  /(\d+[.,]\d{2})\s*€\s*(?:gesamt|total|brutto)/i,
+]
+
+function parseGermanDate(s: string): string | null {
+  const m = s.match(/(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{2,4})/)
+  if (!m) return null
+  const [, d, mo, y] = m
+  const year = y.length === 2 ? `20${y}` : y
+  return `${year}-${mo.padStart(2, '0')}-${d.padStart(2, '0')}`
+}
+
+export function istRechnungsEmail(betreff: string, inhalt: string): boolean {
+  const text = `${betreff} ${inhalt}`
+  return RECHNUNG_PATTERNS.some(p => p.test(text))
+}
+
+export function parseRechnung(params: { absender: string; betreff: string; inhalt: string }): ParsedRechnung {
+  const { absender, betreff, inhalt } = params
+  const volltext = `${betreff}\n${inhalt}`
+
+  const lieferant = absender.split('@')[1]?.split('.')[0] ?? absender
+
+  let rechnungsnummer: string | null = null
+  for (const p of RECHNUNGSNR_PATTERNS) {
+    const m = volltext.match(p)
+    if (m) { rechnungsnummer = m[1]; break }
+  }
+
+  let datum: string | null = null
+  for (const p of DATUM_PATTERNS) {
+    const m = volltext.match(p)
+    if (m) { datum = parseGermanDate(m[1]); break }
+  }
+
+  let faelligAm: string | null = null
+  for (const p of FAELLIG_PATTERNS) {
+    const m = volltext.match(p)
+    if (m) { faelligAm = parseGermanDate(m[1]); break }
+  }
+
+  let gesamt: number | null = null
+  for (const p of GESAMT_PATTERNS) {
+    const m = volltext.match(p)
+    if (m) { gesamt = parseFloat(m[1].replace(',', '.')); break }
+  }
+  // Fallback: größter Betrag im Text
+  if (gesamt === null) {
+    const alle = [...volltext.matchAll(/(\d+[.,]\d{2})\s*€/g)]
+      .map(m => parseFloat(m[1].replace(',', '.')))
+    if (alle.length) gesamt = Math.max(...alle)
+  }
+
+  // Positionen aus Tabellenzeilen
+  const positionen: ParsedRechnung['positionen'] = []
+  for (const zeile of volltext.split('\n').map(z => z.trim()).filter(z => z.length > 4)) {
+    const m = zeile.match(/^(\d+)\s*x?\s+(.{4,60?}?)[\s\t]+(\d+[.,]\d{2})\s*€?\s*[\s\t]+(\d+[.,]\d{2})\s*€/)
+    if (m) {
+      positionen.push({
+        bezeichnung: m[2].trim(),
+        teilenummer: null,
+        menge: parseInt(m[1]),
+        einzelpreis: parseFloat(m[3].replace(',', '.')),
+        gesamtpreis: parseFloat(m[4].replace(',', '.')),
+      })
+    }
+  }
+
+  return { istRechnung: true, lieferant, rechnungsnummer, datum, faelligAm, gesamt, positionen }
+}
+
 export interface ParsedEmail {
   lieferant: string
   status: ErkannterStatus

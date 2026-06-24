@@ -1,9 +1,10 @@
 'use client'
 import { useState, useRef } from 'react'
-import { Receipt, Upload, X, ChevronDown, ChevronUp, Package, Loader2, CheckCircle, AlertCircle, Mail, RefreshCw } from 'lucide-react'
+import { Receipt, Upload, X, ChevronDown, ChevronUp, Package, Loader2, CheckCircle, AlertCircle, Mail, AlertTriangle, Euro } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { createClient } from '@/lib/supabase/client'
 
 type Position = {
   id: string
@@ -19,9 +20,17 @@ type Rechnung = {
   lieferant: string | null
   rechnungsnummer: string | null
   datum: string | null
+  faellig_am: string | null
   gesamt: number | null
+  bezahlt: boolean
+  bezahlt_am: string | null
   erstellt_am: string
   positionen: Position[]
+}
+
+function fmt(d?: string | null) {
+  if (!d) return null
+  return new Date(d).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
 export function RechnungenContent({ rechnungen: initial }: { rechnungen: Rechnung[] }) {
@@ -32,153 +41,141 @@ export function RechnungenContent({ rechnungen: initial }: { rechnungen: Rechnun
   const [erfolg, setErfolg] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [dragOver, setDragOver] = useState(false)
+  const [filter, setFilter] = useState<'alle' | 'offen' | 'bezahlt'>('alle')
   const inputRef = useRef<HTMLInputElement>(null)
+  const supabase = createClient()
+
+  async function toggleBezahlt(r: Rechnung) {
+    const neuBezahlt = !r.bezahlt
+    const heute = new Date().toISOString().split('T')[0]
+    setRechnungen(prev => prev.map(x => x.id === r.id
+      ? { ...x, bezahlt: neuBezahlt, bezahlt_am: neuBezahlt ? heute : null }
+      : x
+    ))
+    await supabase.from('rechnungen').update({
+      bezahlt: neuBezahlt,
+      bezahlt_am: neuBezahlt ? heute : null,
+    }).eq('id', r.id)
+  }
 
   async function emailSync() {
-    setSyncing(true)
-    setFehler(null)
-    setErfolg(null)
+    setSyncing(true); setFehler(null); setErfolg(null)
     try {
       const res = await fetch('/api/email-sync', { method: 'POST' })
       const data = await res.json()
-      if (!res.ok || !data.erfolg) {
-        setFehler(data.error ?? 'Sync fehlgeschlagen')
-        return
-      }
-      if (data.rechnungenImportiert > 0) {
-        // Neu laden
+      if (!res.ok || !data.erfolg) { setFehler(data.error ?? 'Sync fehlgeschlagen'); return }
+
+      const teile = data.statusAktualisiert ?? 0
+      const rech = data.rechnungenImportiert ?? 0
+      if (rech > 0) {
         const res2 = await fetch('/api/rechnung-import/list')
-        if (res2.ok) {
-          const { rechnungen: neu } = await res2.json()
-          setRechnungen(neu)
-        }
-        setErfolg(`${data.rechnungenImportiert} Rechnung${data.rechnungenImportiert !== 1 ? 'en' : ''} aus ${data.emailsGeprueft} E-Mails importiert.`)
-      } else {
-        setErfolg(`${data.emailsGeprueft} E-Mails geprüft — keine neuen Rechnungen gefunden.`)
+        if (res2.ok) { const { rechnungen: neu } = await res2.json(); setRechnungen(neu) }
       }
-    } catch (e: any) {
-      setFehler(e.message)
-    } finally {
-      setSyncing(false)
-    }
+      const teile_str = teile > 0 ? `, ${teile} Teile aktualisiert` : ''
+      const rech_str = rech > 0 ? `${rech} Rechnung${rech !== 1 ? 'en' : ''} importiert` : 'Keine neuen Rechnungen'
+      setErfolg(`${data.emailsGeprueft} E-Mails geprüft — ${rech_str}${teile_str}`)
+    } catch (e: any) { setFehler(e.message) }
+    finally { setSyncing(false) }
   }
 
   async function uploadRechnung(file: File) {
-    setUploading(true)
-    setFehler(null)
-    setErfolg(null)
-
-    const fd = new FormData()
-    fd.append('datei', file)
-
+    setUploading(true); setFehler(null); setErfolg(null)
+    const fd = new FormData(); fd.append('datei', file)
     try {
       const res = await fetch('/api/rechnung-import', { method: 'POST', body: fd })
       const data = await res.json()
-
-      if (!res.ok || !data.erfolg) {
-        setFehler(data.error ?? 'Unbekannter Fehler')
-        return
-      }
-
-      // Neu laden
+      if (!res.ok || !data.erfolg) { setFehler(data.error ?? 'Fehler beim Import'); return }
       const res2 = await fetch('/api/rechnung-import/list')
-      if (res2.ok) {
-        const { rechnungen: neu } = await res2.json()
-        setRechnungen(neu)
-      } else {
-        // Fallback: Seite neu laden
-        window.location.reload()
-        return
-      }
-
-      setErfolg(`Rechnung von ${data.extrakt.lieferant ?? 'Unbekannt'} erfolgreich importiert (${data.extrakt.positionen?.length ?? 0} Positionen)`)
+      if (res2.ok) { const { rechnungen: neu } = await res2.json(); setRechnungen(neu) }
+      else window.location.reload()
+      setErfolg(`Rechnung von ${data.extrakt.lieferant ?? 'Unbekannt'} importiert`)
       setExpandedId(data.rechnungId)
-    } catch (e: any) {
-      setFehler(e.message)
-    } finally {
-      setUploading(false)
-    }
+    } catch (e: any) { setFehler(e.message) }
+    finally { setUploading(false) }
   }
 
   function handleFiles(files: FileList | null) {
     if (!files?.length) return
     const file = files[0]
-    const ok = file.type === 'application/pdf' || file.type.startsWith('image/')
-    if (!ok) { setFehler('Nur PDF oder Bilder erlaubt'); return }
+    if (file.type !== 'application/pdf' && !file.type.startsWith('image/')) { setFehler('Nur PDF oder Bilder erlaubt'); return }
     uploadRechnung(file)
   }
 
-  const gesamtGekauft = rechnungen.reduce((s, r) => s + (r.gesamt ?? 0), 0)
-  const anzahlPositionen = rechnungen.reduce((s, r) => s + r.positionen.length, 0)
+  const heute = new Date().toISOString().split('T')[0]
+  const gefiltert = rechnungen.filter(r =>
+    filter === 'offen' ? !r.bezahlt :
+    filter === 'bezahlt' ? r.bezahlt : true
+  )
+  const offene = rechnungen.filter(r => !r.bezahlt)
+  const ueberfaellig = offene.filter(r => r.faellig_am && r.faellig_am < heute)
+  const offenBetrag = offene.reduce((s, r) => s + (r.gesamt ?? 0), 0)
+  const gesamtBetrag = rechnungen.reduce((s, r) => s + (r.gesamt ?? 0), 0)
 
   return (
     <div className="space-y-5">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Lieferantenrechnungen</h1>
-          <p className="text-sm text-gray-500 mt-0.5">{rechnungen.length} Rechnungen · {anzahlPositionen} Positionen gesamt</p>
+          <h1 className="text-2xl font-bold text-slate-900">Lieferantenrechnungen</h1>
+          <p className="text-sm text-slate-500 mt-0.5">{rechnungen.length} Rechnungen · {offene.length} offen</p>
         </div>
-        <Button
-          onClick={emailSync}
-          disabled={syncing}
-          className="bg-blue-600 hover:bg-blue-700 text-white flex-shrink-0"
-        >
-          {syncing
-            ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Syncing…</>
-            : <><Mail className="w-4 h-4 mr-2" />E-Mails sync</>
-          }
+        <Button onClick={emailSync} disabled={syncing} className="flex-shrink-0">
+          {syncing ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Prüfe…</> : <><Mail className="w-4 h-4 mr-2" />E-Mails prüfen</>}
         </Button>
       </div>
 
-      {/* KPI-Zeile */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        <Card>
+      {/* KPIs */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <Card className="card-hover">
           <CardContent className="p-4">
-            <p className="text-xs text-gray-500 uppercase tracking-wide">Rechnungen</p>
-            <p className="text-2xl font-bold text-gray-900 mt-1">{rechnungen.length}</p>
+            <p className="text-xs text-slate-500 uppercase tracking-wide">Gesamt</p>
+            <p className="text-2xl font-bold text-slate-900 mt-1">{rechnungen.length}</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className={cn('card-hover', ueberfaellig.length > 0 && 'border-red-300 bg-red-50/40')}>
           <CardContent className="p-4">
-            <p className="text-xs text-gray-500 uppercase tracking-wide">Teile eingekauft</p>
-            <p className="text-2xl font-bold text-gray-900 mt-1">{anzahlPositionen}</p>
+            <p className="text-xs text-slate-500 uppercase tracking-wide flex items-center gap-1">
+              {ueberfaellig.length > 0 && <AlertTriangle className="w-3 h-3 text-red-500" />} Überfällig
+            </p>
+            <p className={cn('text-2xl font-bold mt-1', ueberfaellig.length > 0 ? 'text-red-600 status-pulse' : 'text-slate-900')}>{ueberfaellig.length}</p>
           </CardContent>
         </Card>
-        <Card className="col-span-2 sm:col-span-1">
+        <Card className="card-hover">
           <CardContent className="p-4">
-            <p className="text-xs text-gray-500 uppercase tracking-wide">Einkaufswert gesamt</p>
-            <p className="text-2xl font-bold text-orange-600 mt-1">{gesamtGekauft.toFixed(2)} €</p>
+            <p className="text-xs text-slate-500 uppercase tracking-wide">Offen</p>
+            <p className="text-2xl font-bold text-amber-600 mt-1">{offenBetrag.toFixed(2)} €</p>
+          </CardContent>
+        </Card>
+        <Card className="card-hover">
+          <CardContent className="p-4">
+            <p className="text-xs text-slate-500 uppercase tracking-wide">Einkauf gesamt</p>
+            <p className="text-2xl font-bold text-slate-900 mt-1">{gesamtBetrag.toFixed(2)} €</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Upload-Bereich */}
+      {/* Upload */}
       <div
         onDragOver={e => { e.preventDefault(); setDragOver(true) }}
         onDragLeave={() => setDragOver(false)}
         onDrop={e => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files) }}
         onClick={() => !uploading && inputRef.current?.click()}
         className={cn(
-          'border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all',
-          dragOver ? 'border-orange-400 bg-orange-50' : 'border-gray-200 bg-white hover:border-orange-300 hover:bg-orange-50/30',
+          'border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all',
+          dragOver ? 'border-orange-400 bg-orange-50' : 'border-slate-200 bg-white hover:border-orange-300 hover:bg-orange-50/30',
           uploading && 'pointer-events-none opacity-70'
         )}
       >
         <input ref={inputRef} type="file" accept="application/pdf,image/*" className="hidden" onChange={e => handleFiles(e.target.files)} />
         {uploading ? (
-          <div className="flex flex-col items-center gap-3">
-            <Loader2 className="w-10 h-10 text-orange-500 animate-spin" />
-            <p className="font-medium text-gray-700">Claude liest die Rechnung aus…</p>
-            <p className="text-sm text-gray-500">Das kann 10–30 Sekunden dauern</p>
+          <div className="flex flex-col items-center gap-2">
+            <Loader2 className="w-8 h-8 text-orange-500 animate-spin" />
+            <p className="font-medium text-slate-700">Rechnung wird ausgelesen…</p>
           </div>
         ) : (
-          <div className="flex flex-col items-center gap-3">
-            <Upload className="w-10 h-10 text-gray-300" />
-            <div>
-              <p className="font-medium text-gray-700">Rechnung hochladen</p>
-              <p className="text-sm text-gray-500 mt-1">PDF oder Foto hierher ziehen, oder klicken zum Auswählen</p>
-            </div>
-            <p className="text-xs text-gray-400">Claude extrahiert automatisch Teile, Mengen und Preise</p>
+          <div className="flex flex-col items-center gap-2">
+            <Upload className="w-8 h-8 text-slate-300" />
+            <p className="font-medium text-slate-700">Rechnung hochladen</p>
+            <p className="text-xs text-slate-400">PDF oder Foto — wird automatisch ausgelesen</p>
           </div>
         )}
       </div>
@@ -199,97 +196,107 @@ export function RechnungenContent({ rechnungen: initial }: { rechnungen: Rechnun
         </div>
       )}
 
-      {/* Rechnungsliste */}
-      {rechnungen.length === 0 ? (
+      {/* Filter */}
+      <div className="flex gap-2">
+        {(['alle', 'offen', 'bezahlt'] as const).map(f => (
+          <button key={f} onClick={() => setFilter(f)}
+            className={cn('px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors',
+              filter === f ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400'
+            )}>
+            {f === 'alle' ? `Alle (${rechnungen.length})` : f === 'offen' ? `Offen (${offene.length})` : `Bezahlt (${rechnungen.length - offene.length})`}
+          </button>
+        ))}
+      </div>
+
+      {/* Liste */}
+      {gefiltert.length === 0 ? (
         <Card>
           <CardContent className="py-16 text-center">
-            <Receipt className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-            <p className="text-gray-500">Noch keine Rechnungen importiert</p>
-            <p className="text-sm text-gray-400 mt-1">Lade eine Rechnung hoch um zu starten</p>
+            <Receipt className="w-12 h-12 mx-auto mb-3 text-slate-200" />
+            <p className="text-slate-500">Keine Rechnungen gefunden</p>
           </CardContent>
         </Card>
       ) : (
         <div className="space-y-2">
-          {rechnungen.map(r => {
+          {gefiltert.map(r => {
             const open = expandedId === r.id
+            const ueberfaelligR = !r.bezahlt && r.faellig_am && r.faellig_am < heute
             return (
-              <div key={r.id} className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-                {/* Header */}
-                <button
-                  onClick={() => setExpandedId(open ? null : r.id)}
-                  className="w-full flex items-center gap-4 px-5 py-4 text-left hover:bg-gray-50 transition-colors"
-                >
-                  <div className="w-9 h-9 rounded-lg bg-orange-100 flex items-center justify-center flex-shrink-0">
-                    <Receipt className="w-4 h-4 text-orange-600" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-gray-900 truncate">{r.lieferant ?? 'Unbekannter Lieferant'}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      {r.rechnungsnummer && <span className="font-mono mr-2">{r.rechnungsnummer}</span>}
-                      {r.datum && <span>{new Date(r.datum).toLocaleDateString('de-DE')}</span>}
-                      <span className="ml-2 text-gray-400">· {r.positionen.length} Positionen</span>
-                    </p>
-                  </div>
-                  <div className="text-right flex-shrink-0">
-                    {r.gesamt != null && (
-                      <p className="font-bold text-gray-900">{r.gesamt.toFixed(2)} €</p>
+              <div key={r.id} className={cn('bg-white border rounded-xl overflow-hidden transition-all',
+                ueberfaelligR ? 'border-red-300' : r.bezahlt ? 'border-green-200' : 'border-slate-200'
+              )}>
+                <div className="flex items-center gap-3 px-4 py-3.5">
+                  {/* Bezahlt-Toggle */}
+                  <button
+                    onClick={() => toggleBezahlt(r)}
+                    title={r.bezahlt ? 'Als offen markieren' : 'Als bezahlt markieren'}
+                    className={cn(
+                      'w-7 h-7 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all',
+                      r.bezahlt
+                        ? 'bg-green-500 border-green-500 text-white'
+                        : ueberfaelligR
+                        ? 'border-red-400 hover:border-red-600'
+                        : 'border-slate-300 hover:border-green-400'
                     )}
-                  </div>
-                  {open ? <ChevronUp className="w-4 h-4 text-gray-400 flex-shrink-0" /> : <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0" />}
-                </button>
+                  >
+                    {r.bezahlt && <CheckCircle className="w-4 h-4" />}
+                  </button>
 
-                {/* Positionen */}
-                {open && r.positionen.length > 0 && (
-                  <div className="border-t border-gray-100">
-                    <div className="overflow-x-auto">
-                      <table className="w-full">
-                        <thead>
-                          <tr className="bg-gray-50">
-                            <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-5 py-2.5">Bezeichnung</th>
-                            <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-2.5 hidden sm:table-cell">Teilenummer</th>
-                            <th className="text-right text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-2.5">Menge</th>
-                            <th className="text-right text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-2.5">Einzelpreis</th>
-                            <th className="text-right text-xs font-semibold text-gray-500 uppercase tracking-wide px-5 py-2.5">Gesamt</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-50">
-                          {r.positionen.map(p => (
-                            <tr key={p.id} className="hover:bg-gray-50/50">
-                              <td className="px-5 py-3">
-                                <div className="flex items-center gap-2">
-                                  <Package className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                                  <span className="text-sm text-gray-800">{p.bezeichnung}</span>
-                                </div>
-                              </td>
-                              <td className="px-4 py-3 hidden sm:table-cell">
-                                <span className="text-xs font-mono text-gray-500">{p.teilenummer ?? '—'}</span>
-                              </td>
-                              <td className="px-4 py-3 text-right">
-                                <span className="text-sm text-gray-700">{p.menge}x</span>
-                              </td>
-                              <td className="px-4 py-3 text-right">
-                                <span className="text-sm text-gray-700">{p.einzelpreis != null ? `${p.einzelpreis.toFixed(2)} €` : '—'}</span>
-                              </td>
-                              <td className="px-5 py-3 text-right">
-                                <span className="text-sm font-medium text-gray-900">
-                                  {p.gesamtpreis != null ? `${p.gesamtpreis.toFixed(2)} €` : '—'}
-                                </span>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                        <tfoot>
-                          <tr className="border-t border-gray-200 bg-gray-50">
-                            <td colSpan={4} className="px-5 py-3 text-sm font-semibold text-gray-700 text-right">Summe</td>
-                            <td className="px-5 py-3 text-right">
-                              <span className="text-sm font-bold text-orange-600">
-                                {r.gesamt != null ? `${r.gesamt.toFixed(2)} €` : '—'}
-                              </span>
-                            </td>
-                          </tr>
-                        </tfoot>
-                      </table>
+                  <button onClick={() => setExpandedId(open ? null : r.id)} className="flex-1 flex items-center gap-3 text-left min-w-0">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-semibold text-slate-900 text-sm truncate">{r.lieferant ?? 'Unbekannter Lieferant'}</p>
+                        {ueberfaelligR && <span className="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full font-medium status-pulse">Überfällig</span>}
+                        {r.bezahlt && <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-medium">Bezahlt {fmt(r.bezahlt_am) ?? ''}</span>}
+                      </div>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        {r.rechnungsnummer && <span className="font-mono mr-2">{r.rechnungsnummer}</span>}
+                        {r.datum && <span>{fmt(r.datum)}</span>}
+                        {r.faellig_am && !r.bezahlt && <span className={cn('ml-2', ueberfaelligR ? 'text-red-600 font-medium' : 'text-slate-400')}>· Fällig {fmt(r.faellig_am)}</span>}
+                        <span className="ml-2 text-slate-400">· {r.positionen.length} Positionen</span>
+                      </p>
                     </div>
+                    <div className="flex items-center gap-3 flex-shrink-0">
+                      {r.gesamt != null && (
+                        <p className={cn('font-bold text-sm', r.bezahlt ? 'text-green-600' : ueberfaelligR ? 'text-red-600' : 'text-slate-900')}>
+                          {r.gesamt.toFixed(2)} €
+                        </p>
+                      )}
+                      {open ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+                    </div>
+                  </button>
+                </div>
+
+                {open && r.positionen.length > 0 && (
+                  <div className="border-t border-slate-100 overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="bg-slate-50">
+                          <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wide px-5 py-2.5">Bezeichnung</th>
+                          <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wide px-4 py-2.5 hidden sm:table-cell">Teile-Nr.</th>
+                          <th className="text-right text-xs font-semibold text-slate-500 uppercase tracking-wide px-4 py-2.5">Menge</th>
+                          <th className="text-right text-xs font-semibold text-slate-500 uppercase tracking-wide px-4 py-2.5">Einzelpreis</th>
+                          <th className="text-right text-xs font-semibold text-slate-500 uppercase tracking-wide px-5 py-2.5">Gesamt</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-50">
+                        {r.positionen.map(p => (
+                          <tr key={p.id} className="row-interactive">
+                            <td className="px-5 py-3"><div className="flex items-center gap-2"><Package className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" /><span className="text-sm text-slate-800">{p.bezeichnung}</span></div></td>
+                            <td className="px-4 py-3 hidden sm:table-cell"><span className="text-xs font-mono text-slate-500">{p.teilenummer ?? '—'}</span></td>
+                            <td className="px-4 py-3 text-right text-sm text-slate-700">{p.menge}x</td>
+                            <td className="px-4 py-3 text-right text-sm text-slate-700">{p.einzelpreis != null ? `${p.einzelpreis.toFixed(2)} €` : '—'}</td>
+                            <td className="px-5 py-3 text-right text-sm font-medium text-slate-900">{p.gesamtpreis != null ? `${p.gesamtpreis.toFixed(2)} €` : '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr className="border-t border-slate-200 bg-slate-50">
+                          <td colSpan={4} className="px-5 py-3 text-sm font-semibold text-slate-700 text-right">Summe</td>
+                          <td className="px-5 py-3 text-right text-sm font-bold text-orange-600">{r.gesamt != null ? `${r.gesamt.toFixed(2)} €` : '—'}</td>
+                        </tr>
+                      </tfoot>
+                    </table>
                   </div>
                 )}
               </div>

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { refreshAccessToken, fetchUnreadMessages, markMessageAsRead } from '@/lib/graph-client'
-import { parseEmail } from '@/lib/email-parser'
+import { parseEmail, istRechnungsEmail, parseRechnung } from '@/lib/email-parser'
 
 export async function POST() {
   const supabase = await createClient()
@@ -40,6 +40,7 @@ export async function POST() {
 
     let neuErstellt = 0
     let statusAktualisiert = 0
+    let rechnungenImportiert = 0
     const fehler: string[] = []
 
     for (const msg of messages) {
@@ -48,11 +49,34 @@ export async function POST() {
           ? msg.body.content.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 6000)
           : msg.body.content.slice(0, 6000)
 
-        const parsed = parseEmail({
-          absender: msg.from.emailAddress.address,
-          betreff: msg.subject ?? '',
-          inhalt,
-        })
+        const absender = msg.from.emailAddress.address
+        const betreff = msg.subject ?? ''
+
+        // ── Rechnungs-E-Mail? ────────────────────────────────
+        if (istRechnungsEmail(betreff, inhalt)) {
+          const r = parseRechnung({ absender, betreff, inhalt })
+          const { data: neu } = await supabase.from('rechnungen').insert({
+            lieferant: msg.from.emailAddress.name || r.lieferant,
+            rechnungsnummer: r.rechnungsnummer,
+            datum: r.datum,
+            faellig_am: r.faelligAm,
+            gesamt: r.gesamt,
+            absender_email: absender,
+            bezahlt: false,
+          }).select('id').single()
+
+          if (neu && r.positionen.length > 0) {
+            await supabase.from('rechnung_positionen').insert(
+              r.positionen.map(p => ({ rechnung_id: neu.id, ...p }))
+            )
+          }
+          rechnungenImportiert++
+          await markMessageAsRead(accessToken, msg.id)
+          continue
+        }
+
+        // ── Teile-Status-E-Mail ──────────────────────────────
+        const parsed = parseEmail({ absender, betreff, inhalt })
 
         // Nur E-Mails mit erkennbarem Status verarbeiten (Lieferant egal)
         if ((parsed.status as string) === 'unbekannt') {
@@ -62,7 +86,7 @@ export async function POST() {
 
         // Lieferantenname aus Absender ableiten falls unbekannt
         if (parsed.lieferant === 'Unbekannt') {
-          const absenderName = msg.from.emailAddress.name || msg.from.emailAddress.address.split('@')[1]?.split('.')[0] || 'Lieferant'
+          const absenderName = msg.from.emailAddress.name || absender.split('@')[1]?.split('.')[0] || 'Lieferant'
           parsed.lieferant = absenderName
         }
 
@@ -162,6 +186,7 @@ export async function POST() {
       emailsGeprueft: messages.length,
       neuErstellt,
       statusAktualisiert,
+      rechnungenImportiert,
       fehler,
     })
   } catch (e: any) {
