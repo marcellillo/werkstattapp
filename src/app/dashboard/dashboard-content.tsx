@@ -116,11 +116,11 @@ const auftragMap = new Map<string, Auftrag>()
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         {stats.map(({ label, value, icon: Icon, color, bg, href }) => (
           <Link key={label} href={href}>
-            <Card className="hover:shadow-md transition-shadow cursor-pointer"><CardContent className="p-5">
+            <Card className="card-hover cursor-pointer"><CardContent className="p-5">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-800">{label}</p>
-                  <p className="text-3xl font-bold text-gray-900 mt-1">{value}</p>
+                  <p className="text-sm text-slate-500">{label}</p>
+                  <p className="text-3xl font-bold text-slate-900 mt-1 stat-number">{value}</p>
                 </div>
                 <div className={`w-12 h-12 ${bg} rounded-xl flex items-center justify-center`}>
                   <Icon className={`w-6 h-6 ${color}`} />
@@ -340,7 +340,7 @@ function BuehneCard({
       onDragLeave={onDragLeave}
       onDrop={onAuftragDrop}
       className={cn(
-        'rounded-xl border-2 bg-white overflow-hidden transition-all duration-150',
+        'rounded-xl border-2 bg-white overflow-hidden transition-all duration-200 hover:shadow-md',
         borderColor,
       )}
     >
@@ -494,7 +494,7 @@ function AuftragCardFull({ auftrag, onStatusChange, overdue, accentColor, mitarb
       </div>
       {auftrag.arbeiten && <p className="text-xs text-gray-800 line-clamp-2 mb-2 flex items-start gap-1"><Wrench className="w-3 h-3 mt-0.5 flex-shrink-0 text-gray-600" />{auftrag.arbeiten}</p>}
       {auftrag.tuev_ergebnis && <div className={cn('text-xs px-2 py-0.5 rounded border mb-2 font-medium', TUEV_CFG[auftrag.tuev_ergebnis as keyof typeof TUEV_CFG]?.color)}>TÜV: {TUEV_CFG[auftrag.tuev_ergebnis as keyof typeof TUEV_CFG]?.label}</div>}
-      {overdue && <p className="text-xs text-red-600 font-medium mb-2 flex items-center gap-1"><AlertTriangle className="w-3 h-3" />Überfällig</p>}
+      {overdue && <p className="text-xs text-red-600 font-medium mb-2 flex items-center gap-1 status-pulse"><AlertTriangle className="w-3 h-3" />Überfällig</p>}
       <div className="relative mt-auto">
         <button onClick={e=>{e.stopPropagation();setShowMenu(v=>!v)}} className={cn('flex w-full items-center justify-center px-2.5 py-1.5 rounded-full text-xs font-semibold border', FAHRZEUG_STATUS_COLOR[auftrag.status])}>
           {FAHRZEUG_STATUS_LABEL[auftrag.status]}
@@ -548,7 +548,7 @@ function AuftragCardCompact({ auftrag, onStatusChange, overdue, mitarbeiter }: {
         </div>
         <p className="text-xs font-mono text-gray-800">{auftrag.fahrzeug?.kennzeichen}</p>
         {auftrag.arbeiten && <p className="text-xs text-gray-600 truncate mt-0.5">{auftrag.arbeiten}</p>}
-        {overdue && <p className="text-xs text-red-600 font-medium"><AlertTriangle className="w-3 h-3 inline mr-0.5" />Überfällig</p>}
+        {overdue && <p className="text-xs text-red-600 font-medium status-pulse"><AlertTriangle className="w-3 h-3 inline mr-0.5" />Überfällig</p>}
       </div>
       <div className="flex items-center gap-2 flex-shrink-0">
         <div className="relative">

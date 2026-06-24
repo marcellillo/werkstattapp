@@ -4,6 +4,7 @@ import { Sidebar } from './sidebar'
 import { Topbar } from './topbar'
 import { BottomNav } from './bottom-nav'
 import { RollenProvider } from '@/lib/rollen-context'
+import { PageTransition } from '@/components/ui/page-transition'
 import { cn } from '@/lib/utils'
 
 interface AppLayoutProps {
@@ -16,10 +17,10 @@ export function AppLayout({ children, title }: AppLayoutProps) {
 
   return (
     <RollenProvider>
-      <div className="flex h-screen bg-gray-50 overflow-hidden">
+      <div className="flex h-screen bg-slate-50 overflow-hidden">
         {sidebarOpen && (
           <div
-            className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+            className="fixed inset-0 bg-black/40 z-40 lg:hidden backdrop-blur-sm"
             onClick={() => setSidebarOpen(false)}
           />
         )}
@@ -33,8 +34,10 @@ export function AppLayout({ children, title }: AppLayoutProps) {
 
         <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
           <Topbar title={title} onMenuClick={() => setSidebarOpen(!sidebarOpen)} />
-          <main className="flex-1 overflow-y-auto p-4 md:p-6 pb-20 lg:pb-6">
-            {children}
+          <main className="flex-1 overflow-y-auto p-5 md:p-6 pb-20 lg:pb-6">
+            <PageTransition>
+              {children}
+            </PageTransition>
           </main>
         </div>
 

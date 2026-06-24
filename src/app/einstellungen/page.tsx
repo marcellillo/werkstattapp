@@ -27,6 +27,11 @@ export default async function EinstellungenPage() {
         initialConfig={{
           imap_email: cfg.imap_email ?? '',
           imap_password: cfg.imap_password ?? '',
+          graph_client_id: cfg.graph_client_id ?? '',
+          graph_tenant_id: cfg.graph_tenant_id ?? '',
+          graph_client_secret: cfg.graph_client_secret ?? '',
+          graph_email: cfg.graph_email ?? '',
+          graph_refresh_token: cfg.graph_refresh_token ?? '',
           anthropic_api_key: cfg.anthropic_api_key ?? '',
           firma_name: cfg.firma_name ?? '',
           firma_strasse: cfg.firma_strasse ?? '',

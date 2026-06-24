@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useRef, useMemo } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Car, User, Wrench, Package, Calendar, Plus, Trash2, CheckCircle, Clock, Circle, ChevronRight, ShieldCheck, Search, Printer, Receipt, Ban, UserCheck } from 'lucide-react'
+import { ArrowLeft, Car, User, Wrench, Package, Calendar, Plus, Trash2, CheckCircle, Clock, Circle, ChevronRight, ShieldCheck, Search, Printer, Receipt, Ban, UserCheck, ClipboardCheck, X } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { cn, formatDate, formatDateTime } from '@/lib/utils'
@@ -56,7 +56,23 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie 
   const [stornieren, setStornieren] = useState(false)
   const [mitarbeiter, setMitarbeiter] = useState<any[]>([])
   const [zugewiesenAn, setZugewiesenAn] = useState<string>(initialAuftrag.zugewiesen_an ?? '')
+  const [checklisteZiel, setChecklisteZiel] = useState<FahrzeugStatus | null>(null)
+  const [checklisteAbgehakt, setChecklisteAbgehakt] = useState<Record<string, boolean>>({})
   const supabase = createClient()
+
+  const CHECKLISTE_FERTIG = [
+    { id: 'arbeiten', label: 'Alle Arbeiten wurden erledigt' },
+    { id: 'teile', label: 'Alle Ersatzteile sind verbaut' },
+    { id: 'sauber', label: 'Fahrzeug wurde gereinigt' },
+    { id: 'rechnung', label: 'Rechnung wurde erstellt' },
+    { id: 'schluessel', label: 'Fahrzeugschlüssel sind bereit' },
+  ]
+  const CHECKLISTE_AUSGELIEFERT = [
+    { id: 'uebergabe', label: 'Fahrzeug wurde an Kunden übergeben' },
+    { id: 'bezahlt', label: 'Rechnung wurde bezahlt' },
+    { id: 'schluessel', label: 'Schlüssel wurden übergeben' },
+    { id: 'papiere', label: 'Fahrzeugpapiere wurden übergeben' },
+  ]
 
   // Lade Mitarbeiter
   useEffect(() => {
@@ -164,9 +180,27 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie 
       setBuehneWarnung(status)
       return
     }
+    // Checkliste vor Fertig / Ausgeliefert
+    if (status === 'fertig' || status === 'ausgeliefert') {
+      setChecklisteZiel(status)
+      setChecklisteAbgehakt({})
+      return
+    }
     setBuehneWarnung(null)
     setAuftrag(a => ({ ...a, status }))
     await supabase.from('auftraege').update({ status }).eq('id', auftrag.id)
+    fetch('/api/benachrichtigungen/generieren', { method: 'POST' }).catch(() => {})
+  }
+
+  async function handleChecklisteBestaetigen() {
+    if (!checklisteZiel) return
+    const status = checklisteZiel
+    setChecklisteZiel(null)
+    setBuehneWarnung(null)
+    setAuftrag(a => ({ ...a, status }))
+    const updates: Record<string, any> = { status }
+    if (status === 'fertig') updates.fertiggestellt_am = new Date().toISOString().split('T')[0]
+    await supabase.from('auftraege').update(updates).eq('id', auftrag.id)
     fetch('/api/benachrichtigungen/generieren', { method: 'POST' }).catch(() => {})
   }
 
@@ -277,6 +311,87 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie 
           </Link>
         </div>
       </div>
+
+      {/* Checkliste vor Fertig / Ausgeliefert */}
+      {checklisteZiel && (() => {
+        const items = checklisteZiel === 'fertig' ? CHECKLISTE_FERTIG : CHECKLISTE_AUSGELIEFERT
+        const alleAbgehakt = items.every(i => checklisteAbgehakt[i.id])
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
+                    <ClipboardCheck className="w-5 h-5 text-green-600" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-gray-900 text-lg">
+                      {checklisteZiel === 'fertig' ? 'Fahrzeug fertigstellen' : 'Fahrzeug ausliefern'}
+                    </h3>
+                    <p className="text-sm text-gray-500">Bitte alles abhaken bevor du fortfährst</p>
+                  </div>
+                </div>
+                <button onClick={() => setChecklisteZiel(null)} className="text-gray-400 hover:text-gray-600">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                {items.map(item => (
+                  <button
+                    key={item.id}
+                    onClick={() => setChecklisteAbgehakt(prev => ({ ...prev, [item.id]: !prev[item.id] }))}
+                    className={cn(
+                      'w-full flex items-center gap-4 p-4 rounded-xl border-2 text-left transition-all',
+                      checklisteAbgehakt[item.id]
+                        ? 'border-green-400 bg-green-50'
+                        : 'border-gray-200 bg-white hover:border-gray-300'
+                    )}
+                  >
+                    <div className={cn(
+                      'w-7 h-7 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all',
+                      checklisteAbgehakt[item.id]
+                        ? 'border-green-500 bg-green-500'
+                        : 'border-gray-300'
+                    )}>
+                      {checklisteAbgehakt[item.id] && <CheckCircle className="w-4 h-4 text-white" />}
+                    </div>
+                    <span className={cn(
+                      'font-medium text-sm',
+                      checklisteAbgehakt[item.id] ? 'text-green-800 line-through decoration-green-400' : 'text-gray-800'
+                    )}>
+                      {item.label}
+                    </span>
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex gap-3 pt-1">
+                <button
+                  onClick={() => setChecklisteZiel(null)}
+                  className="flex-1 px-4 py-3 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:border-gray-300 transition-colors"
+                >
+                  Abbrechen
+                </button>
+                <button
+                  onClick={handleChecklisteBestaetigen}
+                  disabled={!alleAbgehakt}
+                  className={cn(
+                    'flex-1 px-4 py-3 rounded-xl text-sm font-bold transition-all',
+                    alleAbgehakt
+                      ? 'bg-green-600 hover:bg-green-700 text-white'
+                      : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  )}
+                >
+                  {alleAbgehakt
+                    ? checklisteZiel === 'fertig' ? '✓ Fertigstellen' : '✓ Ausliefern'
+                    : `Noch ${items.filter(i => !checklisteAbgehakt[i.id]).length} offen`}
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Stornieren-Bestätigung */}
       {storniereBestaetigung && (

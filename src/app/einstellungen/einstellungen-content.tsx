@@ -11,6 +11,11 @@ import { DEFAULT_BERECHTIGUNGEN, type Rolle } from '@/lib/rollen-context'
 interface Config {
   imap_email: string
   imap_password: string
+  graph_client_id: string
+  graph_tenant_id: string
+  graph_client_secret: string
+  graph_email: string
+  graph_refresh_token: string
   anthropic_api_key: string
   // Firmendaten
   firma_name: string
@@ -48,6 +53,8 @@ export function EinstellungenContent({ initialConfig, profile, userEmail }: {
   const supabase = createClient()
 
   const isKonfiguriert = !!(config.imap_email && config.imap_password)
+  const isGraphVerbunden = !!config.graph_refresh_token
+  const isGraphKonfiguriert = !!(config.graph_client_id && config.graph_tenant_id && config.graph_client_secret)
 
   useEffect(() => {
     async function ladenRollen() {
@@ -297,44 +304,64 @@ export function EinstellungenContent({ initialConfig, profile, userEmail }: {
           <CardTitle className="flex items-center gap-2 text-base">
             <Mail className="w-5 h-5 text-orange-500" />
             E-Mail-Integration (Outlook / Microsoft 365)
-            {isKonfiguriert && (
+            {isGraphVerbunden && (
               <span className="ml-auto text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full flex items-center gap-1">
-                <CheckCircle className="w-3 h-3" /> Konfiguriert
+                <CheckCircle className="w-3 h-3" /> Verbunden
               </span>
             )}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
 
-          {!isKonfiguriert && (
-            <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 text-sm text-orange-800">
-              <p className="font-medium mb-1">Postfach verknüpfen</p>
-              <p>Gib deine Outlook-Adresse und ein App-Passwort ein. Die App liest dann automatisch Bestell- und Lieferbestätigungen ein.</p>
+          {/* Status */}
+          {isGraphVerbunden ? (
+            <div className="bg-green-50 border border-green-200 rounded-xl p-4 flex items-center gap-3">
+              <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-semibold text-green-800">Microsoft-Konto verbunden</p>
+                {config.graph_email && (
+                  <p className="text-xs text-green-600 mt-0.5">{config.graph_email}</p>
+                )}
+                <p className="text-xs text-green-600 mt-0.5">E-Mails von Nora Zentrum & PV werden automatisch ausgelesen.</p>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-800">
+              <p className="font-semibold mb-1">Schritt 1 von 2: Azure-Daten eintragen</p>
+              <p className="text-blue-600">Trage die Werte aus dem Azure Portal ein und klicke dann auf „Mit Microsoft verbinden".</p>
             </div>
           )}
 
+          {/* Azure Konfiguration */}
           <div className="space-y-3">
             <div>
-              <label className="text-xs font-medium text-gray-700 mb-1 block">E-Mail-Adresse</label>
+              <label className="text-xs font-medium text-gray-700 mb-1 block">Anwendungs-ID (Client ID)</label>
               <input
-                type="email"
-                value={config.imap_email}
-                onChange={e => setConfig(c => ({ ...c, imap_email: e.target.value }))}
-                placeholder="werkstatt@heliosautomobile.de"
-                className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                type="text"
+                value={config.graph_client_id}
+                onChange={e => setConfig(c => ({ ...c, graph_client_id: e.target.value }))}
+                placeholder="450742e8-235d-421a-a010-..."
+                className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-orange-400"
               />
             </div>
             <div>
-              <label className="text-xs font-medium text-gray-700 mb-1 block">
-                App-Passwort
-                <span className="ml-1 text-gray-400 font-normal">(nicht dein normales Passwort!)</span>
-              </label>
+              <label className="text-xs font-medium text-gray-700 mb-1 block">Verzeichnis-ID (Tenant ID)</label>
+              <input
+                type="text"
+                value={config.graph_tenant_id}
+                onChange={e => setConfig(c => ({ ...c, graph_tenant_id: e.target.value }))}
+                placeholder="a07e1d89-5fbc-4234-..."
+                className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-orange-400"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-700 mb-1 block">Client Secret (Wert)</label>
               <div className="relative">
                 <input
                   type={showPassword ? 'text' : 'password'}
-                  value={config.imap_password}
-                  onChange={e => setConfig(c => ({ ...c, imap_password: e.target.value }))}
-                  placeholder="xxxx xxxx xxxx xxxx"
+                  value={config.graph_client_secret}
+                  onChange={e => setConfig(c => ({ ...c, graph_client_secret: e.target.value }))}
+                  placeholder="Das Secret aus Azure → Zertifikate & Geheimnisse"
                   className="w-full px-3 py-2.5 pr-10 border border-gray-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-orange-400"
                 />
                 <button type="button" onClick={() => setShowPassword(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
@@ -344,20 +371,7 @@ export function EinstellungenContent({ initialConfig, profile, userEmail }: {
             </div>
           </div>
 
-          {/* Anleitung App-Passwort */}
-          <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 text-sm text-gray-700 space-y-2">
-            <p className="font-medium text-gray-900">App-Passwort erstellen (einmalig, 2 Minuten)</p>
-            <ol className="space-y-1 text-gray-600 list-decimal list-inside">
-              <li>Öffne <a href="https://account.microsoft.com/security" target="_blank" rel="noopener noreferrer" className="text-orange-600 hover:underline inline-flex items-center gap-0.5">account.microsoft.com/security <ExternalLink className="w-3 h-3" /></a></li>
-              <li>Melde dich mit deinem Microsoft-Konto an</li>
-              <li>Klicke auf <strong>„Erweiterte Sicherheitsoptionen"</strong></li>
-              <li>Unter App-Kennwörter: <strong>„Neues App-Kennwort erstellen"</strong></li>
-              <li>Name: „Werkstatt Manager" → Passwort kopieren und hier eintragen</li>
-            </ol>
-            <p className="text-xs text-gray-500 mt-1">Außerdem: In Outlook → Einstellungen → IMAP aktivieren (falls noch nicht an)</p>
-          </div>
-
-          {/* Speichern + Testen */}
+          {/* Buttons */}
           <div className="flex gap-3 flex-wrap">
             <button
               onClick={speichern}
@@ -367,35 +381,19 @@ export function EinstellungenContent({ initialConfig, profile, userEmail }: {
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
               {saved ? 'Gespeichert!' : 'Speichern'}
             </button>
-            {isKonfiguriert && (
-              <button
-                onClick={verbindungTesten}
-                disabled={testStatus === 'testing'}
-                className="flex items-center gap-2 px-4 py-2.5 border border-gray-200 hover:border-orange-300 text-gray-700 rounded-xl text-sm font-medium transition-colors disabled:opacity-50"
+            {isGraphKonfiguriert && (
+              <a
+                href="/api/graph/auth"
+                className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-medium transition-colors"
               >
-                {testStatus === 'testing'
-                  ? <Loader2 className="w-4 h-4 animate-spin" />
-                  : testStatus === 'ok'
-                  ? <Wifi className="w-4 h-4 text-green-500" />
-                  : testStatus === 'fehler'
-                  ? <WifiOff className="w-4 h-4 text-red-500" />
-                  : <Wifi className="w-4 h-4" />}
-                Verbindung testen
-              </button>
+                <Mail className="w-4 h-4" />
+                {isGraphVerbunden ? 'Erneut verbinden' : 'Mit Microsoft verbinden'}
+              </a>
             )}
           </div>
 
-          {testStatus === 'ok' && (
-            <div className="bg-green-50 border border-green-200 rounded-xl p-3 text-sm text-green-800 flex items-start gap-2">
-              <CheckCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-              <span>{testMsg}</span>
-            </div>
-          )}
-          {testStatus === 'fehler' && (
-            <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-800">
-              <p className="font-medium mb-0.5">Verbindungsfehler</p>
-              <p className="font-mono text-xs">{testMsg}</p>
-            </div>
+          {!isGraphKonfiguriert && (
+            <p className="text-xs text-gray-400">Erst speichern, dann erscheint der „Mit Microsoft verbinden"-Button.</p>
           )}
         </CardContent>
       </Card>
