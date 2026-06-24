@@ -39,10 +39,12 @@ interface Config {
   firma_stripe: string
 }
 
-export function EinstellungenContent({ initialConfig, profile, userEmail }: {
+export function EinstellungenContent({ initialConfig, profile, userEmail, urlError, urlSuccess }: {
   initialConfig: Config
   profile: any
   userEmail: string
+  urlError?: string
+  urlSuccess?: string
 }) {
   const [config, setConfig] = useState<Config>(initialConfig)
   const [logoUploading, setLogoUploading] = useState(false)
@@ -156,6 +158,23 @@ export function EinstellungenContent({ initialConfig, profile, userEmail }: {
         <h1 className="text-2xl font-bold text-gray-900">Einstellungen</h1>
         <p className="text-sm text-gray-800 mt-0.5">Werkstatt-Konfiguration</p>
       </div>
+
+      {/* OAuth-Rückmeldung aus URL-Parametern */}
+      {urlSuccess === 'graph_verbunden' && (
+        <div className="flex items-center gap-3 p-4 bg-green-50 border border-green-200 rounded-xl">
+          <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0" />
+          <p className="text-sm text-green-800 font-medium">Microsoft-Konto erfolgreich verbunden!</p>
+        </div>
+      )}
+      {urlError && (
+        <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-xl">
+          <span className="text-red-600 flex-shrink-0 mt-0.5">✕</span>
+          <div>
+            <p className="text-sm font-semibold text-red-800">Verbindung fehlgeschlagen</p>
+            <p className="text-xs text-red-700 mt-0.5 break-all">{decodeURIComponent(urlError)}</p>
+          </div>
+        </div>
+      )}
 
       {/* Firmendaten */}
       <Card>

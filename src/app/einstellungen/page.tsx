@@ -3,7 +3,11 @@ import { redirect } from 'next/navigation'
 import { AppLayout } from '@/components/layout/app-layout'
 import { EinstellungenContent } from './einstellungen-content'
 
-export default async function EinstellungenPage() {
+export default async function EinstellungenPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ success?: string; error?: string }>
+}) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
@@ -19,11 +23,15 @@ export default async function EinstellungenPage() {
     if (row.wert) cfg[row.schluessel] = row.wert
   }
 
+  const params = await searchParams
+
   return (
     <AppLayout title="Einstellungen">
       <EinstellungenContent
         profile={profile}
         userEmail={user.email ?? ''}
+        urlSuccess={params.success}
+        urlError={params.error}
         initialConfig={{
           imap_email: cfg.imap_email ?? '',
           imap_password: cfg.imap_password ?? '',
