@@ -10,7 +10,7 @@ export default async function KalenderPage() {
 
   const today = new Date().toISOString().split('T')[0]
 
-  const [{ data: auftraegeRaw }, { data: termineRaw }] = await Promise.all([
+  const [{ data: auftraegeRaw }, { data: termineRaw }, { data: kundenRaw }, { data: fahrzeugeRaw }] = await Promise.all([
     supabase
       .from('auftraege')
       .select(`
@@ -30,6 +30,14 @@ export default async function KalenderPage() {
       .gte('datum', today)
       .order('datum')
       .order('uhrzeit'),
+    supabase
+      .from('kunden')
+      .select('id, vorname, nachname, telefon, email')
+      .order('nachname'),
+    supabase
+      .from('fahrzeuge')
+      .select('id, kennzeichen, marke, modell, kunde_id')
+      .order('kennzeichen'),
   ])
 
   return (
@@ -37,6 +45,8 @@ export default async function KalenderPage() {
       <KalenderContent
         auftraege={(auftraegeRaw ?? []) as any[]}
         termine={(termineRaw ?? []) as any[]}
+        kunden={(kundenRaw ?? []) as any[]}
+        fahrzeuge={(fahrzeugeRaw ?? []) as any[]}
       />
     </AppLayout>
   )

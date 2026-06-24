@@ -1,7 +1,11 @@
 'use client'
-import { useState } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 import Link from 'next/link'
-import { ChevronLeft, ChevronRight, Calendar, Car, ShieldCheck, CalendarClock, AlertTriangle, Clock, CheckCircle } from 'lucide-react'
+import {
+  ChevronLeft, ChevronRight, Calendar, Car, ShieldCheck, CalendarClock,
+  AlertTriangle, Clock, CheckCircle, Plus, X, Search, User, UserPlus,
+  ChevronDown,
+} from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { cn, formatDate } from '@/lib/utils'
 import { FAHRZEUG_STATUS_LABEL, FAHRZEUG_STATUS_COLOR, type FahrzeugStatus } from '@/types/database'
@@ -26,7 +30,6 @@ function getWeekStart(date: Date) {
   return d
 }
 
-// Heute + N Werktage (Wochenenden überspringen)
 function addWerktage(tage: number): string {
   const d = new Date()
   let verbleibend = Math.ceil(tage)
@@ -38,11 +41,496 @@ function addWerktage(tage: number): string {
   return d.toISOString().split('T')[0]
 }
 
-export function KalenderContent({ auftraege: initialAuftraege, termine = [] }: { auftraege: any[]; termine?: any[] }) {
+// ── Kunden-Suche Dropdown ────────────────────────────────────────────────────
+function KundenSuche({
+  kunden,
+  selectedId,
+  onSelect,
+  onNeukunde,
+}: {
+  kunden: any[]
+  selectedId: string | null
+  onSelect: (k: any) => void
+  onNeukunde: () => void
+}) {
+  const [query, setQuery] = useState('')
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  const selected = kunden.find(k => k.id === selectedId)
+
+  const filtered = useMemo(() => {
+    if (!query.trim()) return kunden.slice(0, 20)
+    const q = query.toLowerCase()
+    return kunden.filter(k =>
+      `${k.vorname} ${k.nachname}`.toLowerCase().includes(q) ||
+      k.telefon?.includes(q) ||
+      k.email?.toLowerCase().includes(q)
+    ).slice(0, 20)
+  }, [kunden, query])
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        className="w-full flex items-center justify-between gap-2 border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white hover:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-400 transition-colors"
+      >
+        <span className={selected ? 'text-gray-900' : 'text-gray-400'}>
+          {selected ? `${selected.vorname} ${selected.nachname}` : 'Kunde auswählen …'}
+        </span>
+        <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0" />
+      </button>
+
+      {open && (
+        <div className="absolute z-50 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
+          <div className="p-2 border-b border-gray-100">
+            <div className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-1.5">
+              <Search className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+              <input
+                autoFocus
+                type="text"
+                value={query}
+                onChange={e => setQuery(e.target.value)}
+                placeholder="Name, Telefon …"
+                className="flex-1 bg-transparent text-sm outline-none text-gray-800 placeholder-gray-400"
+              />
+              {query && (
+                <button type="button" onClick={() => setQuery('')}>
+                  <X className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
+                </button>
+              )}
+            </div>
+          </div>
+          <div className="max-h-48 overflow-y-auto">
+            {filtered.length === 0 && (
+              <p className="text-xs text-gray-400 text-center py-4">Kein Kunde gefunden</p>
+            )}
+            {filtered.map(k => (
+              <button
+                key={k.id}
+                type="button"
+                onClick={() => { onSelect(k); setOpen(false); setQuery('') }}
+                className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-orange-50 text-left transition-colors"
+              >
+                <div className="w-7 h-7 rounded-full bg-orange-100 flex items-center justify-center flex-shrink-0">
+                  <User className="w-3.5 h-3.5 text-orange-500" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-gray-900">{k.vorname} {k.nachname}</p>
+                  {k.telefon && <p className="text-xs text-gray-400 truncate">{k.telefon}</p>}
+                </div>
+              </button>
+            ))}
+          </div>
+          <div className="border-t border-gray-100">
+            <button
+              type="button"
+              onClick={() => { setOpen(false); setQuery(''); onNeukunde() }}
+              className="w-full flex items-center gap-2 px-3 py-2.5 text-sm font-medium text-orange-600 hover:bg-orange-50 transition-colors"
+            >
+              <UserPlus className="w-4 h-4" />
+              + Neukunde anlegen
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Neuer Termin Seitenpanel ─────────────────────────────────────────────────
+function TerminPanel({
+  open,
+  onClose,
+  kunden,
+  fahrzeuge,
+  onSaved,
+}: {
+  open: boolean
+  onClose: () => void
+  kunden: any[]
+  fahrzeuge: any[]
+  onSaved: (termin: any) => void
+}) {
+  const supabase = createClient()
+  const today = new Date().toISOString().split('T')[0]
+
+  const [titel, setTitel] = useState('')
+  const [datum, setDatum] = useState(today)
+  const [uhrzeit, setUhrzeit] = useState('')
+  const [dauer, setDauer] = useState('')
+  const [typ, setTyp] = useState('werkstatt')
+  const [beschreibung, setBeschreibung] = useState('')
+  const [selectedKundeId, setSelectedKundeId] = useState<string | null>(null)
+  const [selectedFahrzeugId, setSelectedFahrzeugId] = useState<string | null>(null)
+
+  // Neukunde inline
+  const [showNeukunde, setShowNeukunde] = useState(false)
+  const [neuVorname, setNeuVorname] = useState('')
+  const [neuNachname, setNeuNachname] = useState('')
+  const [neuTelefon, setNeuTelefon] = useState('')
+  const [neuEmail, setNeuEmail] = useState('')
+
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  const kundeFahrzeuge = useMemo(
+    () => fahrzeuge.filter(f => f.kunde_id === selectedKundeId),
+    [fahrzeuge, selectedKundeId],
+  )
+
+  function reset() {
+    setTitel(''); setDatum(today); setUhrzeit(''); setDauer(''); setTyp('werkstatt')
+    setBeschreibung(''); setSelectedKundeId(null); setSelectedFahrzeugId(null)
+    setShowNeukunde(false); setNeuVorname(''); setNeuNachname(''); setNeuTelefon(''); setNeuEmail('')
+    setError('')
+  }
+
+  function handleClose() { reset(); onClose() }
+
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault()
+    if (!titel.trim()) { setError('Titel ist erforderlich'); return }
+    if (!datum) { setError('Datum ist erforderlich'); return }
+    setSaving(true); setError('')
+
+    try {
+      let kundeId = selectedKundeId
+
+      // Neukunde anlegen
+      if (showNeukunde && neuNachname.trim()) {
+        const { data: neuerKunde, error: kErr } = await supabase
+          .from('kunden')
+          .insert({ vorname: neuVorname.trim(), nachname: neuNachname.trim(), telefon: neuTelefon.trim() || null, email: neuEmail.trim() || null })
+          .select('id')
+          .single()
+        if (kErr) throw kErr
+        kundeId = neuerKunde.id
+      }
+
+      const { data: neu, error: tErr } = await supabase
+        .from('termine')
+        .insert({
+          titel: titel.trim(),
+          datum,
+          uhrzeit: uhrzeit || null,
+          dauer_minuten: dauer ? parseInt(dauer) : null,
+          typ,
+          status: 'geplant',
+          beschreibung: beschreibung.trim() || null,
+          kunde_id: kundeId || null,
+          fahrzeug_id: selectedFahrzeugId || null,
+        })
+        .select('id, titel, datum, uhrzeit, dauer_minuten, typ, status, beschreibung, fahrzeug:fahrzeuge(marke, modell, kennzeichen), kunde:kunden(vorname, nachname)')
+        .single()
+
+      if (tErr) throw tErr
+      onSaved(neu)
+      reset()
+      onClose()
+    } catch (err: any) {
+      setError(err.message ?? 'Fehler beim Speichern')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // ESC schließt
+  useEffect(() => {
+    if (!open) return
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') handleClose() }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [open])
+
+  return (
+    <>
+      {/* Backdrop */}
+      {open && (
+        <div
+          className="fixed inset-0 bg-black/20 z-40 transition-opacity"
+          onClick={handleClose}
+        />
+      )}
+
+      {/* Panel */}
+      <div className={cn(
+        'fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-2xl z-50 flex flex-col transition-transform duration-300',
+        open ? 'translate-x-0' : 'translate-x-full',
+      )}>
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 flex-shrink-0">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center">
+              <Plus className="w-4 h-4 text-orange-600" />
+            </div>
+            <h2 className="font-semibold text-gray-900">Neuer Termin</h2>
+          </div>
+          <button
+            type="button"
+            onClick={handleClose}
+            className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            <X className="w-5 h-5 text-gray-500" />
+          </button>
+        </div>
+
+        {/* Form */}
+        <form onSubmit={handleSave} className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+
+          {/* Titel */}
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1.5">Titel *</label>
+            <input
+              type="text"
+              value={titel}
+              onChange={e => setTitel(e.target.value)}
+              placeholder="z. B. Inspektion, TÜV-Vorbereitung …"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+            />
+          </div>
+
+          {/* Typ */}
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1.5">Typ</label>
+            <div className="flex gap-2">
+              {Object.entries(TERMIN_TYP_CFG).map(([key, cfg]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setTyp(key)}
+                  className={cn(
+                    'flex-1 py-2 rounded-lg text-xs font-medium border transition-colors',
+                    typ === key ? cfg.color + ' shadow-sm' : 'border-gray-200 text-gray-500 hover:border-gray-300',
+                  )}
+                >
+                  {cfg.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Datum & Uhrzeit */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1.5">Datum *</label>
+              <input
+                type="date"
+                value={datum}
+                min={today}
+                onChange={e => setDatum(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1.5">Uhrzeit</label>
+              <input
+                type="time"
+                value={uhrzeit}
+                onChange={e => setUhrzeit(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+              />
+            </div>
+          </div>
+
+          {/* Dauer */}
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1.5">Dauer (Minuten)</label>
+            <div className="flex gap-2">
+              {['30', '60', '90', '120'].map(m => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => setDauer(dauer === m ? '' : m)}
+                  className={cn(
+                    'flex-1 py-1.5 rounded-lg text-xs font-medium border transition-colors',
+                    dauer === m ? 'bg-orange-100 border-orange-300 text-orange-700' : 'border-gray-200 text-gray-500 hover:border-gray-300',
+                  )}
+                >
+                  {m}&apos;
+                </button>
+              ))}
+              <input
+                type="number"
+                min="5"
+                step="5"
+                value={dauer}
+                onChange={e => setDauer(e.target.value)}
+                placeholder="Min."
+                className="w-16 border border-gray-300 rounded-lg px-2 py-1.5 text-xs text-center focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+              />
+            </div>
+          </div>
+
+          {/* Trennlinie */}
+          <div className="border-t border-gray-100" />
+
+          {/* Kunde */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs font-medium text-gray-700">Kunde</label>
+              {selectedKundeId && (
+                <button
+                  type="button"
+                  onClick={() => { setSelectedKundeId(null); setSelectedFahrzeugId(null) }}
+                  className="text-xs text-gray-400 hover:text-red-400"
+                >
+                  Entfernen
+                </button>
+              )}
+            </div>
+
+            {!showNeukunde ? (
+              <KundenSuche
+                kunden={kunden}
+                selectedId={selectedKundeId}
+                onSelect={k => { setSelectedKundeId(k.id); setSelectedFahrzeugId(null) }}
+                onNeukunde={() => { setSelectedKundeId(null); setShowNeukunde(true) }}
+              />
+            ) : (
+              <div className="border border-orange-200 rounded-xl p-3 space-y-2.5 bg-orange-50/30">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-orange-700 flex items-center gap-1.5">
+                    <UserPlus className="w-3.5 h-3.5" /> Neukunde anlegen
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setShowNeukunde(false)}
+                    className="text-xs text-gray-400 hover:text-gray-600"
+                  >
+                    ← Zurück
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="text"
+                    value={neuVorname}
+                    onChange={e => setNeuVorname(e.target.value)}
+                    placeholder="Vorname"
+                    className="border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
+                  />
+                  <input
+                    type="text"
+                    value={neuNachname}
+                    onChange={e => setNeuNachname(e.target.value)}
+                    placeholder="Nachname *"
+                    className="border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
+                  />
+                </div>
+                <input
+                  type="tel"
+                  value={neuTelefon}
+                  onChange={e => setNeuTelefon(e.target.value)}
+                  placeholder="Telefon"
+                  className="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
+                />
+                <input
+                  type="email"
+                  value={neuEmail}
+                  onChange={e => setNeuEmail(e.target.value)}
+                  placeholder="E-Mail"
+                  className="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Fahrzeug (nur wenn Kunde ausgewählt) */}
+          {selectedKundeId && kundeFahrzeuge.length > 0 && (
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1.5">Fahrzeug</label>
+              <div className="space-y-1.5">
+                {kundeFahrzeuge.map(f => (
+                  <button
+                    key={f.id}
+                    type="button"
+                    onClick={() => setSelectedFahrzeugId(selectedFahrzeugId === f.id ? null : f.id)}
+                    className={cn(
+                      'w-full flex items-center gap-3 px-3 py-2 rounded-lg border text-left transition-colors',
+                      selectedFahrzeugId === f.id
+                        ? 'border-orange-400 bg-orange-50'
+                        : 'border-gray-200 hover:border-gray-300',
+                    )}
+                  >
+                    <Car className={cn('w-4 h-4 flex-shrink-0', selectedFahrzeugId === f.id ? 'text-orange-500' : 'text-gray-400')} />
+                    <span className="text-sm text-gray-900">{f.marke} {f.modell}</span>
+                    <span className="text-xs text-gray-500 font-mono ml-auto">{f.kennzeichen}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Beschreibung */}
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1.5">Notiz / Beschreibung</label>
+            <textarea
+              value={beschreibung}
+              onChange={e => setBeschreibung(e.target.value)}
+              rows={3}
+              placeholder="Optionale Anmerkungen …"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+            />
+          </div>
+
+          {error && (
+            <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+              {error}
+            </div>
+          )}
+        </form>
+
+        {/* Footer */}
+        <div className="px-5 py-4 border-t border-gray-200 flex gap-3 flex-shrink-0">
+          <button
+            type="button"
+            onClick={handleClose}
+            className="flex-1 py-2.5 rounded-lg border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+          >
+            Abbrechen
+          </button>
+          <button
+            type="submit"
+            form=""
+            onClick={handleSave}
+            disabled={saving}
+            className="flex-1 py-2.5 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-sm font-medium transition-colors disabled:opacity-60"
+          >
+            {saving ? 'Speichern …' : 'Termin anlegen'}
+          </button>
+        </div>
+      </div>
+    </>
+  )
+}
+
+// ── Haupt-Komponente ─────────────────────────────────────────────────────────
+export function KalenderContent({
+  auftraege: initialAuftraege,
+  termine: initialTermine = [],
+  kunden = [],
+  fahrzeuge = [],
+}: {
+  auftraege: any[]
+  termine?: any[]
+  kunden?: any[]
+  fahrzeuge?: any[]
+}) {
   const [auftraege, setAuftraege] = useState(initialAuftraege)
+  const [termine, setTermine] = useState(initialTermine)
   const [view, setView] = useState<ViewMode>('monat')
   const [currentDate, setCurrentDate] = useState(new Date())
   const [settingDateFor, setSettingDateFor] = useState<string | null>(null)
+  const [panelOpen, setPanelOpen] = useState(false)
   const supabase = createClient()
 
   const mitDatum   = auftraege.filter(a => a.geplante_fertigstellung)
@@ -59,6 +547,10 @@ export function KalenderContent({ auftraege: initialAuftraege, termine = [] }: {
   async function clearFertigstellung(auftragId: string) {
     setAuftraege(prev => prev.map(a => a.id === auftragId ? { ...a, geplante_fertigstellung: null } : a))
     await supabase.from('auftraege').update({ geplante_fertigstellung: null }).eq('id', auftragId)
+  }
+
+  function handleTerminSaved(termin: any) {
+    setTermine(prev => [...prev, termin].sort((a, b) => a.datum.localeCompare(b.datum)))
   }
 
   function navigate(delta: number) {
@@ -99,14 +591,23 @@ export function KalenderContent({ auftraege: initialAuftraege, termine = [] }: {
             {ueberfaellig.length > 0 && <span className="ml-2 text-red-600 font-medium">· {ueberfaellig.length} überfällig</span>}
           </p>
         </div>
-        <div className="flex bg-gray-100 rounded-lg p-1 gap-1">
-          {(['tag', 'woche', 'monat'] as ViewMode[]).map(v => (
-            <button key={v} onClick={() => setView(v)}
-              className={cn('px-3 py-1.5 rounded-md text-sm font-medium transition-colors capitalize',
-                view === v ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-700')}>
-              {v}
-            </button>
-          ))}
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setPanelOpen(true)}
+            className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white text-sm font-medium px-4 py-2 rounded-xl transition-colors shadow-sm"
+          >
+            <Plus className="w-4 h-4" />
+            Neuer Termin
+          </button>
+          <div className="flex bg-gray-100 rounded-lg p-1 gap-1">
+            {(['tag', 'woche', 'monat'] as ViewMode[]).map(v => (
+              <button key={v} onClick={() => setView(v)}
+                className={cn('px-3 py-1.5 rounded-md text-sm font-medium transition-colors capitalize',
+                  view === v ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-700')}>
+                {v}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -237,41 +738,37 @@ export function KalenderContent({ auftraege: initialAuftraege, termine = [] }: {
             <CardContent className="py-12 text-center">
               <Calendar className="w-10 h-10 mx-auto mb-2 text-gray-300" />
               <p className="text-gray-500">Keine Termine geplant</p>
-              <p className="text-xs text-gray-400 mt-1">Setze bei jedem Fahrzeug oben einen Termin</p>
+              <p className="text-xs text-gray-400 mt-1">Setze bei jedem Fahrzeug oben einen Termin oder klicke <button onClick={() => setPanelOpen(true)} className="text-orange-500 hover:underline">Neuer Termin</button></p>
             </CardContent>
           </Card>
         ) : (
           <div className="space-y-2">
-            {/* Termine */}
             {termine.map(t => {
               const cfg = getTerminCfg(t.typ)
               const Icon = cfg.icon
               return (
-                <Link key={`termin-${t.id}`} href="/termine">
-                  <div className="flex items-center gap-4 px-4 py-3 bg-white border border-gray-200 rounded-xl hover:border-blue-300 transition-colors">
-                    <div className={cn('w-12 h-12 rounded-xl flex flex-col items-center justify-center text-center flex-shrink-0', cfg.bg)}>
-                      <span className="text-xs font-bold text-gray-700">{new Date(t.datum + 'T00:00:00').toLocaleDateString('de-DE', { day: '2-digit' })}</span>
-                      <span className="text-xs text-gray-500">{new Date(t.datum + 'T00:00:00').toLocaleDateString('de-DE', { month: 'short' })}</span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <Icon className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                        <p className="font-medium text-gray-900 text-sm truncate">{t.titel}</p>
-                      </div>
-                      <p className="text-xs text-gray-500">
-                        {t.uhrzeit ? `${t.uhrzeit.slice(0,5)} Uhr` : 'Ganztägig'}
-                        {t.dauer_minuten ? ` · ${t.dauer_minuten} Min.` : ''}
-                        {t.fahrzeug?.kennzeichen ? ` · ${t.fahrzeug.kennzeichen}` : ''}
-                        {t.kunde?.nachname ? ` · ${t.kunde.vorname} ${t.kunde.nachname}` : ''}
-                      </p>
-                    </div>
-                    <span className={cn('text-xs px-2 py-0.5 rounded-full border font-medium flex-shrink-0', cfg.color)}>{cfg.label}</span>
+                <div key={`termin-${t.id}`} className="flex items-center gap-4 px-4 py-3 bg-white border border-gray-200 rounded-xl hover:border-blue-300 transition-colors">
+                  <div className={cn('w-12 h-12 rounded-xl flex flex-col items-center justify-center text-center flex-shrink-0', cfg.bg)}>
+                    <span className="text-xs font-bold text-gray-700">{new Date(t.datum + 'T00:00:00').toLocaleDateString('de-DE', { day: '2-digit' })}</span>
+                    <span className="text-xs text-gray-500">{new Date(t.datum + 'T00:00:00').toLocaleDateString('de-DE', { month: 'short' })}</span>
                   </div>
-                </Link>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <Icon className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                      <p className="font-medium text-gray-900 text-sm truncate">{t.titel}</p>
+                    </div>
+                    <p className="text-xs text-gray-500">
+                      {t.uhrzeit ? `${t.uhrzeit.slice(0,5)} Uhr` : 'Ganztägig'}
+                      {t.dauer_minuten ? ` · ${t.dauer_minuten} Min.` : ''}
+                      {t.fahrzeug?.kennzeichen ? ` · ${t.fahrzeug.kennzeichen}` : ''}
+                      {t.kunde?.nachname ? ` · ${t.kunde.vorname} ${t.kunde.nachname}` : ''}
+                    </p>
+                  </div>
+                  <span className={cn('text-xs px-2 py-0.5 rounded-full border font-medium flex-shrink-0', cfg.color)}>{cfg.label}</span>
+                </div>
               )
             })}
 
-            {/* Fahrzeug-Fertigstellungen */}
             {[...mitDatum].sort((a, b) => (a.geplante_fertigstellung ?? '').localeCompare(b.geplante_fertigstellung ?? '')).map(a => {
               const overdue = a.geplante_fertigstellung < today
               return (
@@ -304,7 +801,6 @@ export function KalenderContent({ auftraege: initialAuftraege, termine = [] }: {
                     <button
                       onClick={() => clearFertigstellung(a.id)}
                       className="text-xs text-gray-300 hover:text-red-400 transition-colors"
-                      title="Termin entfernen"
                     >
                       Termin entfernen
                     </button>
@@ -315,6 +811,15 @@ export function KalenderContent({ auftraege: initialAuftraege, termine = [] }: {
           </div>
         )}
       </div>
+
+      {/* Neuer Termin Panel */}
+      <TerminPanel
+        open={panelOpen}
+        onClose={() => setPanelOpen(false)}
+        kunden={kunden}
+        fahrzeuge={fahrzeuge}
+        onSaved={handleTerminSaved}
+      />
     </div>
   )
 }
@@ -358,11 +863,9 @@ function MonthView({ currentDate, getAuftraegeForDate, getTermineForDate }: {
               {dayTermine.slice(0, 1).map(t => {
                 const cfg = getTerminCfg(t.typ)
                 return (
-                  <Link key={t.id} href="/termine">
-                    <div className={cn('text-xs px-1.5 py-0.5 rounded truncate mb-0.5 font-medium border', cfg.color)}>
-                      {t.uhrzeit ? t.uhrzeit.slice(0,5) + ' ' : ''}{t.titel}
-                    </div>
-                  </Link>
+                  <div key={t.id} className={cn('text-xs px-1.5 py-0.5 rounded truncate mb-0.5 font-medium border', cfg.color)}>
+                    {t.uhrzeit ? t.uhrzeit.slice(0,5) + ' ' : ''}{t.titel}
+                  </div>
                 )
               })}
               {dayAuftraege.slice(0, dayTermine.length > 0 ? 1 : 2).map(a => {
@@ -409,11 +912,9 @@ function WeekView({ currentDate, getAuftraegeForDate, getTermineForDate }: {
             {dayTermine.map(t => {
               const cfg = getTerminCfg(t.typ)
               return (
-                <Link key={t.id} href="/termine">
-                  <div className={cn('text-xs px-2 py-1 rounded-lg mb-1 font-medium truncate border', cfg.color)}>
-                    {t.uhrzeit ? t.uhrzeit.slice(0,5) + ' ' : ''}{t.titel}
-                  </div>
-                </Link>
+                <div key={t.id} className={cn('text-xs px-2 py-1 rounded-lg mb-1 font-medium truncate border', cfg.color)}>
+                  {t.uhrzeit ? t.uhrzeit.slice(0,5) + ' ' : ''}{t.titel}
+                </div>
               )
             })}
             {dayAuftraege.map(a => {
@@ -463,24 +964,21 @@ function DayView({ currentDate, getAuftraegeForDate, getTermineForDate }: {
         const cfg = getTerminCfg(t.typ)
         const Icon = cfg.icon
         return (
-          <Link key={t.id} href="/termine">
-            <Card className={cn('hover:border-blue-300 transition-colors border',
-              cfg.color.includes('yellow') ? 'border-yellow-200' : cfg.color.includes('purple') ? 'border-purple-200' : 'border-blue-200')}>
-              <CardContent className="p-4 flex items-center gap-4">
-                <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0', cfg.bg)}>
-                  <Icon className="w-5 h-5 text-gray-600" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-gray-900">{t.titel}</p>
-                  <p className="text-sm text-gray-500">
-                    {t.uhrzeit ? `${t.uhrzeit.slice(0,5)} Uhr` : 'Ganztägig'}
-                    {t.dauer_minuten ? ` · ${t.dauer_minuten} Min.` : ''}
-                  </p>
-                </div>
-                <span className={cn('text-xs px-2 py-0.5 rounded-full border font-medium flex-shrink-0', cfg.color)}>{cfg.label}</span>
-              </CardContent>
-            </Card>
-          </Link>
+          <Card key={t.id} className={cn('border', cfg.color.includes('yellow') ? 'border-yellow-200' : cfg.color.includes('purple') ? 'border-purple-200' : 'border-blue-200')}>
+            <CardContent className="p-4 flex items-center gap-4">
+              <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0', cfg.bg)}>
+                <Icon className="w-5 h-5 text-gray-600" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-gray-900">{t.titel}</p>
+                <p className="text-sm text-gray-500">
+                  {t.uhrzeit ? `${t.uhrzeit.slice(0,5)} Uhr` : 'Ganztägig'}
+                  {t.dauer_minuten ? ` · ${t.dauer_minuten} Min.` : ''}
+                </p>
+              </div>
+              <span className={cn('text-xs px-2 py-0.5 rounded-full border font-medium flex-shrink-0', cfg.color)}>{cfg.label}</span>
+            </CardContent>
+          </Card>
         )
       })}
       {dayAuftraege.map(a => {
