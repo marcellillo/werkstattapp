@@ -101,3 +101,24 @@ export async function markMessageAsRead(accessToken: string, messageId: string):
     body: JSON.stringify({ isRead: true }),
   })
 }
+
+export interface GraphAttachment {
+  id: string
+  name: string
+  contentType: string
+  contentBytes: string // base64
+  size: number
+}
+
+export async function fetchAttachments(accessToken: string, messageId: string): Promise<GraphAttachment[]> {
+  const res = await fetch(
+    `${GRAPH_BASE}/me/messages/${messageId}/attachments?$select=id,name,contentType,contentBytes,size`,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  )
+  if (!res.ok) return []
+  const data = await res.json()
+  return (data.value ?? []).filter((a: any) =>
+    a.contentType === 'application/pdf' ||
+    a.contentType?.startsWith('image/')
+  )
+}

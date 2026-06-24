@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
+import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@/lib/supabase/server'
-import { refreshAccessToken, fetchUnreadMessages, markMessageAsRead } from '@/lib/graph-client'
+import { refreshAccessToken, fetchUnreadMessages, markMessageAsRead, fetchAttachments } from '@/lib/graph-client'
 import { parseEmail, istRechnungsEmail, parseRechnung } from '@/lib/email-parser'
 
 export async function POST() {
@@ -53,21 +54,91 @@ export async function POST() {
         const betreff = msg.subject ?? ''
 
         // ── Rechnungs-E-Mail? ────────────────────────────────
-        if (istRechnungsEmail(betreff, inhalt)) {
-          const r = parseRechnung({ absender, betreff, inhalt })
+        if (istRechnungsEmail(betreff, inhalt) || msg.hasAttachments) {
+          let extrakt: any = null
+
+          // Anhänge prüfen und per Claude analysieren
+          if (msg.hasAttachments) {
+            const anhaenge = await fetchAttachments(accessToken, msg.id)
+            const pdf = anhaenge[0] // erstes PDF/Bild nehmen
+            if (pdf) {
+              try {
+                const { data: keyRow } = await supabase
+                  .from('werkstatt_einstellungen').select('wert')
+                  .eq('schluessel', 'anthropic_api_key').maybeSingle()
+                const apiKey = keyRow?.wert || process.env.ANTHROPIC_API_KEY
+
+                if (apiKey) {
+                  const anthropic = new Anthropic({ apiKey })
+                  const isPdf = pdf.contentType === 'application/pdf'
+                  const mediaType = isPdf ? 'application/pdf' : pdf.contentType as 'image/jpeg' | 'image/png' | 'image/webp'
+
+                  const message = await anthropic.messages.create({
+                    model: 'claude-opus-4-8',
+                    max_tokens: 2048,
+                    messages: [{
+                      role: 'user',
+                      content: [
+                        isPdf
+                          ? { type: 'document' as const, source: { type: 'base64' as const, media_type: 'application/pdf' as const, data: pdf.contentBytes } }
+                          : { type: 'image' as const, source: { type: 'base64' as const, media_type: mediaType as 'image/jpeg' | 'image/png' | 'image/webp', data: pdf.contentBytes } },
+                        {
+                          type: 'text',
+                          text: `Analysiere diese Lieferantenrechnung. Antworte NUR mit JSON:
+{"lieferant":"Name","rechnungsnummer":"Nr oder null","datum":"YYYY-MM-DD oder null","faellig_am":"YYYY-MM-DD oder null","gesamt":123.45,"positionen":[{"bezeichnung":"Name","teilenummer":"Nr oder null","menge":1,"einzelpreis":9.99,"gesamtpreis":9.99}]}`,
+                        },
+                      ],
+                    }],
+                  })
+
+                  const textBlock = message.content.find(b => b.type === 'text')
+                  if (textBlock?.type === 'text') {
+                    const cleaned = textBlock.text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+                    extrakt = JSON.parse(cleaned)
+                  }
+                }
+              } catch { /* Fallback auf Text-Parsing */ }
+            }
+          }
+
+          // Fallback: Text-Parsing wenn kein Anhang oder Claude fehlgeschlagen
+          if (!extrakt && istRechnungsEmail(betreff, inhalt)) {
+            const r = parseRechnung({ absender, betreff, inhalt })
+            extrakt = {
+              lieferant: msg.from.emailAddress.name || r.lieferant,
+              rechnungsnummer: r.rechnungsnummer,
+              datum: r.datum,
+              faellig_am: r.faelligAm,
+              gesamt: r.gesamt,
+              positionen: r.positionen,
+            }
+          }
+
+          if (!extrakt) {
+            await markMessageAsRead(accessToken, msg.id)
+            continue
+          }
+
           const { data: neu } = await supabase.from('rechnungen').insert({
-            lieferant: msg.from.emailAddress.name || r.lieferant,
-            rechnungsnummer: r.rechnungsnummer,
-            datum: r.datum,
-            faellig_am: r.faelligAm,
-            gesamt: r.gesamt,
+            lieferant: extrakt.lieferant ?? msg.from.emailAddress.name ?? absender,
+            rechnungsnummer: extrakt.rechnungsnummer,
+            datum: extrakt.datum,
+            faellig_am: extrakt.faellig_am,
+            gesamt: extrakt.gesamt,
             absender_email: absender,
             bezahlt: false,
           }).select('id').single()
 
-          if (neu && r.positionen.length > 0) {
+          if (neu && extrakt.positionen?.length > 0) {
             await supabase.from('rechnung_positionen').insert(
-              r.positionen.map(p => ({ rechnung_id: neu.id, ...p }))
+              extrakt.positionen.map((p: any) => ({
+                rechnung_id: neu.id,
+                bezeichnung: p.bezeichnung,
+                teilenummer: p.teilenummer ?? null,
+                menge: p.menge ?? 1,
+                einzelpreis: p.einzelpreis ?? null,
+                gesamtpreis: p.gesamtpreis ?? null,
+              }))
             )
           }
           rechnungenImportiert++
