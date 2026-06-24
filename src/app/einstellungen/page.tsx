@@ -47,6 +47,7 @@ export default async function EinstellungenPage() {
           firma_stundensatz: cfg.firma_stundensatz ?? '',
           firma_kleinunternehmer: cfg.firma_kleinunternehmer ?? 'nein',
           firma_logo: cfg.firma_logo ?? '',
+          firma_paypal: cfg.firma_paypal ?? '',
         }}
       />
     </AppLayout>

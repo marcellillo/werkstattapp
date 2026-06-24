@@ -2,8 +2,10 @@
 import { useState, useEffect } from 'react'
 import {
   Settings, Mail, Bell, Users, Database, Building2,
-  CheckCircle, ExternalLink, Save, Loader2, Bot, Eye, EyeOff, Wifi, WifiOff, Receipt, Shield
+  CheckCircle, ExternalLink, Save, Loader2, Bot, Eye, EyeOff, Wifi, WifiOff, Receipt, Shield, QrCode as QrIcon, Download
 } from 'lucide-react'
+import { QrCode, downloadQr } from '@/components/ui/qr-code'
+import { buildGiroCode } from '@/lib/girocode'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { createClient } from '@/lib/supabase/client'
 import { DEFAULT_BERECHTIGUNGEN, type Rolle } from '@/lib/rollen-context'
@@ -32,6 +34,7 @@ interface Config {
   firma_stundensatz: string
   firma_kleinunternehmer: string
   firma_logo: string
+  firma_paypal: string
 }
 
 export function EinstellungenContent({ initialConfig, profile, userEmail }: {
@@ -271,6 +274,88 @@ export function EinstellungenContent({ initialConfig, profile, userEmail }: {
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
             {saved ? 'Gespeichert!' : 'Rechnungseinstellungen speichern'}
+          </button>
+        </CardContent>
+      </Card>
+
+      {/* Zahlungs-QR-Code */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <QrIcon className="w-5 h-5 text-violet-600" /> Zahlungs-QR-Codes
+            <span className="ml-auto text-xs bg-violet-100 text-violet-700 px-2 py-0.5 rounded-full">Auf Rechnungen</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          <p className="text-xs text-gray-500">
+            QR-Codes erscheinen auf der Rechnung neben der Bankverbindung. Kunden können damit direkt per Banking-App oder PayPal bezahlen.
+          </p>
+
+          {/* GiroCode / IBAN */}
+          {config.firma_iban ? (() => {
+            const giroValue = buildGiroCode({
+              bic: config.firma_bic,
+              name: config.firma_name || 'Werkstatt',
+              iban: config.firma_iban,
+            })
+            return (
+              <div className="border border-slate-200 rounded-xl p-4 flex items-center gap-5">
+                <QrCode value={giroValue} size={96} className="rounded-lg flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-sm text-slate-900">GiroCode (SEPA-Überweisung)</p>
+                  <p className="text-xs text-slate-500 mt-0.5">Funktioniert mit allen deutschen Banking-Apps (Sparkasse, DKB, ING, …)</p>
+                  <p className="text-xs font-mono text-slate-400 mt-1 truncate">{config.firma_iban}</p>
+                  <button
+                    onClick={() => downloadQr(giroValue, 'girocode-iban.png')}
+                    className="mt-2 flex items-center gap-1.5 text-xs text-violet-700 hover:text-violet-900 font-medium border border-violet-200 hover:border-violet-400 px-2.5 py-1.5 rounded-lg transition-colors"
+                  >
+                    <Download className="w-3.5 h-3.5" /> QR herunterladen
+                  </button>
+                </div>
+              </div>
+            )
+          })() : (
+            <div className="border border-dashed border-slate-300 rounded-xl p-4 text-center">
+              <p className="text-sm text-slate-500">Bitte zuerst IBAN in den Firmendaten eintragen.</p>
+            </div>
+          )}
+
+          {/* PayPal */}
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-slate-700 block">PayPal.me-Link (optional)</label>
+            <input
+              type="text"
+              value={config.firma_paypal}
+              onChange={e => setConfig(c => ({ ...c, firma_paypal: e.target.value }))}
+              placeholder="https://paypal.me/deinname"
+              className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
+            />
+          </div>
+
+          {config.firma_paypal && (
+            <div className="border border-slate-200 rounded-xl p-4 flex items-center gap-5">
+              <QrCode value={config.firma_paypal} size={96} className="rounded-lg flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-sm text-slate-900">PayPal-QR-Code</p>
+                <p className="text-xs text-slate-500 mt-0.5">Öffnet direkt die PayPal-App beim Scannen</p>
+                <p className="text-xs font-mono text-slate-400 mt-1 truncate">{config.firma_paypal}</p>
+                <button
+                  onClick={() => downloadQr(config.firma_paypal, 'paypal-qr.png')}
+                  className="mt-2 flex items-center gap-1.5 text-xs text-violet-700 hover:text-violet-900 font-medium border border-violet-200 hover:border-violet-400 px-2.5 py-1.5 rounded-lg transition-colors"
+                >
+                  <Download className="w-3.5 h-3.5" /> QR herunterladen
+                </button>
+              </div>
+            </div>
+          )}
+
+          <button
+            onClick={speichern}
+            disabled={saving}
+            className="flex items-center gap-2 px-4 py-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-sm font-medium transition-colors disabled:opacity-50"
+          >
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            {saved ? 'Gespeichert!' : 'Speichern'}
           </button>
         </CardContent>
       </Card>

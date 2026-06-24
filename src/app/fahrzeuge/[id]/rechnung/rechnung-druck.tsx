@@ -1,5 +1,7 @@
 'use client'
 import { useEffect } from 'react'
+import { useQrDataUrl } from '@/components/ui/qr-code'
+import { buildGiroCode } from '@/lib/girocode'
 
 function fmt(date?: string | null) {
   if (!date) return '—'
@@ -10,6 +12,17 @@ function fmtEuro(n: number) {
 }
 
 export function RechnungDruck({ auftrag, firma }: { auftrag: any; firma: Record<string, string> }) {
+  const giroCode = firma.firma_iban
+    ? buildGiroCode({
+        bic: firma.firma_bic,
+        name: firma.firma_name || 'Werkstatt',
+        iban: firma.firma_iban,
+        betrag: undefined, // kein Betrag vorausfüllen — Kunde wählt selbst
+        verwendungszweck: `Rechnung ${(auftrag.auftrag_nr ?? '').replace(/^AU-/i, '')}`,
+      })
+    : null
+  const giroQr = useQrDataUrl(giroCode ?? '')
+  const paypalQr = useQrDataUrl(firma.firma_paypal ?? '')
   const fz = auftrag.fahrzeug ?? {}
   const kd = auftrag.kunde ?? {}
   const teile = (auftrag.ersatzteile ?? []) as any[]
@@ -92,6 +105,10 @@ export function RechnungDruck({ auftrag, firma }: { auftrag: any; firma: Record<
         .zahlung-titel { font-size: 9px; font-weight: 700; text-transform: uppercase; color: #475569; letter-spacing: 0.06em; margin-bottom: 8px; border-bottom: 1px solid #cbd5e1; padding-bottom: 6px; }
         .zahlung-wert { font-size: 11px; line-height: 1.8; }
         .zahlung-wert strong { color: #ea580c; }
+        .qr-row { display: flex; align-items: flex-start; gap: 16px; margin-top: 16px; }
+        .qr-item { background: #f8fafc; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 10px 12px; display: flex; align-items: center; gap: 12px; flex: 1; }
+        .qr-label { font-size: 9px; font-weight: 700; text-transform: uppercase; color: #475569; letter-spacing: 0.06em; margin-bottom: 2px; }
+        .qr-hint { font-size: 8px; color: #94a3b8; line-height: 1.4; }
 
         /* Fußzeile */
         .footer { margin-top: 24px; border-top: 1px solid #e2e8f0; padding-top: 10px; font-size: 9px; color: #94a3b8; text-align: center; line-height: 1.6; }
@@ -298,6 +315,30 @@ export function RechnungDruck({ auftrag, firma }: { auftrag: any; firma: Record<
             </div>
           </div>
         </div>
+
+        {/* QR-Codes */}
+        {(giroQr || paypalQr) && (
+          <div className="qr-row">
+            {giroQr && (
+              <div className="qr-item">
+                <img src={giroQr} alt="GiroCode" style={{width: 64, height: 64, borderRadius: 4}} />
+                <div>
+                  <div className="qr-label">GiroCode</div>
+                  <div className="qr-hint">Banking-App scannen<br />für Sofortüberweisung</div>
+                </div>
+              </div>
+            )}
+            {paypalQr && (
+              <div className="qr-item">
+                <img src={paypalQr} alt="PayPal" style={{width: 64, height: 64, borderRadius: 4}} />
+                <div>
+                  <div className="qr-label">PayPal</div>
+                  <div className="qr-hint">PayPal-App scannen<br />für Online-Zahlung</div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Fußzeile */}
         <div className="footer">
