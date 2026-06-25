@@ -49,8 +49,11 @@ export function RechnungenContent({ rechnungen: initial, isAdmin = false }: { re
 
   async function loeschenBestaetigen(id: string) {
     setLoesching(true)
-    await supabase.from('rechnung_positionen').delete().eq('rechnung_id', id)
-    await supabase.from('rechnungen').delete().eq('id', id)
+    setFehler(null)
+    const { error: e1 } = await supabase.from('rechnung_positionen').delete().eq('rechnung_id', id)
+    if (e1) { setFehler(`Positionen: ${e1.message}`); setLoesching(false); return }
+    const { error: e2 } = await supabase.from('rechnungen').delete().eq('id', id)
+    if (e2) { setFehler(`Rechnung: ${e2.message}`); setLoesching(false); return }
     setRechnungen(prev => prev.filter(r => r.id !== id))
     setLoeschenId(null)
     setLoesching(false)
