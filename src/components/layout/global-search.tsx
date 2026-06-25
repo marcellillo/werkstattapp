@@ -44,30 +44,34 @@ export function GlobalSearch() {
   const suchen = useCallback(async (q: string) => {
     if (q.trim().length < 2) { setErgebnisse([]); return }
     setLaden(true)
+
+    // Tokens: "Bauer Golf" → ["bauer", "golf"]
+    const tokens = q.trim().toLowerCase().split(/\s+/).filter(t => t.length >= 2)
     const term = q.trim()
 
+    // Alle vier Quellen parallel laden
+    // Fahrzeuge + Kunden immer mit Join, damit "Bauer Golf" cross-table klappt
     const [
-      { data: kunden },
-      { data: fahrzeuge },
-      { data: auftraege },
-      { data: rechnungen },
+      { data: fahrzeugeRaw },
+      { data: kundenRaw },
+      { data: auftraegeRaw },
+      { data: rechnungenRaw },
     ] = await Promise.all([
+      supabase
+        .from('fahrzeuge')
+        .select('id, kennzeichen, marke, modell, kunde:kunden(id, vorname, nachname, telefon, email)')
+        .limit(200),
       supabase
         .from('kunden')
         .select('id, vorname, nachname, telefon, email')
         .or(`vorname.ilike.%${term}%,nachname.ilike.%${term}%,telefon.ilike.%${term}%,email.ilike.%${term}%`)
-        .limit(4),
-      supabase
-        .from('fahrzeuge')
-        .select('id, kennzeichen, marke, modell, kunde:kunden(vorname, nachname)')
-        .or(`kennzeichen.ilike.%${term}%,marke.ilike.%${term}%,modell.ilike.%${term}%`)
-        .limit(4),
+        .limit(5),
       supabase
         .from('auftraege')
-        .select('id, arbeiten, status, fahrzeug:fahrzeuge(id, kennzeichen, marke, modell)')
+        .select('id, arbeiten, status, fahrzeug:fahrzeuge(id, kennzeichen, marke, modell, kunde:kunden(vorname, nachname))')
         .or(`arbeiten.ilike.%${term}%`)
         .not('status', 'eq', 'storniert')
-        .limit(4),
+        .limit(5),
       supabase
         .from('rechnungen')
         .select('id, lieferant, rechnungsnummer, gesamt')
@@ -75,29 +79,73 @@ export function GlobalSearch() {
         .limit(3),
     ])
 
+    // Fahrzeuge client-seitig filtern: jeder Token muss irgendwo matchen
+    // (kennzeichen, marke, modell ODER kunde.vorname/nachname)
+    function fahrzeugMatcht(f: any): boolean {
+      const haystack = [
+        f.kennzeichen ?? '',
+        f.marke ?? '',
+        f.modell ?? '',
+        (f.kunde as any)?.vorname ?? '',
+        (f.kunde as any)?.nachname ?? '',
+        `${(f.kunde as any)?.vorname ?? ''} ${(f.kunde as any)?.nachname ?? ''}`,
+        `${f.marke ?? ''} ${f.modell ?? ''}`,
+        `${(f.kunde as any)?.nachname ?? ''} ${f.marke ?? ''} ${f.modell ?? ''}`,
+      ].map(s => s.toLowerCase())
+      return tokens.every(token => haystack.some(h => h.includes(token)))
+    }
+
+    const fahrzeuge = (fahrzeugeRaw ?? []).filter(fahrzeugMatcht).slice(0, 5)
+
+    // Kunden: zusätzlich auch über Fahrzeuge suchen (Kunde hat Golf → bei "Müller Golf" Kunden finden)
+    const kundenIds = new Set((kundenRaw ?? []).map(k => k.id))
+    // Kunden die über Fahrzeug-Match gefunden wurden
+    fahrzeuge.forEach(f => {
+      const k = f.kunde as any
+      if (k?.id) kundenIds.add(k.id)
+    })
+    // Alle unique Kunden aus beiden Quellen zusammenführen
+    const alleKunden = [
+      ...(kundenRaw ?? []),
+      ...fahrzeuge
+        .map(f => f.kunde as any)
+        .filter(k => k?.id && !(kundenRaw ?? []).find((r: any) => r.id === k.id)),
+    ].filter(Boolean).slice(0, 5)
+
     const results: Ergebnis[] = [
-      ...(kunden ?? []).map(k => ({
+      // Kunden
+      ...alleKunden.map((k: any) => ({
         id: k.id, typ: 'kunde' as const,
         titel: `${k.vorname ?? ''} ${k.nachname ?? ''}`.trim(),
         untertitel: [k.telefon, k.email].filter(Boolean).join(' · '),
         href: `/kunden`,
       })),
-      ...(fahrzeuge ?? []).map(f => ({
-        id: f.id, typ: 'fahrzeug' as const,
-        titel: `${f.kennzeichen} — ${f.marke ?? ''} ${f.modell ?? ''}`.trim(),
-        untertitel: f.kunde ? `${(f.kunde as any).vorname ?? ''} ${(f.kunde as any).nachname ?? ''}`.trim() : '',
-        href: `/fahrzeuge/${f.id}`,
-      })),
-      ...(auftraege ?? []).map(a => {
+      // Fahrzeuge
+      ...fahrzeuge.map((f: any) => {
+        const k = f.kunde as any
+        return {
+          id: f.id, typ: 'fahrzeug' as const,
+          titel: `${f.kennzeichen} — ${f.marke ?? ''} ${f.modell ?? ''}`.trim(),
+          untertitel: k ? `${k.vorname ?? ''} ${k.nachname ?? ''}`.trim() : '',
+          href: `/fahrzeuge/${f.id}`,
+        }
+      }),
+      // Aufträge
+      ...(auftraegeRaw ?? []).map((a: any) => {
         const fz = a.fahrzeug as any
+        const kd = fz?.kunde as any
         return {
           id: a.id, typ: 'auftrag' as const,
           titel: fz ? `${fz.kennzeichen} — ${fz.marke ?? ''} ${fz.modell ?? ''}`.trim() : 'Auftrag',
-          untertitel: (a.arbeiten ?? '').split('\n')[0].substring(0, 60),
+          untertitel: [
+            kd ? `${kd.vorname ?? ''} ${kd.nachname ?? ''}`.trim() : null,
+            (a.arbeiten ?? '').split('\n')[0].substring(0, 50),
+          ].filter(Boolean).join(' · '),
           href: fz ? `/fahrzeuge/${fz.id}` : `/fahrzeuge`,
         }
       }),
-      ...(rechnungen ?? []).map(r => ({
+      // Rechnungen
+      ...(rechnungenRaw ?? []).map((r: any) => ({
         id: r.id, typ: 'rechnung' as const,
         titel: r.rechnungsnummer ? `RE ${r.rechnungsnummer}` : 'Rechnung',
         untertitel: [r.lieferant, r.gesamt != null ? `${Number(r.gesamt).toFixed(2)} €` : null].filter(Boolean).join(' · '),
@@ -105,7 +153,11 @@ export function GlobalSearch() {
       })),
     ]
 
-    setErgebnisse(results)
+    // Duplikate nach id entfernen
+    const seen = new Set<string>()
+    const unique = results.filter(r => { if (seen.has(r.id)) return false; seen.add(r.id); return true })
+
+    setErgebnisse(unique)
     setAktiv(-1)
     setLaden(false)
   }, [supabase])
