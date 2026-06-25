@@ -81,9 +81,11 @@ export interface GraphMessage {
   isRead: boolean
 }
 
-export async function fetchUnreadMessages(accessToken: string, top = 30): Promise<GraphMessage[]> {
+export async function fetchUnreadMessages(accessToken: string, top = 50): Promise<GraphMessage[]> {
+  // Letzte 14 Tage abrufen (nicht nur ungelesen) — Duplikat-Check in route.ts verhindert doppelte Imports
+  const seit = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString()
   const res = await fetch(
-    `${GRAPH_BASE}/me/messages?$filter=isRead eq false&$top=${top}&$select=id,subject,from,receivedDateTime,bodyPreview,body,hasAttachments,isRead&$orderby=receivedDateTime desc`,
+    `${GRAPH_BASE}/me/messages?$filter=receivedDateTime ge ${seit}&$top=${top}&$select=id,subject,from,receivedDateTime,bodyPreview,body,hasAttachments,isRead&$orderby=receivedDateTime desc`,
     { headers: { Authorization: `Bearer ${accessToken}` } },
   )
   if (!res.ok) {

@@ -282,16 +282,14 @@ export function RechnungenContent({ rechnungen: initial, isAdmin = false }: { re
                     </div>
                   </div>
 
-                  {/* Löschen-Button außerhalb des klickbaren Bereichs */}
-                  {isAdmin && (
-                    <button
-                      onClick={e => { e.stopPropagation(); setLoeschenId(r.id) }}
-                      className="p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors flex-shrink-0"
-                      title="Rechnung löschen"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  )}
+                  {/* Löschen-Button */}
+                  <button
+                    onClick={e => { e.stopPropagation(); setLoeschenId(r.id) }}
+                    className="p-1.5 rounded-lg text-slate-900 hover:text-red-500 hover:bg-red-50 transition-colors flex-shrink-0"
+                    title="Rechnung löschen"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </div>
 
                 {open && (
