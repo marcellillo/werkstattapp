@@ -5,96 +5,6 @@ import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@/lib/supabase/server'
 import { refreshAccessToken, fetchUnreadMessages, markMessageAsRead, fetchAttachments } from '@/lib/graph-client'
 
-// Claude analysiert eine E-Mail vollständig (Text + alle Anhänge)
-async function analysiereEmailMitClaude(
-  anthropic: Anthropic,
-  msg: { subject: string; from: { emailAddress: { address: string; name: string } }; body: { content: string; contentType: string }; hasAttachments: boolean },
-  anhaenge: { name: string; contentType: string; contentBytes: string }[],
-): Promise<EmailAnalyse> {
-  const absenderName = msg.from.emailAddress.name || msg.from.emailAddress.address
-  const absenderEmail = msg.from.emailAddress.address
-  const betreff = msg.subject ?? ''
-  const bodyText = msg.body.contentType === 'html'
-    ? msg.body.content.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 8000)
-    : msg.body.content.slice(0, 8000)
-
-  const systemPrompt = `Du bist ein KFZ-Werkstatt-Assistent. Analysiere eingehende E-Mails von Lieferanten und extrahiere strukturierte Daten.
-Antworte NUR mit validem JSON, kein anderer Text.`
-
-  const userPrompt = `Analysiere diese E-Mail von einem Kfz-Teilelieferanten:
-
-Absender: ${absenderName} <${absenderEmail}>
-Betreff: ${betreff}
-Inhalt:
-${bodyText}
-
-Extrahiere ALLES und antworte mit diesem JSON-Schema:
-{
-  "typ": "rechnung" | "lieferstatus" | "bestellbestaetigung" | "sonstiges",
-  "lieferant": "Firmenname des Absenders",
-  "status": "bestellt" | "unterwegs" | "geliefert" | "unbekannt",
-  "auftragsnummer": "AUF-XXXX-XXX oder null",
-  "kennzeichen": "KFZ-Kennzeichen oder null",
-  "teile": [
-    {
-      "bezeichnung": "Artikelname",
-      "teilenummer": "Artikelnummer oder null",
-      "menge": 1,
-      "einzelpreis": 9.99
-    }
-  ],
-  "rechnung": {
-    "rechnungsnummer": "Nr oder null",
-    "datum": "YYYY-MM-DD oder null",
-    "faellig_am": "YYYY-MM-DD oder null",
-    "gesamt": 123.45
-  } | null
-}
-
-Wichtig:
-- Extrahiere ALLE Teile/Artikel aus dem Text
-- Bei Versandbestätigungen: status="unterwegs"
-- Bei Lieferbestätigungen/Zustellungen: status="geliefert"
-- Bei Bestellbestätigungen: status="bestellt"
-- Erkenne Rechnungen auch ohne explizites Wort "Rechnung"`
-
-  const contentBlocks: Anthropic.MessageParam['content'] = []
-
-  // Alle Anhänge hinzufügen
-  for (const anhang of anhaenge) {
-    try {
-      if (anhang.contentType === 'application/pdf') {
-        contentBlocks.push({
-          type: 'document',
-          source: { type: 'base64', media_type: 'application/pdf', data: anhang.contentBytes },
-          title: anhang.name,
-        } as any)
-      } else if (anhang.contentType?.startsWith('image/')) {
-        const mediaType = anhang.contentType as 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif'
-        contentBlocks.push({
-          type: 'image',
-          source: { type: 'base64', media_type: mediaType, data: anhang.contentBytes },
-        })
-      }
-    } catch { /* Anhang überspringen wenn kaputt */ }
-  }
-
-  contentBlocks.push({ type: 'text', text: userPrompt })
-
-  const message = await anthropic.messages.create({
-    model: 'claude-opus-4-8',
-    max_tokens: 2048,
-    system: systemPrompt,
-    messages: [{ role: 'user', content: contentBlocks }],
-  })
-
-  const textBlock = message.content.find(b => b.type === 'text')
-  if (!textBlock || textBlock.type !== 'text') throw new Error('Keine Antwort von Claude')
-
-  const cleaned = textBlock.text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
-  return JSON.parse(cleaned) as EmailAnalyse
-}
-
 interface EmailAnalyse {
   typ: 'rechnung' | 'lieferstatus' | 'bestellbestaetigung' | 'sonstiges'
   lieferant: string
@@ -110,6 +20,118 @@ interface EmailAnalyse {
   } | null
 }
 
+async function analysiereEmailMitClaude(
+  anthropic: Anthropic,
+  msg: { subject: string; from: { emailAddress: { address: string; name: string } }; body: { content: string; contentType: string } },
+  anhaenge: { name: string; contentType: string; contentBytes: string }[],
+): Promise<EmailAnalyse> {
+  const absenderName = msg.from.emailAddress.name || msg.from.emailAddress.address
+  const absenderEmail = msg.from.emailAddress.address
+  const betreff = msg.subject ?? ''
+  const bodyText = msg.body.contentType === 'html'
+    ? msg.body.content.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 8000)
+    : msg.body.content.slice(0, 8000)
+
+  const systemPrompt = `Du bist ein KFZ-Werkstatt-Assistent. Analysiere E-Mails von Lieferanten und extrahiere strukturierte Daten. Antworte NUR mit validem JSON, kein anderer Text.`
+
+  const hatAnhaenge = anhaenge.length > 0
+
+  const prompt = hatAnhaenge
+    ? `Lies den/die beigefuegten Anhang/Anhaenge (PDF oder Bild) und extrahiere alle Daten daraus.
+Der E-Mail-Text dient nur als Kontext (Absender, Betreff).
+
+Von: ${absenderName} <${absenderEmail}>
+Betreff: ${betreff}
+
+Extrahiere aus dem Anhang und antworte mit exakt diesem JSON:
+{
+  "typ": "rechnung",
+  "lieferant": "Firmenname aus dem Briefkopf des Anhangs",
+  "status": "unbekannt",
+  "auftragsnummer": null,
+  "kennzeichen": null,
+  "teile": [
+    { "bezeichnung": "Vollstaendiger Artikelname", "teilenummer": "OE/Artikel-Nr oder null", "menge": 1, "einzelpreis": 9.99 }
+  ],
+  "rechnung": {
+    "rechnungsnummer": "Rechnungsnummer aus Anhang oder null",
+    "datum": "YYYY-MM-DD oder null",
+    "faellig_am": "YYYY-MM-DD oder null",
+    "gesamt": 123.45
+  }
+}
+
+Regeln fuer Anhang-Analyse:
+- Lieferant = Firmenname im Briefkopf/Logo des Dokuments (NICHT der E-Mail-Absender)
+- teile = JEDE einzelne Position/Artikel aus dem Dokument auflisten
+- rechnung darf nicht null sein wenn es eine Rechnung ist
+- typ: "rechnung" bei Rechnung/Invoice, "lieferstatus" bei Lieferschein, "bestellbestaetigung" bei Auftragsbestaetigung`
+    : `Analysiere den E-Mail-Text. Kein Anhang vorhanden.
+
+Von: ${absenderName} <${absenderEmail}>
+Betreff: ${betreff}
+Inhalt:
+${bodyText}
+
+Hinweis: Dies koennte eine weitergeleitete E-Mail sein — suche im Text nach dem urspruenglichen Lieferanten ("Von:", "From:", Briefkopf).
+
+Antworte mit exakt diesem JSON:
+{
+  "typ": "rechnung",
+  "lieferant": "Firmenname des Lieferanten (aus E-Mail-Text extrahieren)",
+  "status": "bestellt",
+  "auftragsnummer": null,
+  "kennzeichen": null,
+  "teile": [
+    { "bezeichnung": "Artikelname", "teilenummer": null, "menge": 1, "einzelpreis": null }
+  ],
+  "rechnung": {
+    "rechnungsnummer": null,
+    "datum": null,
+    "faellig_am": null,
+    "gesamt": null
+  }
+}
+
+Regeln:
+- typ: "rechnung" bei Rechnungstext, "lieferstatus" bei Versand/Lieferung, "bestellbestaetigung" bei Bestellung, "sonstiges" sonst
+- status: "geliefert" bei Lieferbestaetigung, "unterwegs" bei Versandbestaetigung, "bestellt" bei Bestellbestaetigung
+- teile: alle Artikel aus dem Text extrahieren`
+
+  const contentBlocks: Anthropic.MessageParam['content'] = []
+
+  // Alle Anhaenge hinzufuegen (PDFs + Bilder)
+  for (const anhang of anhaenge) {
+    try {
+      if (anhang.contentType === 'application/pdf') {
+        contentBlocks.push({
+          type: 'document',
+          source: { type: 'base64', media_type: 'application/pdf', data: anhang.contentBytes },
+          title: anhang.name,
+        } as any)
+      } else if (anhang.contentType?.startsWith('image/')) {
+        const mediaType = anhang.contentType as 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif'
+        contentBlocks.push({ type: 'image', source: { type: 'base64', media_type: mediaType, data: anhang.contentBytes } })
+      }
+    } catch { /* kaputten Anhang ueberspringen */ }
+  }
+
+  contentBlocks.push({ type: 'text', text: prompt })
+
+  const message = await anthropic.messages.create({
+    model: 'claude-opus-4-8',
+    max_tokens: 2048,
+    system: systemPrompt,
+    messages: [{ role: 'user', content: contentBlocks }],
+  })
+
+  const textBlock = message.content.find(b => b.type === 'text')
+  if (!textBlock || textBlock.type !== 'text') throw new Error('Keine Antwort von Claude')
+
+  const cleaned = textBlock.text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+  return JSON.parse(cleaned) as EmailAnalyse
+}
+
 export async function POST() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -122,7 +144,7 @@ export async function POST() {
   const { graph_client_id, graph_tenant_id, graph_client_secret, graph_refresh_token } = cfg
   if (!graph_refresh_token) {
     return NextResponse.json(
-      { error: 'Microsoft-Konto noch nicht verbunden. Bitte unter Einstellungen → E-Mail-Integration verbinden.' },
+      { error: 'Microsoft-Konto nicht verbunden. Bitte unter Einstellungen verbinden.' },
       { status: 400 },
     )
   }
@@ -144,28 +166,25 @@ export async function POST() {
     let neuErstellt = 0
     let statusAktualisiert = 0
     let rechnungenImportiert = 0
+    let duplikate = 0
     const fehler: string[] = []
     const verarbeitet: string[] = []
 
     for (const msg of messages) {
       try {
-        // Alle Anhänge laden (PDFs + Bilder)
-        const anhaenge = msg.hasAttachments
-          ? await fetchAttachments(accessToken, msg.id)
-          : []
+        const anhaenge = msg.hasAttachments ? await fetchAttachments(accessToken, msg.id) : []
 
         let analyse: EmailAnalyse | null = null
 
-        // Claude analysiert E-Mail + alle Anhänge
         if (anthropic) {
           try {
             analyse = await analysiereEmailMitClaude(anthropic, msg, anhaenge)
           } catch (e: any) {
-            fehler.push(`Claude-Fehler bei "${msg.subject}": ${e.message}`)
+            fehler.push(`Claude-Fehler "${msg.subject}": ${e.message}`)
           }
         }
 
-        // Fallback: Basis-Regex wenn Claude nicht verfügbar
+        // Fallback auf Regex wenn Claude nicht verfuegbar
         if (!analyse) {
           const inhalt = msg.body.contentType === 'html'
             ? msg.body.content.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
@@ -173,11 +192,6 @@ export async function POST() {
           const { parseEmail, istRechnungsEmail, parseRechnung } = await import('@/lib/email-parser')
           const parsed = parseEmail({ absender: msg.from.emailAddress.address, betreff: msg.subject ?? '', inhalt })
           const istRechnung = istRechnungsEmail(msg.subject ?? '', inhalt) || msg.hasAttachments
-          let rechnung = null
-          if (istRechnung) {
-            const r = parseRechnung({ absender: msg.from.emailAddress.address, betreff: msg.subject ?? '', inhalt })
-            rechnung = { rechnungsnummer: r.rechnungsnummer, datum: r.datum, faellig_am: r.faelligAm, gesamt: r.gesamt }
-          }
           analyse = {
             typ: istRechnung ? 'rechnung' : 'lieferstatus',
             lieferant: parsed.lieferant !== 'Unbekannt' ? parsed.lieferant : (msg.from.emailAddress.name || msg.from.emailAddress.address),
@@ -185,7 +199,7 @@ export async function POST() {
             auftragsnummer: parsed.auftragsnummer,
             kennzeichen: parsed.kennzeichen,
             teile: parsed.teile,
-            rechnung,
+            rechnung: istRechnung ? (() => { const r = parseRechnung({ absender: msg.from.emailAddress.address, betreff: msg.subject ?? '', inhalt }); return { rechnungsnummer: r.rechnungsnummer, datum: r.datum, faellig_am: r.faelligAm, gesamt: r.gesamt } })() : null,
           }
         }
 
@@ -194,18 +208,41 @@ export async function POST() {
           continue
         }
 
-        // ── Rechnung importieren ────────────────────────────
-        if (analyse.typ === 'rechnung' && analyse.rechnung) {
+        // ── Rechnung importieren ────────────────────────────────────────
+        if (analyse.typ === 'rechnung') {
           const r = analyse.rechnung
+
+          // Duplikat-Check: gleiche Rechnungsnummer ODER gleicher Absender + gleiches Datum
+          if (r?.rechnungsnummer) {
+            const { data: exist } = await supabase.from('rechnungen')
+              .select('id').eq('rechnungsnummer', r.rechnungsnummer).maybeSingle()
+            if (exist) {
+              duplikate++
+              await markMessageAsRead(accessToken, msg.id)
+              continue
+            }
+          } else {
+            // Kein Rechnungsnummer: check Absender + Datum
+            const absenderEmail = msg.from.emailAddress.address
+            const datum = r?.datum ?? new Date().toISOString().split('T')[0]
+            const { data: exist } = await supabase.from('rechnungen')
+              .select('id').eq('absender_email', absenderEmail).eq('datum', datum).maybeSingle()
+            if (exist) {
+              duplikate++
+              await markMessageAsRead(accessToken, msg.id)
+              continue
+            }
+          }
+
           const { data: neu } = await supabase.from('rechnungen').insert({
             lieferant: analyse.lieferant,
-            rechnungsnummer: r.rechnungsnummer,
-            datum: r.datum,
-            faellig_am: r.faellig_am,
-            gesamt: r.gesamt,
+            rechnungsnummer: r?.rechnungsnummer ?? null,
+            datum: r?.datum ?? null,
+            faellig_am: r?.faellig_am ?? null,
+            gesamt: r?.gesamt ?? null,
             absender_email: msg.from.emailAddress.address,
             bezahlt: false,
-          }).select('id').single()
+          }).select('id').maybeSingle()
 
           if (neu && analyse.teile.length > 0) {
             await supabase.from('rechnung_positionen').insert(
@@ -215,24 +252,23 @@ export async function POST() {
                 teilenummer: t.teilenummer ?? null,
                 menge: t.menge ?? 1,
                 einzelpreis: t.einzelpreis ?? null,
-                gesamtpreis: t.einzelpreis && t.menge ? t.einzelpreis * t.menge : null,
+                gesamtpreis: t.einzelpreis && t.menge ? Math.round(t.einzelpreis * t.menge * 100) / 100 : null,
               }))
             )
           }
+
           rechnungenImportiert++
-          verarbeitet.push(`Rechnung: ${analyse.lieferant}`)
+          verarbeitet.push(`Rechnung: ${analyse.lieferant}${r?.rechnungsnummer ? ` (${r.rechnungsnummer})` : ''} — ${analyse.teile.length} Positionen`)
           await markMessageAsRead(accessToken, msg.id)
           continue
         }
 
-        // ── Teile-Status aktualisieren ──────────────────────
+        // ── Lieferstatus / Teile-Updates ────────────────────────────────
         if (analyse.status === 'unbekannt' && analyse.typ === 'sonstiges') {
-          // Nicht relevante E-Mail → trotzdem als gelesen markieren
           await markMessageAsRead(accessToken, msg.id)
           continue
         }
 
-        // Auftrag suchen
         let auftragId: string | null = null
         if (analyse.auftragsnummer) {
           const { data: a } = await supabase.from('auftraege').select('id')
@@ -246,13 +282,11 @@ export async function POST() {
             const { data: a } = await supabase.from('auftraege').select('id')
               .eq('fahrzeug_id', fz.id)
               .not('status', 'in', '("fertig","ausgeliefert","storniert")')
-              .order('erstellt_am', { ascending: false })
-              .limit(1).maybeSingle()
+              .order('erstellt_am', { ascending: false }).limit(1).maybeSingle()
             if (a) auftragId = a.id
           }
         }
 
-        // E-Mail protokollieren
         const inhaltKurz = msg.body.contentType === 'html'
           ? msg.body.content.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 3000)
           : msg.body.content.slice(0, 3000)
@@ -267,14 +301,12 @@ export async function POST() {
           verarbeitet: false,
         }).select('id').maybeSingle()
 
-        // Teile-Status aktualisieren wenn Auftrag gefunden
         if (auftragId && analyse.status !== 'unbekannt' && analyse.teile.length > 0) {
           const statusReihenfolge = ['nicht_bestellt', 'bestellt', 'unterwegs', 'geliefert', 'eingebaut']
 
           for (const teil of analyse.teile) {
             if (!teil.bezeichnung || teil.bezeichnung === 'Siehe E-Mail') continue
 
-            // Vorhandenes Teil suchen
             let query = supabase.from('ersatzteile').select('id, status').eq('auftrag_id', auftragId)
             if (teil.teilenummer) {
               query = query.or(`teilenummer.eq.${teil.teilenummer},bezeichnung.ilike.%${teil.bezeichnung.slice(0, 20)}%`)
@@ -295,7 +327,6 @@ export async function POST() {
                 statusAktualisiert++
               }
             } else if (analyse.status === 'bestellt' || analyse.status === 'unterwegs') {
-              // Neues Teil anlegen
               await supabase.from('ersatzteile').insert({
                 auftrag_id: auftragId,
                 bezeichnung: teil.bezeichnung,
@@ -310,7 +341,6 @@ export async function POST() {
             }
           }
 
-          // Benachrichtigung bei Lieferung
           if (analyse.status === 'geliefert') {
             await supabase.from('benachrichtigungen').insert({
               titel: `Teile eingetroffen: ${analyse.lieferant}`,
@@ -344,6 +374,7 @@ export async function POST() {
       neuErstellt,
       statusAktualisiert,
       rechnungenImportiert,
+      duplikate,
       verarbeitet,
       fehler,
     })

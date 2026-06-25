@@ -1,10 +1,11 @@
 'use client'
 import { useState, useRef } from 'react'
-import { Receipt, Upload, X, ChevronDown, ChevronUp, Package, Loader2, CheckCircle, AlertCircle, Mail, AlertTriangle, Euro } from 'lucide-react'
+import { Receipt, Upload, X, ChevronDown, ChevronUp, Package, Loader2, CheckCircle, AlertCircle, Mail, AlertTriangle, Euro, Trash2 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
+import { useRollen } from '@/lib/rollen-context'
 
 type Position = {
   id: string
@@ -42,8 +43,22 @@ export function RechnungenContent({ rechnungen: initial }: { rechnungen: Rechnun
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [dragOver, setDragOver] = useState(false)
   const [filter, setFilter] = useState<'alle' | 'offen' | 'bezahlt'>('alle')
+  const [loeschenId, setLoeschenId] = useState<string | null>(null)
+  const [loesching, setLoesching] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const supabase = createClient()
+  const { rolle } = useRollen()
+  const isAdmin = rolle === 'admin'
+
+  async function loeschenBestaetigen(id: string) {
+    setLoesching(true)
+    await supabase.from('rechnung_positionen').delete().eq('rechnung_id', id)
+    await supabase.from('rechnungen').delete().eq('id', id)
+    setRechnungen(prev => prev.filter(r => r.id !== id))
+    setLoeschenId(null)
+    setLoesching(false)
+    setExpandedId(null)
+  }
 
   async function toggleBezahlt(r: Rechnung) {
     const neuBezahlt = !r.bezahlt
@@ -262,6 +277,15 @@ export function RechnungenContent({ rechnungen: initial }: { rechnungen: Rechnun
                           {r.gesamt.toFixed(2)} €
                         </p>
                       )}
+                      {isAdmin && (
+                        <button
+                          onClick={e => { e.stopPropagation(); setLoeschenId(r.id) }}
+                          className="p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+                          title="Rechnung löschen"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
                       {open ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
                     </div>
                   </button>
@@ -335,6 +359,40 @@ export function RechnungenContent({ rechnungen: initial }: { rechnungen: Rechnun
               </div>
             )
           })}
+        </div>
+      )}
+
+      {/* Löschen-Bestätigung (nur Admin) */}
+      {loeschenId && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                <Trash2 className="w-5 h-5 text-red-600" />
+              </div>
+              <div>
+                <p className="font-semibold text-slate-900">Rechnung löschen?</p>
+                <p className="text-sm text-slate-500">Diese Aktion kann nicht rückgängig gemacht werden.</p>
+              </div>
+            </div>
+            <div className="flex gap-3 pt-2">
+              <button
+                onClick={() => setLoeschenId(null)}
+                disabled={loesching}
+                className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50"
+              >
+                Abbrechen
+              </button>
+              <button
+                onClick={() => loeschenBestaetigen(loeschenId)}
+                disabled={loesching}
+                className="flex-1 px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {loesching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                {loesching ? 'Wird gelöscht…' : 'Löschen'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
