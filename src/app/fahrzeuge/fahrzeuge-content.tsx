@@ -3,7 +3,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
-import { Car, Search, Plus, ChevronRight, Package, Tag, Gauge, Palette, Fuel, ArrowUpDown, Wrench, Euro } from 'lucide-react'
+import { Car, Search, Plus, ChevronRight, Package, Tag, Gauge, Palette, Fuel, ArrowUpDown, Wrench, Euro, ShieldCheck } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { cn, formatDate } from '@/lib/utils'
@@ -12,6 +12,8 @@ import {
   FAHRZEUG_STATUS_LABEL, FAHRZEUG_STATUS_COLOR,
 } from '@/types/database'
 import { berechnePrioritaet, PRIORITAET_LABEL, PRIORITAET_COLOR, PRIORITAET_DOT } from '@/lib/prioritaet'
+import { TuevWeckerContent } from '@/app/tuev-wecker/tuev-wecker-content'
+import { ServiceWeckerContent } from '@/app/service-wecker/service-wecker-content'
 
 const STATUS_FILTERS: { label: string; value: FahrzeugStatus | 'alle' }[] = [
   { label: 'Alle', value: 'alle' },
@@ -23,9 +25,17 @@ const STATUS_FILTERS: { label: string; value: FahrzeugStatus | 'alle' }[] = [
   { label: 'Ausgeliefert', value: 'ausgeliefert' },
 ]
 
-export function FahrzeugeContent({ auftraege }: { auftraege: Auftrag[] }) {
+export function FahrzeugeContent({
+  auftraege,
+  tuevFahrzeuge,
+  serviceFahrzeuge,
+}: {
+  auftraege: Auftrag[]
+  tuevFahrzeuge: any[]
+  serviceFahrzeuge: any[]
+}) {
   const router = useRouter()
-  const [tab, setTab] = useState<'fremd' | 'eigen'>('fremd')
+  const [tab, setTab] = useState<'fremd' | 'eigen' | 'tuev' | 'service'>('fremd')
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<FahrzeugStatus | 'alle'>('alle')
   const [sortByPrio, setSortByPrio] = useState(true)
@@ -68,7 +78,7 @@ export function FahrzeugeContent({ auftraege }: { auftraege: Auftrag[] }) {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Fahrzeuge</h1>
           <p className="text-sm text-gray-800 mt-0.5">
-            {fremdAuftraege.length} Kunden · {eigenAuftraege.length} Lager
+            {fremdAuftraege.length} Kunden · {eigenAuftraege.length} Lager · {tuevFahrzeuge.length} TÜV · {serviceFahrzeuge.length} Service
           </p>
         </div>
         <Link href="/fahrzeuge/neu">
@@ -80,35 +90,67 @@ export function FahrzeugeContent({ auftraege }: { auftraege: Auftrag[] }) {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 p-1 bg-gray-100 rounded-lg w-fit">
+      <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide -mx-1 px-1">
         <button
           onClick={() => setTab('fremd')}
           className={cn(
-            'px-4 py-2 text-sm font-medium rounded-md transition-all',
-            tab === 'fremd' ? 'bg-white text-orange-600 shadow-sm' : 'text-gray-600 hover:text-gray-800'
+            'flex-shrink-0 flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-xl border transition-all',
+            tab === 'fremd' ? 'bg-orange-600 text-white border-orange-600 shadow-sm' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
           )}
         >
+          <Car className="w-4 h-4" />
           Kundenfahrzeuge
-          <span className="ml-1.5 text-xs bg-gray-200 text-gray-700 px-1.5 py-0.5 rounded-full">
+          <span className={cn('text-xs px-1.5 py-0.5 rounded-full', tab === 'fremd' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600')}>
             {fremdAuftraege.length}
           </span>
         </button>
         <button
           onClick={() => setTab('eigen')}
           className={cn(
-            'px-4 py-2 text-sm font-medium rounded-md transition-all',
-            tab === 'eigen' ? 'bg-white text-purple-600 shadow-sm' : 'text-gray-600 hover:text-gray-800'
+            'flex-shrink-0 flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-xl border transition-all',
+            tab === 'eigen' ? 'bg-purple-600 text-white border-purple-600 shadow-sm' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
           )}
         >
+          <Wrench className="w-4 h-4" />
           Lagerbestand
-          <span className="ml-1.5 text-xs bg-gray-200 text-gray-700 px-1.5 py-0.5 rounded-full">
+          <span className={cn('text-xs px-1.5 py-0.5 rounded-full', tab === 'eigen' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600')}>
             {eigenAuftraege.length}
           </span>
         </button>
+        <button
+          onClick={() => setTab('tuev')}
+          className={cn(
+            'flex-shrink-0 flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-xl border transition-all',
+            tab === 'tuev' ? 'bg-green-600 text-white border-green-600 shadow-sm' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
+          )}
+        >
+          <ShieldCheck className="w-4 h-4" />
+          TÜV-Wecker
+          {tuevFahrzeuge.length > 0 && (
+            <span className={cn('text-xs px-1.5 py-0.5 rounded-full', tab === 'tuev' ? 'bg-white/20 text-white' : 'bg-green-100 text-green-700')}>
+              {tuevFahrzeuge.length}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => setTab('service')}
+          className={cn(
+            'flex-shrink-0 flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-xl border transition-all',
+            tab === 'service' ? 'bg-blue-600 text-white border-blue-600 shadow-sm' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
+          )}
+        >
+          <Wrench className="w-4 h-4" />
+          Service-Wecker
+          {serviceFahrzeuge.length > 0 && (
+            <span className={cn('text-xs px-1.5 py-0.5 rounded-full', tab === 'service' ? 'bg-white/20 text-white' : 'bg-blue-100 text-blue-700')}>
+              {serviceFahrzeuge.length}
+            </span>
+          )}
+        </button>
       </div>
 
-      {/* Search */}
-      <div className="flex flex-col gap-3">
+      {/* Search — nur für Auftrags-Tabs */}
+      {(tab === 'fremd' || tab === 'eigen') && <div className="flex flex-col gap-3">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600" />
           <input
@@ -148,7 +190,7 @@ export function FahrzeugeContent({ auftraege }: { auftraege: Auftrag[] }) {
             ))}
           </div>
         )}
-      </div>
+      </div>}
 
       {/* Fremdfahrzeuge */}
       {tab === 'fremd' && (
@@ -474,6 +516,16 @@ export function FahrzeugeContent({ auftraege }: { auftraege: Auftrag[] }) {
             })}
           </div>
         )
+      )}
+
+      {/* TÜV-Wecker Tab */}
+      {tab === 'tuev' && (
+        <TuevWeckerContent fahrzeuge={tuevFahrzeuge} />
+      )}
+
+      {/* Service-Wecker Tab */}
+      {tab === 'service' && (
+        <ServiceWeckerContent fahrzeuge={serviceFahrzeuge} />
       )}
     </div>
   )

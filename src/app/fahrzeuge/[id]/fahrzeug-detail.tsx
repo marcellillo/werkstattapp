@@ -50,6 +50,10 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie 
   const [tuevKandidat, setTuevKandidat] = useState(initialAuftrag.tuev_kandidat ?? false)
   const [tuevTermin, setTuevTermin] = useState(initialAuftrag.tuev_termin ?? '')
   const [tuevErgebnis, setTuevErgebnis] = useState(initialAuftrag.tuev_ergebnis ?? '')
+  const fz = initialAuftrag.fahrzeug as any
+  const [naechsteHu, setNaechsteHu] = useState<string>((fz?.naechste_hauptuntersuchung ?? ''))
+  const [naechsterService, setNaechsterService] = useState<string>((fz?.naechster_service_datum ?? ''))
+  const [savingService, setSavingService] = useState(false)
   const [buehneWarnung, setBuehneWarnung] = useState<FahrzeugStatus | null>(null)
   const [buehneWahl, setBuehneWahl] = useState('')
   const [storniereBestaetigung, setStorniereBestaetigung] = useState(false)
@@ -173,6 +177,21 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie 
       tuev_termin: tuevTermin || null,
       tuev_ergebnis: tuevErgebnis || null,
     }).eq('id', auftrag.id)
+    if (naechsteHu) {
+      await supabase.from('fahrzeuge').update({
+        naechste_hauptuntersuchung: naechsteHu,
+        tuev_erinnerung: true,
+      }).eq('id', (auftrag.fahrzeug as any)?.id)
+    }
+  }
+
+  async function saveServiceDaten() {
+    setSavingService(true)
+    await supabase.from('fahrzeuge').update({
+      naechste_hauptuntersuchung: naechsteHu || null,
+      naechster_service_datum: naechsterService || null,
+    }).eq('id', (auftrag.fahrzeug as any)?.id)
+    setSavingService(false)
   }
 
   async function handleStatusChange(status: FahrzeugStatus) {
@@ -1006,8 +1025,49 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie 
                   <option value="nicht_bestanden">❌ Nicht bestanden</option>
                 </select>
               </div>
+              <div>
+                <label className="text-xs text-gray-800 mb-1 block">Nächste HU (TÜV-Wecker)</label>
+                <input
+                  type="date"
+                  value={naechsteHu}
+                  onChange={e => setNaechsteHu(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+                />
+                <p className="text-[11px] text-gray-400 mt-1">Wird im TÜV-Wecker angezeigt</p>
+              </div>
               <Button onClick={saveTuev} size="sm" className="w-full bg-green-600 hover:bg-green-700 text-white">
                 TÜV speichern
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Service */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Wrench className="w-5 h-5 text-blue-600" />
+                Service
+              </CardTitle>
+              <p className="text-xs text-gray-500 mt-0.5">Nächster Service-Termin für Service-Wecker</p>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div>
+                <label className="text-xs text-gray-800 mb-1 block">Nächster Service-Termin</label>
+                <input
+                  type="date"
+                  value={naechsterService}
+                  onChange={e => setNaechsterService(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                />
+                <p className="text-[11px] text-gray-400 mt-1">Wird im Service-Wecker angezeigt</p>
+              </div>
+              <Button
+                onClick={saveServiceDaten}
+                disabled={savingService}
+                size="sm"
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                {savingService ? 'Wird gespeichert…' : 'Service speichern'}
               </Button>
             </CardContent>
           </Card>
