@@ -49,7 +49,9 @@ export function TuevWeckerContent({ fahrzeuge: initialFahrzeuge }: { fahrzeuge: 
   const [fahrzeuge, setFahrzeuge] = useState(initialFahrzeuge)
   const [filter, setFilter] = useState<Filter>('alle')
   const [search, setSearch] = useState('')
-  const [benachrichtigtIds, setBenachrichtigtIds] = useState<Set<string>>(new Set())
+  const [anfragenId, setAnfragenId] = useState<string | null>(null)
+  const [zugestimmtIds, setZugestimmtIds] = useState<Set<string>>(new Set())
+  const [terminErstelltIds, setTerminErstelltIds] = useState<Set<string>>(new Set())
   const [creatingTermin, setCreatingTermin] = useState<string | null>(null)
 
   const heute = new Date().toISOString().split('T')[0]
@@ -91,7 +93,8 @@ export function TuevWeckerContent({ fahrzeuge: initialFahrzeuge }: { fahrzeuge: 
       kunde_id: f.kunde_id ?? null,
       beschreibung: `HU/TÜV fällig am ${formatDate(f.naechste_hauptuntersuchung)}`,
     })
-    setBenachrichtigtIds(prev => new Set([...prev, f.id]))
+    setTerminErstelltIds(prev => new Set([...prev, f.id]))
+    setAnfragenId(null)
     setCreatingTermin(null)
   }
 
@@ -207,7 +210,6 @@ export function TuevWeckerContent({ fahrzeuge: initialFahrzeuge }: { fahrzeuge: 
           {filtered.map(f => {
             const st = getStatus(f.days)
             const Icon = st.icon
-            const benachrichtigt = benachrichtigtIds.has(f.id)
 
             return (
               <div key={f.id} className={cn('border rounded-xl transition-colors', st.border, st.bg)}>
@@ -267,52 +269,67 @@ export function TuevWeckerContent({ fahrzeuge: initialFahrzeuge }: { fahrzeuge: 
                     </div>
 
                     {/* Aktionen */}
-                    <div className="flex flex-wrap items-center gap-2 mt-3">
-                      {/* WhatsApp */}
-                      {f.kunde?.telefon && (
-                        <a
-                          href={waPhone(f.kunde.telefon, f.kennzeichen, f.naechste_hauptuntersuchung)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-1.5 text-xs bg-green-50 hover:bg-green-100 border border-green-200 text-green-700 font-medium px-3 py-1.5 rounded-lg transition-colors"
-                        >
-                          <MessageCircle className="w-3.5 h-3.5" /> WhatsApp
-                        </a>
-                      )}
-
-                      {/* Anrufen */}
-                      {f.kunde?.telefon && (
-                        <a
-                          href={`tel:${f.kunde.telefon}`}
-                          className="flex items-center gap-1.5 text-xs bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 font-medium px-3 py-1.5 rounded-lg transition-colors"
-                        >
-                          <Phone className="w-3.5 h-3.5" /> Anrufen
-                        </a>
-                      )}
-
-                      {/* Termin erstellen */}
-                      {!benachrichtigt ? (
-                        <button
-                          onClick={() => handleTerminErstellen(f)}
-                          disabled={creatingTermin === f.id}
-                          className="flex items-center gap-1.5 text-xs bg-orange-50 hover:bg-orange-100 border border-orange-200 text-orange-700 font-medium px-3 py-1.5 rounded-lg transition-colors disabled:opacity-60"
-                        >
-                          <Calendar className="w-3.5 h-3.5" />
-                          {creatingTermin === f.id ? 'Wird angelegt…' : 'TÜV-Termin anlegen'}
-                        </button>
+                    <div className="mt-3 space-y-2">
+                      {terminErstelltIds.has(f.id) ? (
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="flex items-center gap-1.5 text-xs bg-green-50 border border-green-200 text-green-700 font-medium px-3 py-1.5 rounded-lg">
+                            <CheckCircle className="w-3.5 h-3.5" /> Termin angelegt
+                          </span>
+                          <Link href={`/fahrzeuge/${f.id}`} className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 px-2 py-1.5 rounded-lg hover:bg-gray-100 transition-colors ml-auto">
+                            Fahrzeug <ChevronRight className="w-3.5 h-3.5" />
+                          </Link>
+                        </div>
+                      ) : anfragenId === f.id ? (
+                        /* Anfrage-Panel */
+                        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-2">
+                          <p className="text-xs font-semibold text-amber-800">Kunde kontaktieren &amp; Zustimmung einholen:</p>
+                          <div className="flex flex-wrap gap-2">
+                            {f.kunde?.telefon && (
+                              <a href={waPhone(f.kunde.telefon, f.kennzeichen, f.naechste_hauptuntersuchung)} target="_blank" rel="noopener noreferrer"
+                                className="flex items-center gap-1.5 text-xs bg-green-50 hover:bg-green-100 border border-green-200 text-green-700 font-medium px-3 py-1.5 rounded-lg transition-colors">
+                                <MessageCircle className="w-3.5 h-3.5" /> WhatsApp
+                              </a>
+                            )}
+                            {f.kunde?.telefon && (
+                              <a href={`tel:${f.kunde.telefon}`}
+                                className="flex items-center gap-1.5 text-xs bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 font-medium px-3 py-1.5 rounded-lg transition-colors">
+                                <Phone className="w-3.5 h-3.5" /> Anrufen
+                              </a>
+                            )}
+                            {!f.kunde?.telefon && (
+                              <span className="text-xs text-amber-700">Kein Telefon hinterlegt</span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 pt-1 border-t border-amber-200">
+                            {zugestimmtIds.has(f.id) ? (
+                              <button onClick={() => handleTerminErstellen(f)} disabled={creatingTermin === f.id}
+                                className="flex items-center gap-1.5 text-xs bg-orange-500 hover:bg-orange-600 text-white font-medium px-3 py-1.5 rounded-lg transition-colors disabled:opacity-60">
+                                <Calendar className="w-3.5 h-3.5" />
+                                {creatingTermin === f.id ? 'Wird angelegt…' : 'Termin anlegen'}
+                              </button>
+                            ) : (
+                              <button onClick={() => setZugestimmtIds(prev => new Set([...prev, f.id]))}
+                                className="flex items-center gap-1.5 text-xs bg-green-500 hover:bg-green-600 text-white font-medium px-3 py-1.5 rounded-lg transition-colors">
+                                <CheckCircle className="w-3.5 h-3.5" /> Kunde hat zugestimmt
+                              </button>
+                            )}
+                            <button onClick={() => setAnfragenId(null)} className="text-xs text-amber-600 hover:text-amber-800 px-2 py-1.5">
+                              Abbrechen
+                            </button>
+                          </div>
+                        </div>
                       ) : (
-                        <span className="flex items-center gap-1.5 text-xs bg-green-50 border border-green-200 text-green-700 font-medium px-3 py-1.5 rounded-lg">
-                          <CheckCircle className="w-3.5 h-3.5" /> Termin angelegt
-                        </span>
+                        /* Standard-Zeile */
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <button onClick={() => setAnfragenId(f.id)}
+                            className="flex items-center gap-1.5 text-xs bg-orange-50 hover:bg-orange-100 border border-orange-200 text-orange-700 font-medium px-3 py-1.5 rounded-lg transition-colors">
+                            <Bell className="w-3.5 h-3.5" /> Kunde anfragen
+                          </button>
+                          <Link href={`/fahrzeuge/${f.id}`} className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 px-2 py-1.5 rounded-lg hover:bg-gray-100 transition-colors ml-auto">
+                            Fahrzeug <ChevronRight className="w-3.5 h-3.5" />
+                          </Link>
+                        </div>
                       )}
-
-                      {/* Fahrzeug öffnen */}
-                      <Link
-                        href={`/fahrzeuge/${f.id}`}
-                        className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 px-2 py-1.5 rounded-lg hover:bg-gray-100 transition-colors ml-auto"
-                      >
-                        Fahrzeug <ChevronRight className="w-3.5 h-3.5" />
-                      </Link>
                     </div>
                   </div>
                 </div>

@@ -4,7 +4,7 @@ import Link from 'next/link'
 import {
   Wrench, Search, Phone, Mail, Car, AlertTriangle, CheckCircle,
   Clock, ChevronRight, MessageCircle, Calendar, X, Check,
-  WrenchIcon,
+  WrenchIcon, Bell,
 } from 'lucide-react'
 import { cn, formatDate } from '@/lib/utils'
 import { Card, CardContent } from '@/components/ui/card'
@@ -64,6 +64,8 @@ export function ServiceWeckerContent({ fahrzeuge: initialFahrzeuge }: { fahrzeug
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editDatum, setEditDatum] = useState('')
   const [saving, setSaving] = useState(false)
+  const [anfragenId, setAnfragenId] = useState<string | null>(null)
+  const [zugestimmtIds, setZugestimmtIds] = useState<Set<string>>(new Set())
   const [creatingTermin, setCreatingTermin] = useState<string | null>(null)
   const [terminErstelltIds, setTerminErstelltIds] = useState<Set<string>>(new Set())
 
@@ -123,6 +125,7 @@ export function ServiceWeckerContent({ fahrzeuge: initialFahrzeuge }: { fahrzeug
       beschreibung: `Nächster Service fällig am ${formatDate(f.naechster_service_datum)}`,
     })
     setTerminErstelltIds(prev => new Set([...prev, f.id]))
+    setAnfragenId(null)
     setCreatingTermin(null)
   }
 
@@ -315,91 +318,91 @@ export function ServiceWeckerContent({ fahrzeuge: initialFahrzeuge }: { fahrzeug
                     </div>
 
                     {/* Zeile 4: Nächster Service + Aktionen */}
-                    <div className="flex flex-wrap items-center gap-2 mt-3">
-                      {/* Nächster Service Datum */}
-                      {isEditing ? (
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="date"
-                            value={editDatum}
-                            min={today}
-                            onChange={e => setEditDatum(e.target.value)}
-                            autoFocus
-                            className="border border-orange-400 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-orange-400"
-                          />
-                          <button
-                            onClick={() => saveServiceDatum(f.id, editDatum)}
-                            disabled={saving}
-                            className="w-7 h-7 rounded-lg bg-green-500 hover:bg-green-600 flex items-center justify-center text-white"
-                          >
-                            <Check className="w-3.5 h-3.5" />
+                    <div className="mt-3 space-y-2">
+                      {/* Service-Datum Zeile */}
+                      <div className="flex flex-wrap items-center gap-2">
+                        {isEditing ? (
+                          <div className="flex items-center gap-2">
+                            <input type="date" value={editDatum} min={today} onChange={e => setEditDatum(e.target.value)} autoFocus
+                              className="border border-orange-400 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-orange-400" />
+                            <button onClick={() => saveServiceDatum(f.id, editDatum)} disabled={saving}
+                              className="w-7 h-7 rounded-lg bg-green-500 hover:bg-green-600 flex items-center justify-center text-white">
+                              <Check className="w-3.5 h-3.5" />
+                            </button>
+                            <button onClick={() => setEditingId(null)}
+                              className="w-7 h-7 rounded-lg border border-gray-200 hover:bg-gray-100 flex items-center justify-center text-gray-500">
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ) : (
+                          <button onClick={() => { setEditingId(f.id); setEditDatum(f.naechster_service_datum ?? '') }}
+                            className={cn('flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors',
+                              f.naechster_service_datum
+                                ? 'bg-white border-orange-200 text-orange-700 hover:border-orange-400'
+                                : 'bg-orange-50 border-orange-200 text-orange-600 hover:border-orange-400')}>
+                            <Calendar className="w-3.5 h-3.5" />
+                            {f.naechster_service_datum ? `Nächster: ${formatDate(f.naechster_service_datum)}` : 'Service-Datum setzen'}
                           </button>
-                          <button
-                            onClick={() => setEditingId(null)}
-                            className="w-7 h-7 rounded-lg border border-gray-200 hover:bg-gray-100 flex items-center justify-center text-gray-500"
-                          >
-                            <X className="w-3.5 h-3.5" />
-                          </button>
+                        )}
+                      </div>
+
+                      {/* Anfrage-Flow */}
+                      {terminErstellt ? (
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="flex items-center gap-1.5 text-xs bg-green-50 border border-green-200 text-green-700 px-3 py-1.5 rounded-lg font-medium">
+                            <CheckCircle className="w-3.5 h-3.5" /> Termin angelegt
+                          </span>
+                          <Link href={`/fahrzeuge/${f.id}`} className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 px-2 py-1.5 rounded-lg hover:bg-gray-100 ml-auto transition-colors">
+                            Auftrag <ChevronRight className="w-3.5 h-3.5" />
+                          </Link>
+                        </div>
+                      ) : anfragenId === f.id ? (
+                        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-2">
+                          <p className="text-xs font-semibold text-amber-800">Kunde kontaktieren &amp; Zustimmung einholen:</p>
+                          <div className="flex flex-wrap gap-2">
+                            {f.kunde?.telefon && (
+                              <a href={waService(f.kunde.telefon, f.kennzeichen)} target="_blank" rel="noopener noreferrer"
+                                className="flex items-center gap-1.5 text-xs bg-green-50 hover:bg-green-100 border border-green-200 text-green-700 font-medium px-3 py-1.5 rounded-lg transition-colors">
+                                <MessageCircle className="w-3.5 h-3.5" /> WhatsApp
+                              </a>
+                            )}
+                            {f.kunde?.telefon && (
+                              <a href={`tel:${f.kunde.telefon}`}
+                                className="flex items-center gap-1.5 text-xs bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 font-medium px-3 py-1.5 rounded-lg transition-colors">
+                                <Phone className="w-3.5 h-3.5" /> Anrufen
+                              </a>
+                            )}
+                            {!f.kunde?.telefon && <span className="text-xs text-amber-700">Kein Telefon hinterlegt</span>}
+                          </div>
+                          <div className="flex items-center gap-2 pt-1 border-t border-amber-200">
+                            {zugestimmtIds.has(f.id) ? (
+                              <button onClick={() => handleTerminErstellen(f)} disabled={!f.naechster_service_datum || creatingTermin === f.id}
+                                className="flex items-center gap-1.5 text-xs bg-orange-500 hover:bg-orange-600 text-white font-medium px-3 py-1.5 rounded-lg transition-colors disabled:opacity-60">
+                                <WrenchIcon className="w-3.5 h-3.5" />
+                                {creatingTermin === f.id ? 'Wird angelegt…' : 'Termin anlegen'}
+                              </button>
+                            ) : (
+                              <button onClick={() => setZugestimmtIds(prev => new Set([...prev, f.id]))}
+                                className="flex items-center gap-1.5 text-xs bg-green-500 hover:bg-green-600 text-white font-medium px-3 py-1.5 rounded-lg transition-colors">
+                                <CheckCircle className="w-3.5 h-3.5" /> Kunde hat zugestimmt
+                              </button>
+                            )}
+                            <button onClick={() => setAnfragenId(null)} className="text-xs text-amber-600 hover:text-amber-800 px-2 py-1.5">
+                              Abbrechen
+                            </button>
+                          </div>
                         </div>
                       ) : (
-                        <button
-                          onClick={() => { setEditingId(f.id); setEditDatum(f.naechster_service_datum ?? '') }}
-                          className={cn(
-                            'flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors',
-                            f.naechster_service_datum
-                              ? 'bg-white border-orange-200 text-orange-700 hover:border-orange-400'
-                              : 'bg-orange-50 border-orange-200 text-orange-600 hover:border-orange-400'
-                          )}
-                        >
-                          <Calendar className="w-3.5 h-3.5" />
-                          {f.naechster_service_datum
-                            ? `Nächster: ${formatDate(f.naechster_service_datum)}`
-                            : 'Service-Datum setzen'}
-                        </button>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <button onClick={() => setAnfragenId(f.id)}
+                            className="flex items-center gap-1.5 text-xs bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 font-medium px-3 py-1.5 rounded-lg transition-colors">
+                            <Bell className="w-3.5 h-3.5" /> Kunde anfragen
+                          </button>
+                          <Link href={`/fahrzeuge/${f.id}`} className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 px-2 py-1.5 rounded-lg hover:bg-gray-100 ml-auto transition-colors">
+                            Auftrag <ChevronRight className="w-3.5 h-3.5" />
+                          </Link>
+                        </div>
                       )}
-
-                      {/* WhatsApp */}
-                      {f.kunde?.telefon && f.naechster_service_datum && (
-                        <a
-                          href={waService(f.kunde.telefon, f.kennzeichen)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-1.5 text-xs bg-green-50 hover:bg-green-100 border border-green-200 text-green-700 font-medium px-3 py-1.5 rounded-lg transition-colors"
-                        >
-                          <MessageCircle className="w-3.5 h-3.5" /> WhatsApp
-                        </a>
-                      )}
-
-                      {/* Anrufen */}
-                      {f.kunde?.telefon && (
-                        <a href={`tel:${f.kunde.telefon}`}
-                          className="flex items-center gap-1.5 text-xs bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 font-medium px-3 py-1.5 rounded-lg transition-colors">
-                          <Phone className="w-3.5 h-3.5" /> Anrufen
-                        </a>
-                      )}
-
-                      {/* Termin anlegen */}
-                      {f.naechster_service_datum && !terminErstellt && (
-                        <button
-                          onClick={() => handleTerminErstellen(f)}
-                          disabled={creatingTermin === f.id}
-                          className="flex items-center gap-1.5 text-xs bg-orange-50 hover:bg-orange-100 border border-orange-200 text-orange-700 font-medium px-3 py-1.5 rounded-lg transition-colors disabled:opacity-60"
-                        >
-                          <WrenchIcon className="w-3.5 h-3.5" />
-                          {creatingTermin === f.id ? 'Wird angelegt…' : 'Termin anlegen'}
-                        </button>
-                      )}
-                      {terminErstellt && (
-                        <span className="flex items-center gap-1.5 text-xs bg-green-50 border border-green-200 text-green-700 px-3 py-1.5 rounded-lg font-medium">
-                          <CheckCircle className="w-3.5 h-3.5" /> Termin angelegt
-                        </span>
-                      )}
-
-                      {/* Fahrzeug öffnen */}
-                      <Link href={`/fahrzeuge/${f.id}`}
-                        className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 px-2 py-1.5 rounded-lg hover:bg-gray-100 ml-auto transition-colors">
-                        Auftrag <ChevronRight className="w-3.5 h-3.5" />
-                      </Link>
                     </div>
                   </div>
                 </div>
