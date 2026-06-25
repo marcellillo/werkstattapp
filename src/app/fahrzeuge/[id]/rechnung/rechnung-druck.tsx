@@ -1,7 +1,8 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useQrDataUrl } from '@/components/ui/qr-code'
 import { buildGiroCode } from '@/lib/girocode'
+import { createClient } from '@/lib/supabase/client'
 
 function fmt(date?: string | null) {
   if (!date) return '—'
@@ -119,6 +120,9 @@ function EmailModal({
 
 export function RechnungDruck({ auftrag, firma }: { auftrag: any; firma: Record<string, string> }) {
   const [emailModalOffen, setEmailModalOffen] = useState(false)
+  const [gespeichert, setGespeichert] = useState(false)
+  const savedRef = useRef(false)
+  const supabase = createClient()
   const giroCode = firma.firma_iban
     ? buildGiroCode({
         bic: firma.firma_bic,
@@ -158,7 +162,57 @@ export function RechnungDruck({ auftrag, firma }: { auftrag: any; firma: Record<
   const auftragNummer = (auftrag.auftrag_nr ?? '').replace(/^AU-/i, '')
   const rechnungsNr = `RE-${auftragNummer}-${rechnungsJahr}`
 
-  useEffect(() => { window.print() }, [])
+  useEffect(() => {
+    window.print()
+    if (savedRef.current) return
+    savedRef.current = true
+
+    async function speichern() {
+      const fz = auftrag.fahrzeug ?? {}
+      const kd = auftrag.kunde ?? {}
+      const teile = (auftrag.ersatzteile ?? []) as any[]
+      const kleinunternehmer = firma.firma_kleinunternehmer === 'ja'
+
+      const teileNetto = teile.reduce((s: number, t: any) => {
+        const ep = kleinunternehmer ? (t.einzelpreis ?? 0) : (t.einzelpreis ?? 0) / 1.19
+        return s + ep * (t.menge ?? 1)
+      }, 0)
+      const arbeitNetto: number = auftrag._arbeit_netto ?? 0
+      const sonstigesNetto: number = auftrag._sonstiges_netto ?? 0
+      const kleinteilNetto: number = auftrag._kleinteil_netto ?? 0
+      const gesamtNetto = teileNetto + arbeitNetto + sonstigesNetto + kleinteilNetto
+      const mwstBetrag = kleinunternehmer ? 0 : gesamtNetto * 0.19
+      const gesamtBrutto = gesamtNetto + mwstBetrag
+
+      const rechnungsDatum = auftrag.fertiggestellt_am ?? auftrag.aktualisiert_am ?? new Date().toISOString()
+      const rechnungsJahr = new Date(rechnungsDatum).getFullYear()
+      const auftragNummer = (auftrag.auftrag_nr ?? '').replace(/^AU-/i, '')
+      const rechnungsNr = `RE-${auftragNummer}-${rechnungsJahr}`
+      const faelligAm = new Date(new Date(rechnungsDatum).getTime() + 14 * 86_400_000).toISOString().split('T')[0]
+
+      // Auftrag.einnahmen aktualisieren
+      await supabase.from('auftraege')
+        .update({ einnahmen: gesamtBrutto })
+        .eq('id', auftrag.id)
+
+      // Kundenrechnung speichern (upsert auf rechnungs_nr — verhindert Duplikate bei mehrfachem Drucken)
+      await supabase.from('kunden_rechnungen').upsert({
+        rechnungs_nr: rechnungsNr,
+        auftrag_id: auftrag.id,
+        kunde_id: kd.id ?? null,
+        fahrzeug_id: fz.id ?? null,
+        betrag_netto: gesamtNetto,
+        betrag_mwst: mwstBetrag,
+        betrag_brutto: gesamtBrutto,
+        faellig_am: faelligAm,
+        status: 'offen',
+      }, { onConflict: 'rechnungs_nr', ignoreDuplicates: false })
+
+      setGespeichert(true)
+    }
+
+    speichern()
+  }, [])
 
   return (
     <>

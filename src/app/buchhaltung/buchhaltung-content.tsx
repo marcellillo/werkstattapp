@@ -2,10 +2,13 @@
 import { useState, useMemo } from 'react'
 import {
   TrendingUp, TrendingDown, Euro, Download,
-  ChevronDown, ChevronUp, ArrowUpRight, ArrowDownRight, Eye, EyeOff
+  ChevronDown, ChevronUp, ArrowUpRight, ArrowDownRight, Eye, EyeOff,
+  Receipt, CheckCircle, Clock, AlertTriangle, Mail, Link as LinkIcon
 } from 'lucide-react'
+import Link from 'next/link'
 import { Card, CardContent } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
+import { createClient } from '@/lib/supabase/client'
 
 type Auftrag = {
   id: string
@@ -38,16 +41,49 @@ function fmtEuro(n: number) {
 }
 function sign(n: number) { return n >= 0 ? '+' : '' }
 
-export function BuchhaltungContent({ auftraege, ausgaben, kleinunternehmer, firmaName }: {
+type KundenRechnung = {
+  id: string
+  rechnungs_nr: string
+  auftrag_id: string | null
+  betrag_netto: number
+  betrag_mwst: number
+  betrag_brutto: number
+  status: string
+  bezahlt_am: string | null
+  faellig_am: string | null
+  erstellt_am: string
+  kunde: { vorname: string | null; nachname: string | null } | null
+  fahrzeug: { kennzeichen: string; marke: string | null; modell: string | null } | null
+}
+
+type Tab = 'uebersicht' | 'rechnungen'
+
+export function BuchhaltungContent({ auftraege, ausgaben, kundenRechnungen: initialKundenRechnungen, kleinunternehmer, firmaName }: {
   auftraege: Auftrag[]
   ausgaben: Ausgabe[]
+  kundenRechnungen: KundenRechnung[]
   kleinunternehmer: boolean
   firmaName: string
 }) {
+  const supabase = createClient()
+  const [tab, setTab] = useState<Tab>('uebersicht')
   const [jahr, setJahr] = useState(new Date().getFullYear())
   const [expandedMonat, setExpandedMonat] = useState<number | null>(null)
   const [leereMonate, setLeereMonate] = useState(false)
+  const [kundenRechnungen, setKundenRechnungen] = useState<KundenRechnung[]>(initialKundenRechnungen)
+  const [rechnungFilter, setRechnungFilter] = useState<'alle' | 'offen' | 'bezahlt' | 'ueberfaellig'>('alle')
   const heute = new Date().toISOString().split('T')[0]
+
+  async function toggleBezahlt(r: KundenRechnung) {
+    const neuerStatus = r.status === 'bezahlt' ? 'offen' : 'bezahlt'
+    const bezahltAm = neuerStatus === 'bezahlt' ? heute : null
+    setKundenRechnungen(prev => prev.map(x =>
+      x.id === r.id ? { ...x, status: neuerStatus, bezahlt_am: bezahltAm } : x
+    ))
+    await supabase.from('kunden_rechnungen')
+      .update({ status: neuerStatus, bezahlt_am: bezahltAm })
+      .eq('id', r.id)
+  }
 
   const einnahmenNetto = useMemo(() => auftraege.map(a => ({
     ...a,
@@ -123,6 +159,17 @@ export function BuchhaltungContent({ auftraege, ausgaben, kleinunternehmer, firm
     ? jahresDaten
     : jahresDaten.filter(m => m.hatDaten)
 
+  const offeneRechnungen = kundenRechnungen.filter(r => r.status === 'offen')
+  const ueberfaelligeRechnungen = offeneRechnungen.filter(r => r.faellig_am && r.faellig_am < heute)
+  const offenSumme = offeneRechnungen.reduce((s, r) => s + r.betrag_brutto, 0)
+
+  const gefilterteRechnungen = kundenRechnungen.filter(r => {
+    if (rechnungFilter === 'offen') return r.status === 'offen' && (!r.faellig_am || r.faellig_am >= heute)
+    if (rechnungFilter === 'ueberfaellig') return r.status === 'offen' && r.faellig_am && r.faellig_am < heute
+    if (rechnungFilter === 'bezahlt') return r.status === 'bezahlt'
+    return true
+  })
+
   return (
     <div className="space-y-5">
       {/* Header */}
@@ -142,6 +189,162 @@ export function BuchhaltungContent({ auftraege, ausgaben, kleinunternehmer, firm
           </button>
         </div>
       </div>
+
+      {/* Tabs */}
+      <div className="flex gap-2 border-b border-slate-200 pb-0">
+        {([
+          { value: 'uebersicht', label: 'Übersicht' },
+          { value: 'rechnungen', label: 'Kundenrechnungen', badge: offeneRechnungen.length },
+        ] as const).map(t => (
+          <button key={t.value} onClick={() => setTab(t.value)}
+            className={cn(
+              'flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-colors',
+              tab === t.value
+                ? 'border-orange-500 text-orange-600'
+                : 'border-transparent text-slate-500 hover:text-slate-700'
+            )}>
+            {t.label}
+            {'badge' in t && t.badge > 0 && (
+              <span className={cn('text-xs font-bold px-1.5 py-0.5 rounded-full',
+                tab === t.value ? 'bg-orange-100 text-orange-600' : 'bg-slate-100 text-slate-500')}>
+                {t.badge}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'rechnungen' && (
+        <div className="space-y-4">
+          {/* KPIs Rechnungen */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="bg-white border border-slate-200 rounded-xl p-4">
+              <p className="text-xs text-slate-400 mb-1">Gesamt</p>
+              <p className="text-xl font-bold text-slate-900">{kundenRechnungen.length}</p>
+              <p className="text-xs text-slate-400 mt-0.5">Rechnungen</p>
+            </div>
+            <div className={cn('rounded-xl border p-4', offeneRechnungen.length > 0 ? 'bg-amber-50 border-amber-200' : 'bg-white border-slate-200')}>
+              <p className="text-xs text-slate-400 mb-1">Offen</p>
+              <p className={cn('text-xl font-bold', offeneRechnungen.length > 0 ? 'text-amber-600' : 'text-slate-900')}>{fmtEuro(offenSumme)}</p>
+              <p className="text-xs text-slate-400 mt-0.5">{offeneRechnungen.length} Rechnungen</p>
+            </div>
+            <div className={cn('rounded-xl border p-4', ueberfaelligeRechnungen.length > 0 ? 'bg-red-50 border-red-200' : 'bg-white border-slate-200')}>
+              <p className="text-xs text-slate-400 mb-1">Überfällig</p>
+              <p className={cn('text-xl font-bold', ueberfaelligeRechnungen.length > 0 ? 'text-red-600' : 'text-slate-900')}>{ueberfaelligeRechnungen.length}</p>
+              <p className="text-xs text-slate-400 mt-0.5">Zahlungsziel überschritten</p>
+            </div>
+            <div className="bg-white border border-slate-200 rounded-xl p-4">
+              <p className="text-xs text-slate-400 mb-1">Bezahlt</p>
+              <p className="text-xl font-bold text-green-600">{fmtEuro(kundenRechnungen.filter(r => r.status === 'bezahlt').reduce((s, r) => s + r.betrag_brutto, 0))}</p>
+              <p className="text-xs text-slate-400 mt-0.5">{kundenRechnungen.filter(r => r.status === 'bezahlt').length} Rechnungen</p>
+            </div>
+          </div>
+
+          {/* Filter */}
+          <div className="flex gap-2 flex-wrap">
+            {([
+              { value: 'alle',         label: 'Alle',         count: kundenRechnungen.length },
+              { value: 'offen',        label: 'Offen',        count: offeneRechnungen.filter(r => !r.faellig_am || r.faellig_am >= heute).length },
+              { value: 'ueberfaellig', label: 'Überfällig',   count: ueberfaelligeRechnungen.length },
+              { value: 'bezahlt',      label: 'Bezahlt',      count: kundenRechnungen.filter(r => r.status === 'bezahlt').length },
+            ] as const).map(f => (
+              <button key={f.value} onClick={() => setRechnungFilter(f.value)}
+                className={cn(
+                  'flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm font-medium transition-colors',
+                  rechnungFilter === f.value
+                    ? 'bg-slate-900 text-white border-slate-900'
+                    : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+                )}>
+                {f.label}
+                {f.count > 0 && <span className={cn('text-xs font-bold', rechnungFilter === f.value ? 'text-white/70' : 'text-slate-400')}>{f.count}</span>}
+              </button>
+            ))}
+          </div>
+
+          {/* Liste */}
+          {gefilterteRechnungen.length === 0 ? (
+            <div className="bg-white border border-slate-200 rounded-xl py-16 text-center text-slate-400 text-sm">
+              <Receipt className="w-10 h-10 mx-auto mb-3 text-slate-200" />
+              Keine Rechnungen in dieser Kategorie
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {gefilterteRechnungen.map(r => {
+                const bezahlt = r.status === 'bezahlt'
+                const ueberfaellig = !bezahlt && r.faellig_am && r.faellig_am < heute
+                return (
+                  <div key={r.id} className={cn(
+                    'bg-white border rounded-xl px-4 py-3 flex items-center gap-4',
+                    bezahlt ? 'border-green-200' : ueberfaellig ? 'border-red-200 bg-red-50/30' : 'border-slate-200'
+                  )}>
+                    {/* Rechnung-Nr + Fahrzeug */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-mono text-sm font-semibold text-slate-800">{r.rechnungs_nr}</span>
+                        {r.fahrzeug && (
+                          <span className="text-xs font-mono bg-slate-100 px-2 py-0.5 rounded-full text-slate-600">{r.fahrzeug.kennzeichen}</span>
+                        )}
+                        {r.fahrzeug && (
+                          <span className="text-xs text-slate-400">{r.fahrzeug.marke} {r.fahrzeug.modell}</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3 mt-1 flex-wrap">
+                        {r.kunde && (
+                          <span className="text-xs text-slate-500">{r.kunde.vorname} {r.kunde.nachname}</span>
+                        )}
+                        <span className="text-xs text-slate-400">
+                          Erstellt: {fmt(r.erstellt_am)}
+                          {r.faellig_am && ` · Fällig: ${fmt(r.faellig_am)}`}
+                          {bezahlt && r.bezahlt_am && ` · Bezahlt: ${fmt(r.bezahlt_am)}`}
+                        </span>
+                        {ueberfaellig && (
+                          <span className="flex items-center gap-1 text-xs text-red-600 font-semibold">
+                            <AlertTriangle className="w-3 h-3" /> Überfällig
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Betrag */}
+                    <div className="text-right shrink-0">
+                      <p className="text-sm font-bold text-slate-900">{fmtEuro(r.betrag_brutto)}</p>
+                      {!kleinunternehmer && (
+                        <p className="text-xs text-slate-400">{fmtEuro(r.betrag_netto)} netto</p>
+                      )}
+                    </div>
+
+                    {/* Aktionen */}
+                    <div className="flex items-center gap-2 shrink-0">
+                      {r.auftrag_id && (
+                        <Link href={`/fahrzeuge/${r.auftrag_id}`}
+                          className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-400 hover:text-slate-600 transition-colors"
+                          title="Auftrag öffnen">
+                          <LinkIcon className="w-3.5 h-3.5" />
+                        </Link>
+                      )}
+                      <button
+                        onClick={() => toggleBezahlt(r)}
+                        className={cn(
+                          'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors border',
+                          bezahlt
+                            ? 'bg-green-50 border-green-200 text-green-700 hover:bg-green-100'
+                            : 'bg-white border-slate-200 text-slate-500 hover:border-green-300 hover:text-green-600'
+                        )}
+                      >
+                        {bezahlt
+                          ? <><CheckCircle className="w-3.5 h-3.5" /> Bezahlt</>
+                          : <><Clock className="w-3.5 h-3.5" /> Als bezahlt</>}
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === 'uebersicht' && (<>
 
       {/* KPIs */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -399,6 +602,8 @@ export function BuchhaltungContent({ auftraege, ausgaben, kleinunternehmer, firm
           </div>
         </div>
       )}
+
+      </>)}
     </div>
   )
 }
