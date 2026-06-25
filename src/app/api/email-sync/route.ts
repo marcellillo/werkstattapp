@@ -66,19 +66,23 @@ Regeln fuer Anhang-Analyse:
 - teile = JEDE einzelne Position/Artikel aus dem Dokument auflisten
 - rechnung darf nicht null sein wenn es eine Rechnung ist
 - typ: "rechnung" bei Rechnung/Invoice, "lieferstatus" bei Lieferschein, "bestellbestaetigung" bei Auftragsbestaetigung`
-    : `Analysiere den E-Mail-Text. Kein Anhang vorhanden.
+    : `Diese E-Mail wurde moeglicherweise weitergeleitet. Kein Anhang vorhanden.
 
-Von: ${absenderName} <${absenderEmail}>
+Weitergeleitet von: ${absenderName} <${absenderEmail}>
 Betreff: ${betreff}
 Inhalt:
 ${bodyText}
 
-Hinweis: Dies koennte eine weitergeleitete E-Mail sein — suche im Text nach dem urspruenglichen Lieferanten ("Von:", "From:", Briefkopf).
+WICHTIG: "${absenderName}" ist der Weiterleitende (interner Mitarbeiter), NICHT der Lieferant!
+Suche im Text nach dem URSPRUENGLICHEN Absender/Lieferanten:
+- Zeilen mit "Von:", "From:", "Gesendet von:", "Absender:" im E-Mail-Body
+- Firmenname im Briefkopf oder Footer des weitergeleiteten Textes
+- E-Mail-Domain des urspruenglichen Absenders (z.B. "finanzbuchhaltung@teileservice.de" → Lieferant = "Teileservice" oder Firmenname aus dem Text)
 
 Antworte mit exakt diesem JSON:
 {
   "typ": "rechnung",
-  "lieferant": "Firmenname des Lieferanten (aus E-Mail-Text extrahieren)",
+  "lieferant": "FIRMENNAME DES ORIGINAL-LIEFERANTEN (nicht ${absenderName})",
   "status": "bestellt",
   "auftragsnummer": null,
   "kennzeichen": null,
@@ -94,9 +98,9 @@ Antworte mit exakt diesem JSON:
 }
 
 Regeln:
+- lieferant: NIEMALS "${absenderName}" — das ist der interne Mitarbeiter der weitergeleitet hat
 - typ: "rechnung" bei Rechnungstext, "lieferstatus" bei Versand/Lieferung, "bestellbestaetigung" bei Bestellung, "sonstiges" sonst
-- status: "geliefert" bei Lieferbestaetigung, "unterwegs" bei Versandbestaetigung, "bestellt" bei Bestellbestaetigung
-- teile: alle Artikel aus dem Text extrahieren`
+- teile: alle Artikel/Positionen aus dem Text extrahieren, falls vorhanden`
 
   const contentBlocks: Anthropic.MessageParam['content'] = []
 
@@ -173,6 +177,7 @@ export async function POST() {
     for (const msg of messages) {
       try {
         const anhaenge = msg.hasAttachments ? await fetchAttachments(accessToken, msg.id) : []
+        fehler.push(`DEBUG "${msg.subject?.slice(0, 40)}": hasAttachments=${msg.hasAttachments}, gefundene Anhänge=${anhaenge.length}${anhaenge.length > 0 ? ` (${anhaenge.map(a => `${a.name}[${a.contentType}]`).join(', ')})` : ''}`)
 
         let analyse: EmailAnalyse | null = null
 
@@ -180,8 +185,10 @@ export async function POST() {
           try {
             analyse = await analysiereEmailMitClaude(anthropic, msg, anhaenge)
           } catch (e: any) {
-            fehler.push(`Claude-Fehler "${msg.subject}": ${e.message}`)
+            fehler.push(`Claude-Fehler "${msg.subject}" (${anhaenge.length} Anhänge): ${e.message}`)
           }
+        } else {
+          fehler.push(`Kein Claude API-Key`)
         }
 
         // Fallback auf Regex wenn Claude nicht verfuegbar
@@ -258,7 +265,7 @@ export async function POST() {
           }
 
           rechnungenImportiert++
-          verarbeitet.push(`Rechnung: ${analyse.lieferant}${r?.rechnungsnummer ? ` (${r.rechnungsnummer})` : ''} — ${analyse.teile.length} Positionen`)
+          verarbeitet.push(`Rechnung: ${analyse.lieferant}${r?.rechnungsnummer ? ` (${r.rechnungsnummer})` : ''} — ${analyse.teile.length} Positionen, ${anhaenge.length} Anhänge gelesen`)
           await markMessageAsRead(accessToken, msg.id)
           continue
         }

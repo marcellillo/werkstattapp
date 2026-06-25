@@ -119,8 +119,22 @@ export async function fetchAttachments(accessToken: string, messageId: string): 
   )
   if (!res.ok) return []
   const data = await res.json()
-  return (data.value ?? []).filter((a: any) =>
-    a.contentType === 'application/pdf' ||
-    a.contentType?.startsWith('image/')
-  )
+  return (data.value ?? []).filter((a: any) => {
+    const ct: string = a.contentType ?? ''
+    const name: string = (a.name ?? '').toLowerCase()
+    return ct === 'application/pdf' ||
+      ct === 'application/octet-stream' ||
+      ct.startsWith('image/') ||
+      name.endsWith('.pdf') ||
+      name.endsWith('.jpg') ||
+      name.endsWith('.jpeg') ||
+      name.endsWith('.png')
+  }).map((a: any) => {
+    // Korrigiere contentType anhand Dateiname falls nötig
+    const name: string = (a.name ?? '').toLowerCase()
+    if (a.contentType === 'application/octet-stream' && name.endsWith('.pdf')) {
+      return { ...a, contentType: 'application/pdf' }
+    }
+    return a
+  })
 }

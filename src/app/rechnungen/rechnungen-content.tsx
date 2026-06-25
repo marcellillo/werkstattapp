@@ -88,7 +88,11 @@ export function RechnungenContent({ rechnungen: initial, isAdmin = false }: { re
       }
       const teile_str = teile > 0 ? `, ${teile} Teile aktualisiert` : ''
       const rech_str = rech > 0 ? `${rech} Rechnung${rech !== 1 ? 'en' : ''} importiert` : 'Keine neuen Rechnungen'
-      setErfolg(`${data.emailsGeprueft} E-Mails geprüft — ${rech_str}${teile_str}`)
+      const duplikate_str = data.duplikate > 0 ? ` (${data.duplikate} Duplikate übersprungen)` : ''
+      let msg = `${data.emailsGeprueft} E-Mails geprüft — ${rech_str}${teile_str}${duplikate_str}`
+      if (data.fehler?.length > 0) msg += `\n⚠️ ${data.fehler.join('\n⚠️ ')}`
+      if (data.verarbeitet?.length > 0) msg += `\n✓ ${data.verarbeitet.join('\n✓ ')}`
+      setErfolg(msg)
     } catch (e: any) { setFehler(e.message) }
     finally { setSyncing(false) }
   }
@@ -199,7 +203,7 @@ export function RechnungenContent({ rechnungen: initial, isAdmin = false }: { re
       {erfolg && (
         <div className="flex items-start gap-3 p-4 bg-green-50 border border-green-200 rounded-xl">
           <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
-          <p className="text-sm text-green-800">{erfolg}</p>
+          <p className="text-sm text-green-800 whitespace-pre-wrap">{erfolg}</p>
           <button onClick={() => setErfolg(null)} className="ml-auto"><X className="w-4 h-4 text-green-600" /></button>
         </div>
       )}
