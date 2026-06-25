@@ -4,7 +4,7 @@ import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Car, Users, Package, Calendar,
   Bell, Settings, LogOut, BarChart2,
-  Mail, CalendarClock, Layers, Receipt, History, BookOpen, ShieldAlert
+  Mail, CalendarClock, Layers, Receipt, History, BookOpen, ShieldAlert, Wrench
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
@@ -21,6 +21,7 @@ const navItems = [
   { href: '/teile',              label: 'Lager',              icon: Package,         key: 'teile' },
   { href: '/kalender',           label: 'Kalender',           icon: Calendar,        key: 'kalender' },
   { href: '/tuev-wecker',         label: 'TÜV-Wecker',         icon: ShieldAlert,     key: 'tuev_wecker' },
+  { href: '/service-wecker',      label: 'Service-Wecker',      icon: Wrench,           key: 'service_wecker' },
   { href: '/rechnungen',         label: 'Rechnungen',         icon: Receipt,         key: 'rechnungen' },
   { href: '/buchhaltung',        label: 'Buchhaltung',        icon: BookOpen,        key: 'buchhaltung' },
   { href: '/emails',             label: 'E-Mails',            icon: Mail,            key: 'emails' },

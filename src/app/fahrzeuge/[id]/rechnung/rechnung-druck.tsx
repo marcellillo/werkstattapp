@@ -1,5 +1,5 @@
 'use client'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useQrDataUrl } from '@/components/ui/qr-code'
 import { buildGiroCode } from '@/lib/girocode'
 
@@ -11,7 +11,114 @@ function fmtEuro(n: number) {
   return n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
 }
 
+type EmailStatus = 'idle' | 'senden' | 'ok' | 'fehler'
+
+function EmailModal({
+  auftrag, firma, onClose,
+}: { auftrag: any; firma: Record<string, string>; onClose: () => void }) {
+  const kd = auftrag.kunde ?? {}
+  const [an, setAn] = useState(kd.email ?? '')
+  const [nachricht, setNachricht] = useState('')
+  const [status, setStatus] = useState<EmailStatus>('idle')
+  const [fehlerMsg, setFehlerMsg] = useState('')
+
+  const rechnungsJahr = new Date(auftrag.fertiggestellt_am ?? auftrag.erstellt_am ?? new Date()).getFullYear()
+  const auftragNummer = (auftrag.auftrag_nr ?? '').replace(/^AU-/i, '')
+  const rechnungsNr = `RE-${auftragNummer}-${rechnungsJahr}`
+
+  async function senden() {
+    if (!an.trim()) return
+    setStatus('senden')
+    setFehlerMsg('')
+    try {
+      const res = await fetch('/api/rechnung-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ auftrag, firma, an: an.trim(), nachricht: nachricht.trim() || undefined }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? 'Fehler beim Senden')
+      setStatus('ok')
+    } catch (e: any) {
+      setFehlerMsg(e.message)
+      setStatus('fehler')
+    }
+  }
+
+  return (
+    <div
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <div style={{ background: 'white', borderRadius: '16px', padding: '28px', width: '100%', maxWidth: '440px', boxShadow: '0 20px 60px rgba(0,0,0,0.25)' }}>
+        {status === 'ok' ? (
+          <div style={{ textAlign: 'center', padding: '12px 0' }}>
+            <div style={{ fontSize: '48px', marginBottom: '12px' }}>✅</div>
+            <div style={{ fontSize: '18px', fontWeight: 700, color: '#15803d', marginBottom: '6px' }}>Rechnung gesendet!</div>
+            <div style={{ fontSize: '13px', color: '#64748b', marginBottom: '20px' }}>{rechnungsNr} wurde an <strong>{an}</strong> gesendet.</div>
+            <button onClick={onClose} style={{ background: '#1e293b', color: 'white', border: 'none', borderRadius: '10px', padding: '10px 24px', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}>Schließen</button>
+          </div>
+        ) : (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+              <div>
+                <div style={{ fontSize: '17px', fontWeight: 700, color: '#1e293b' }}>Rechnung per E-Mail senden</div>
+                <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>{rechnungsNr}</div>
+              </div>
+              <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px', color: '#94a3b8', lineHeight: 1 }}>×</button>
+            </div>
+
+            <div style={{ marginBottom: '14px' }}>
+              <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '5px' }}>An (E-Mail-Adresse)</label>
+              <input
+                type="email"
+                value={an}
+                onChange={e => setAn(e.target.value)}
+                placeholder="kunde@beispiel.de"
+                style={{ width: '100%', border: '1.5px solid #e2e8f0', borderRadius: '10px', padding: '9px 12px', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }}
+              />
+            </div>
+
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '5px' }}>
+                Persönliche Nachricht <span style={{ color: '#94a3b8', fontWeight: 400 }}>(optional)</span>
+              </label>
+              <textarea
+                value={nachricht}
+                onChange={e => setNachricht(e.target.value)}
+                placeholder="z.B. Vielen Dank für Ihren Besuch heute …"
+                rows={3}
+                style={{ width: '100%', border: '1.5px solid #e2e8f0', borderRadius: '10px', padding: '9px 12px', fontSize: '13px', resize: 'vertical', outline: 'none', boxSizing: 'border-box' }}
+              />
+            </div>
+
+            {fehlerMsg && (
+              <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', padding: '10px 12px', fontSize: '12px', color: '#dc2626', marginBottom: '14px' }}>
+                ⚠ {fehlerMsg}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button onClick={onClose} style={{ flex: 1, background: 'none', border: '1.5px solid #e2e8f0', borderRadius: '10px', padding: '10px', fontSize: '14px', fontWeight: 600, color: '#64748b', cursor: 'pointer' }}>
+                Abbrechen
+              </button>
+              <button
+                onClick={senden}
+                disabled={!an.trim() || status === 'senden'}
+                style={{ flex: 2, background: an.trim() ? '#ea580c' : '#e2e8f0', color: an.trim() ? 'white' : '#94a3b8', border: 'none', borderRadius: '10px', padding: '10px', fontSize: '14px', fontWeight: 700, cursor: an.trim() ? 'pointer' : 'default', transition: 'background 0.15s' }}
+              >
+                {status === 'senden' ? 'Wird gesendet …' : '✉ Rechnung senden'}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export function RechnungDruck({ auftrag, firma }: { auftrag: any; firma: Record<string, string> }) {
+  const [emailModalOffen, setEmailModalOffen] = useState(false)
   const giroCode = firma.firma_iban
     ? buildGiroCode({
         bic: firma.firma_bic,
@@ -121,7 +228,9 @@ export function RechnungDruck({ auftrag, firma }: { auftrag: any; firma: Record<
       `}</style>
 
       <button className="no-print back-btn" onClick={() => history.back()}>← Zurück</button>
-      <button className="no-print print-btn" onClick={() => window.print()}>Drucken / PDF</button>
+      <button className="no-print print-btn" onClick={() => window.print()} style={{right: '160px'}}>Drucken / PDF</button>
+      <button className="no-print" onClick={() => setEmailModalOffen(true)} style={{position:'fixed',top:'16px',right:'16px',background:'#2563eb',color:'white',border:'none',borderRadius:'6px',padding:'8px 16px',fontSize:'13px',fontWeight:600,cursor:'pointer',zIndex:999}}>✉ Per E-Mail</button>
+      {emailModalOffen && <EmailModal auftrag={auftrag} firma={firma} onClose={() => setEmailModalOffen(false)} />}
 
       <div className="page">
         {/* Briefkopf */}

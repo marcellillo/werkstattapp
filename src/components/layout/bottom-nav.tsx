@@ -5,7 +5,7 @@ import { useState } from 'react'
 import {
   LayoutDashboard, Car, Layers, CalendarClock, Menu, X,
   Users, Package, Calendar, Bell, BarChart2, Mail, Settings,
-  LogOut, Receipt, History, BookOpen, ShieldAlert
+  LogOut, Receipt, History, BookOpen, ShieldAlert, Wrench
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
@@ -24,6 +24,7 @@ const moreItemDefs = [
   { href: '/kunden',             label: 'Kunden',          icon: Users,    key: 'kunden' },
   { href: '/teile',              label: 'Lager',           icon: Package,  key: 'teile' },
   { href: '/tuev-wecker',         label: 'TÜV-Wecker',      icon: ShieldAlert, key: 'tuev_wecker' },
+  { href: '/service-wecker',      label: 'Service-Wecker',  icon: Wrench,       key: 'service_wecker' },
   { href: '/kalender',           label: 'Kalender',        icon: Calendar, key: 'kalender' },
   { href: '/rechnungen',         label: 'Rechnungen',      icon: Receipt,  key: 'rechnungen' },
   { href: '/buchhaltung',        label: 'Buchhaltung',     icon: BookOpen, key: 'buchhaltung' },

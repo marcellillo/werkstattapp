@@ -1,6 +1,7 @@
 'use client'
 import { Menu } from 'lucide-react'
 import { NotificationBell } from './notification-bell'
+import { GlobalSearch } from './global-search'
 import { usePathname } from 'next/navigation'
 
 interface TopbarProps {
@@ -43,6 +44,7 @@ export function Topbar({ title, onMenuClick }: TopbarProps) {
       </div>
 
       <div className="ml-auto flex items-center gap-3">
+        <GlobalSearch />
         <NotificationBell />
         <div className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-sm">
           W
