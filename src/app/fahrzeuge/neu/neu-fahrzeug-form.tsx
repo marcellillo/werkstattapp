@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Car, User, Plus, Download, Upload } from 'lucide-react'
+import { ArrowLeft, Car, User, Plus, Download, Upload, ShieldAlert, Bell, BellOff } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { createClient } from '@/lib/supabase/client'
@@ -84,6 +84,10 @@ export function NeuFahrzeugForm({ kunden, hebebuehnen }: Props) {
   const [kFirma, setKFirma] = useState('')
   const [kTelefon, setKTelefon] = useState('')
   const [kMobil, setKMobil] = useState('')
+
+  // TÜV-Wecker
+  const [naechsteHu, setNaechsteHu] = useState('')
+  const [tuevErinnerung, setTuevErinnerung] = useState<boolean | null>(null)
 
   // Order
   const [arbeiten, setArbeiten] = useState('')
@@ -213,7 +217,15 @@ export function NeuFahrzeugForm({ kunden, hebebuehnen }: Props) {
         mobile_de_id: mobileDeId || null,
         bilder_urls: bilderUrls.length > 0 ? JSON.stringify(bilderUrls) : null,
         notizen: verkaufspreis ? `Verkaufspreis: ${parseFloat(verkaufspreis).toLocaleString('de-DE')} € (Brutto)` : null,
+        naechste_hauptuntersuchung: naechsteHu || null,
       }).select().single()
+
+      // tuev_erinnerung separat – keine harte Abhängigkeit
+      if (fahrzeug && tuevErinnerung !== null) {
+        await supabase.from('fahrzeuge')
+          .update({ tuev_erinnerung: tuevErinnerung })
+          .eq('id', fahrzeug.id)
+      }
 
       if (!fahrzeug) throw new Error('Fahrzeug konnte nicht erstellt werden')
 
@@ -468,6 +480,76 @@ export function NeuFahrzeugForm({ kunden, hebebuehnen }: Props) {
             )}
           </CardContent>
         </Card>}
+
+        {/* TÜV-Wecker — nur bei Fremdfahrzeugen */}
+        {fahrzeugTyp === 'fremd' && (
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <ShieldAlert className="w-5 h-5 text-yellow-500" />
+                TÜV-Wecker
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <label className="text-xs text-gray-800 mb-1 block">Nächste Hauptuntersuchung (HU)</label>
+                <input
+                  type="date"
+                  value={naechsteHu}
+                  onChange={e => setNaechsteHu(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                />
+                {naechsteHu && (() => {
+                  const days = Math.ceil((new Date(naechsteHu + 'T00:00:00').getTime() - new Date().setHours(0,0,0,0)) / 86400000)
+                  const color = days < 0 ? 'text-red-600' : days <= 30 ? 'text-orange-600' : days <= 60 ? 'text-yellow-600' : 'text-green-600'
+                  const label = days < 0 ? `${Math.abs(days)} Tage überfällig` : days === 0 ? 'Heute!' : `in ${days} Tagen`
+                  return <p className={`text-xs mt-1 font-medium ${color}`}>HU: {label}</p>
+                })()}
+              </div>
+
+              {naechsteHu && (
+                <div>
+                  <p className="text-xs text-gray-700 font-medium mb-2">
+                    Möchte der Kunde an den TÜV erinnert werden?
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setTuevErinnerung(true)}
+                      className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border text-sm font-medium transition-colors ${
+                        tuevErinnerung === true
+                          ? 'bg-green-500 border-green-500 text-white'
+                          : 'border-gray-200 text-gray-600 hover:border-green-400 hover:text-green-600'
+                      }`}
+                    >
+                      <Bell className="w-4 h-4" /> Ja, bitte erinnern
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTuevErinnerung(false)}
+                      className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border text-sm font-medium transition-colors ${
+                        tuevErinnerung === false
+                          ? 'bg-gray-400 border-gray-400 text-white'
+                          : 'border-gray-200 text-gray-600 hover:border-gray-400'
+                      }`}
+                    >
+                      <BellOff className="w-4 h-4" /> Nein, danke
+                    </button>
+                  </div>
+                  {tuevErinnerung === true && (
+                    <p className="text-xs text-green-600 mt-2 flex items-center gap-1">
+                      <ShieldAlert className="w-3.5 h-3.5" />
+                      Fahrzeug erscheint im TÜV-Wecker und kann rechtzeitig kontaktiert werden.
+                    </p>
+                  )}
+                  {tuevErinnerung === false && (
+                    <p className="text-xs text-gray-400 mt-2">Kunde wird im TÜV-Wecker nicht angezeigt.</p>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Work order */}
         <Card>

@@ -7,15 +7,15 @@ export type Rolle = 'admin' | 'werkstattmeister' | 'mechaniker' | 'buchhalter'
 export const DEFAULT_BERECHTIGUNGEN: Record<Rolle, string[]> = {
   admin: [
     'dashboard', 'hebebuehnen', 'fahrzeuge', 'termine', 'kunden', 'teile',
-    'kalender', 'rechnungen', 'emails', 'verlauf', 'statistiken',
+    'kalender', 'tuev_wecker', 'rechnungen', 'emails', 'verlauf', 'statistiken',
     'benachrichtigungen', 'einstellungen', 'buchhaltung',
   ],
   werkstattmeister: [
     'dashboard', 'hebebuehnen', 'fahrzeuge', 'termine', 'kunden', 'teile',
-    'kalender', 'rechnungen', 'emails', 'verlauf', 'statistiken', 'benachrichtigungen',
+    'kalender', 'tuev_wecker', 'rechnungen', 'emails', 'verlauf', 'statistiken', 'benachrichtigungen',
   ],
   mechaniker: [
-    'dashboard', 'hebebuehnen', 'fahrzeuge', 'termine', 'teile', 'benachrichtigungen',
+    'dashboard', 'hebebuehnen', 'fahrzeuge', 'termine', 'teile', 'tuev_wecker', 'benachrichtigungen',
   ],
   buchhalter: [
     'dashboard', 'buchhaltung', 'rechnungen', 'statistiken', 'benachrichtigungen',
