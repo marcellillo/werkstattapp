@@ -254,7 +254,8 @@ export function RechnungenContent({ rechnungen: initial, isAdmin = false }: { re
                     {r.bezahlt && <CheckCircle className="w-4 h-4" />}
                   </button>
 
-                  <button onClick={() => setExpandedId(open ? null : r.id)} className="flex-1 flex items-center gap-3 text-left min-w-0">
+                  {/* Klickbare Zeile — kein Button-in-Button */}
+                  <div onClick={() => setExpandedId(open ? null : r.id)} className="flex-1 flex items-center gap-3 cursor-pointer min-w-0">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <p className="font-semibold text-slate-900 text-sm truncate">{r.lieferant ?? 'Unbekannter Lieferant'}</p>
@@ -268,24 +269,26 @@ export function RechnungenContent({ rechnungen: initial, isAdmin = false }: { re
                         <span className="ml-2 text-slate-400">· {r.positionen.length} Positionen</span>
                       </p>
                     </div>
-                    <div className="flex items-center gap-3 flex-shrink-0">
+                    <div className="flex items-center gap-2 flex-shrink-0">
                       {r.gesamt != null && (
                         <p className={cn('font-bold text-sm', r.bezahlt ? 'text-green-600' : ueberfaelligR ? 'text-red-600' : 'text-slate-900')}>
                           {r.gesamt.toFixed(2)} €
                         </p>
                       )}
-                      {isAdmin && (
-                        <button
-                          onClick={e => { e.stopPropagation(); setLoeschenId(r.id) }}
-                          className="p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors"
-                          title="Rechnung löschen"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      )}
                       {open ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
                     </div>
-                  </button>
+                  </div>
+
+                  {/* Löschen-Button außerhalb des klickbaren Bereichs */}
+                  {isAdmin && (
+                    <button
+                      onClick={e => { e.stopPropagation(); setLoeschenId(r.id) }}
+                      className="p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors flex-shrink-0"
+                      title="Rechnung löschen"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
 
                 {open && (
