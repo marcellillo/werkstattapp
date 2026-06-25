@@ -43,6 +43,16 @@ html {
   scroll-behavior: smooth;
 }
 
+/* Safe-area padding for iPhone home indicator */
+.safe-area-pb {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Main content bottom padding: clears bottom nav + iPhone home indicator */
+.main-content-pb {
+  padding-bottom: max(5rem, calc(4rem + env(safe-area-inset-bottom, 0px)));
+}
+
 /* Hide scrollbar utility */
 .scrollbar-hide {
   -ms-overflow-style: none;
