@@ -86,6 +86,13 @@ Wichtig:
     return NextResponse.json({ error: 'Claude Antwort konnte nicht geparst werden', raw: textBlock.text }, { status: 500 })
   }
 
+  // Dedup-Check vor dem Speichern
+  if (extrakt.rechnungsnummer) {
+    const { data: exist } = await supabase.from('rechnungen')
+      .select('id').eq('rechnungsnummer', extrakt.rechnungsnummer).maybeSingle()
+    if (exist) return NextResponse.json({ erfolg: true, rechnungId: exist.id, extrakt, duplikat: true })
+  }
+
   // Rechnung speichern
   const { data: rechnung, error: rErr } = await supabase
     .from('rechnungen')

@@ -174,18 +174,33 @@ export async function POST() {
     const fehler: string[] = []
     const verarbeitet: string[] = []
 
-    for (const msg of messages) {
+    // Nur relevante E-Mails verarbeiten (Anhang ODER Rechnungs-Keywords im Betreff)
+    const rechnungsKeywords = /rechnung|invoice|zahlungsavis|bestellung|liefersch|order|faktura/i
+    const relevanteMessages = messages.filter(msg =>
+      msg.hasAttachments || rechnungsKeywords.test(msg.subject ?? '')
+    )
+    verarbeitet.push(`📊 ${messages.length} E-Mails total, ${relevanteMessages.length} relevant`)
+
+    for (const msg of relevanteMessages) {
       try {
-        const anhaenge = msg.hasAttachments ? await fetchAttachments(accessToken, msg.id) : []
-        fehler.push(`DEBUG "${msg.subject?.slice(0, 40)}": hasAttachments=${msg.hasAttachments}, gefundene Anhänge=${anhaenge.length}${anhaenge.length > 0 ? ` (${anhaenge.map(a => `${a.name}[${a.contentType}]`).join(', ')})` : ''}`)
+        let anhaenge: { name: string; contentType: string; contentBytes: string }[] = []
+        if (msg.hasAttachments) {
+          try {
+            anhaenge = await fetchAttachments(accessToken, msg.id)
+          } catch (e: any) {
+            fehler.push(`Anhang-Fehler "${msg.subject?.slice(0, 30)}": ${e.message}`)
+          }
+        }
+        verarbeitet.push(`📧 "${msg.subject?.slice(0, 40)}" — Anhänge=${anhaenge.length}`)
 
         let analyse: EmailAnalyse | null = null
 
         if (anthropic) {
           try {
             analyse = await analysiereEmailMitClaude(anthropic, msg, anhaenge)
+            verarbeitet.push(`🤖 Claude: typ=${analyse.typ}, lieferant=${analyse.lieferant}, teile=${analyse.teile.length}`)
           } catch (e: any) {
-            fehler.push(`Claude-Fehler "${msg.subject}" (${anhaenge.length} Anhänge): ${e.message}`)
+            fehler.push(`Claude-Fehler "${msg.subject}": ${e.message}`)
           }
         } else {
           fehler.push(`Kein Claude API-Key`)
@@ -213,6 +228,12 @@ export async function POST() {
         if (!analyse) {
           await markMessageAsRead(accessToken, msg.id)
           continue
+        }
+
+        // Wenn PDF-Anhang vorhanden, immer als Rechnung behandeln
+        if (anhaenge.length > 0 && analyse.typ !== 'rechnung') {
+          analyse.typ = 'rechnung'
+          if (!analyse.rechnung) analyse.rechnung = { rechnungsnummer: null, datum: null, faellig_am: null, gesamt: null }
         }
 
         // ── Rechnung importieren ────────────────────────────────────────
