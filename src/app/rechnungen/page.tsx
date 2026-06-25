@@ -10,15 +10,14 @@ export default async function RechnungenPage() {
 
   const { data: rechnungen } = await supabase
     .from('rechnungen')
-    .select(`
-      *,
-      positionen:rechnung_positionen(*)
-    `)
+    .select(`*, positionen:rechnung_positionen(*)`)
     .order('erstellt_am', { ascending: false })
+
+  const isAdmin = true // App ist passwortgeschützt — alle eingeloggten Nutzer dürfen löschen
 
   return (
     <AppLayout title="Rechnungen">
-      <RechnungenContent rechnungen={(rechnungen ?? []) as any[]} />
+      <RechnungenContent rechnungen={(rechnungen ?? []) as any[]} isAdmin={isAdmin} />
     </AppLayout>
   )
 }

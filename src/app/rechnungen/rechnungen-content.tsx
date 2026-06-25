@@ -5,7 +5,6 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
-import { useRollen } from '@/lib/rollen-context'
 
 type Position = {
   id: string
@@ -34,7 +33,7 @@ function fmt(d?: string | null) {
   return new Date(d).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
-export function RechnungenContent({ rechnungen: initial }: { rechnungen: Rechnung[] }) {
+export function RechnungenContent({ rechnungen: initial, isAdmin = false }: { rechnungen: Rechnung[]; isAdmin?: boolean }) {
   const [rechnungen, setRechnungen] = useState(initial)
   const [uploading, setUploading] = useState(false)
   const [syncing, setSyncing] = useState(false)
@@ -47,8 +46,6 @@ export function RechnungenContent({ rechnungen: initial }: { rechnungen: Rechnun
   const [loesching, setLoesching] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const supabase = createClient()
-  const { rolle } = useRollen()
-  const isAdmin = rolle === 'admin'
 
   async function loeschenBestaetigen(id: string) {
     setLoesching(true)
