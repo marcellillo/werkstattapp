@@ -48,6 +48,12 @@ html {
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
+/* Topbar: höhe + safe-area-inset-top für iPhone-Notch */
+.topbar-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+  min-height: calc(3.5rem + env(safe-area-inset-top, 0px));
+}
+
 /* Main content bottom padding: clears bottom nav + iPhone home indicator */
 .main-content-pb {
   padding-bottom: max(5rem, calc(4rem + env(safe-area-inset-bottom, 0px)));

@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
+import { PushSettings } from '@/components/push-settings'
 import {
   Settings, Mail, Bell, Users, Database, Building2,
   CheckCircle, ExternalLink, Save, Loader2, Bot, Eye, EyeOff, Wifi, WifiOff, Receipt, Shield, QrCode as QrIcon, Download
@@ -570,21 +571,18 @@ export function EinstellungenContent({ initialConfig, profile, userEmail, urlErr
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
+          <PushSettings />
+          <p className="text-xs text-gray-500 pt-1">Benachrichtigungen werden gesendet bei:</p>
           {[
-            { label: 'Benachrichtigung bei eingetroffenen Teilen', defaultChecked: true },
-            { label: 'Benachrichtigung bei überschrittenem Fertigstellungstermin', defaultChecked: true },
-            { label: 'Fahrzeug länger als X Tage auf Bühne', defaultChecked: true },
+            { label: 'Eingetroffene Ersatzteile', defaultChecked: true },
+            { label: 'Auftrag überschreitet Fertigstellungstermin', defaultChecked: true },
+            { label: 'Auftrag als fertig markiert', defaultChecked: true },
           ].map(item => (
             <label key={item.label} className="flex items-center gap-3 cursor-pointer">
               <input type="checkbox" defaultChecked={item.defaultChecked} className="w-4 h-4 accent-orange-500" />
               <span className="text-sm text-gray-700">{item.label}</span>
             </label>
           ))}
-          <div>
-            <label className="text-xs text-gray-800 mb-1 block">Warnung nach X Tagen auf Bühne</label>
-            <input type="number" defaultValue={5} min={1}
-              className="w-24 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
-          </div>
         </CardContent>
       </Card>
 

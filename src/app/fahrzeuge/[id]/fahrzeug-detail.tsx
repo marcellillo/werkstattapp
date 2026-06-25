@@ -202,6 +202,13 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie 
     if (status === 'fertig') updates.fertiggestellt_am = new Date().toISOString().split('T')[0]
     await supabase.from('auftraege').update(updates).eq('id', auftrag.id)
     fetch('/api/benachrichtigungen/generieren', { method: 'POST' }).catch(() => {})
+    if (status === 'fertig') {
+      const kz = auftrag.fahrzeug?.kennzeichen ?? ''
+      const name = `${auftrag.fahrzeug?.marke ?? ''} ${auftrag.fahrzeug?.modell ?? ''}`.trim()
+      fetch('/api/push/send', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: '✅ Auftrag fertig', body: `${name} (${kz}) ist fertig zur Abholung`, url: `/fahrzeuge/${auftrag.id}`, tag: 'fertig' })
+      }).catch(() => {})
+    }
   }
 
   async function handleStornieren() {
@@ -241,8 +248,15 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie 
   }
 
   async function handleTeilStatusChange(teilId: string, status: TeilStatus) {
+    const teil = teile.find(t => t.id === teilId)
     setTeile(prev => prev.map(t => t.id === teilId ? { ...t, status } : t))
     await supabase.from('ersatzteile').update({ status }).eq('id', teilId)
+    if (status === 'geliefert' && teil) {
+      const kz = auftrag.fahrzeug?.kennzeichen ?? ''
+      fetch('/api/push/send', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: '📦 Teil eingetroffen', body: `${teil.bezeichnung} für ${kz} ist angekommen`, url: `/fahrzeuge/${auftrag.id}`, tag: 'teil' })
+      }).catch(() => {})
+    }
   }
 
   async function handleAddTeil() {

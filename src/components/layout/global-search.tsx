@@ -49,28 +49,23 @@ export function GlobalSearch() {
     const tokens = q.trim().toLowerCase().split(/\s+/).filter(t => t.length >= 2)
     const term = q.trim()
 
-    // Alle vier Quellen parallel laden
-    // Fahrzeuge + Kunden immer mit Join, damit "Bauer Golf" cross-table klappt
+    // Aufträge mit Fahrzeug+Kunde gejoint laden (liefert die korrekte Auftrag-ID für Links)
+    // + Kunden direkt + Rechnungen direkt
     const [
-      { data: fahrzeugeRaw },
-      { data: kundenRaw },
       { data: auftraegeRaw },
+      { data: kundenRaw },
       { data: rechnungenRaw },
     ] = await Promise.all([
       supabase
-        .from('fahrzeuge')
-        .select('id, kennzeichen, marke, modell, kunde:kunden(id, vorname, nachname, telefon, email)')
-        .limit(200),
+        .from('auftraege')
+        .select('id, arbeiten, status, fahrzeug:fahrzeuge(id, kennzeichen, marke, modell, kunde:kunden(id, vorname, nachname, telefon, email))')
+        .not('status', 'eq', 'storniert')
+        .order('erstellt_am', { ascending: false })
+        .limit(300),
       supabase
         .from('kunden')
         .select('id, vorname, nachname, telefon, email')
         .or(`vorname.ilike.%${term}%,nachname.ilike.%${term}%,telefon.ilike.%${term}%,email.ilike.%${term}%`)
-        .limit(5),
-      supabase
-        .from('auftraege')
-        .select('id, arbeiten, status, fahrzeug:fahrzeuge(id, kennzeichen, marke, modell, kunde:kunden(vorname, nachname))')
-        .or(`arbeiten.ilike.%${term}%`)
-        .not('status', 'eq', 'storniert')
         .limit(5),
       supabase
         .from('rechnungen')
@@ -79,38 +74,46 @@ export function GlobalSearch() {
         .limit(3),
     ])
 
-    // Fahrzeuge client-seitig filtern: jeder Token muss irgendwo matchen
-    // (kennzeichen, marke, modell ODER kunde.vorname/nachname)
-    function fahrzeugMatcht(f: any): boolean {
+    // Aufträge client-seitig filtern — jeder Token muss irgendwo matchen
+    function auftragMatcht(a: any): boolean {
+      const fz = a.fahrzeug as any
+      const kd = fz?.kunde as any
       const haystack = [
-        f.kennzeichen ?? '',
-        f.marke ?? '',
-        f.modell ?? '',
-        (f.kunde as any)?.vorname ?? '',
-        (f.kunde as any)?.nachname ?? '',
-        `${(f.kunde as any)?.vorname ?? ''} ${(f.kunde as any)?.nachname ?? ''}`,
-        `${f.marke ?? ''} ${f.modell ?? ''}`,
-        `${(f.kunde as any)?.nachname ?? ''} ${f.marke ?? ''} ${f.modell ?? ''}`,
+        fz?.kennzeichen ?? '',
+        fz?.marke ?? '',
+        fz?.modell ?? '',
+        kd?.vorname ?? '',
+        kd?.nachname ?? '',
+        `${kd?.vorname ?? ''} ${kd?.nachname ?? ''}`,
+        `${fz?.marke ?? ''} ${fz?.modell ?? ''}`,
+        `${kd?.nachname ?? ''} ${fz?.marke ?? ''} ${fz?.modell ?? ''}`,
+        a.arbeiten ?? '',
       ].map(s => s.toLowerCase())
       return tokens.every(token => haystack.some(h => h.includes(token)))
     }
 
-    const fahrzeuge = (fahrzeugeRaw ?? []).filter(fahrzeugMatcht).slice(0, 5)
+    const matchendeAuftraege = (auftraegeRaw ?? []).filter(auftragMatcht)
 
-    // Kunden: zusätzlich auch über Fahrzeuge suchen (Kunde hat Golf → bei "Müller Golf" Kunden finden)
-    const kundenIds = new Set((kundenRaw ?? []).map(k => k.id))
-    // Kunden die über Fahrzeug-Match gefunden wurden
-    fahrzeuge.forEach(f => {
-      const k = f.kunde as any
-      if (k?.id) kundenIds.add(k.id)
-    })
-    // Alle unique Kunden aus beiden Quellen zusammenführen
-    const alleKunden = [
-      ...(kundenRaw ?? []),
-      ...fahrzeuge
-        .map(f => f.kunde as any)
-        .filter(k => k?.id && !(kundenRaw ?? []).find((r: any) => r.id === k.id)),
-    ].filter(Boolean).slice(0, 5)
+    // Deduplizieren: pro Fahrzeug nur den neuesten Auftrag zeigen
+    const seenFahrzeug = new Set<string>()
+    const fahrzeugAuftraege: any[] = []
+    for (const a of matchendeAuftraege) {
+      const fzId = (a.fahrzeug as any)?.id
+      if (fzId && !seenFahrzeug.has(fzId)) {
+        seenFahrzeug.add(fzId)
+        fahrzeugAuftraege.push(a)
+      }
+      if (fahrzeugAuftraege.length >= 5) break
+    }
+
+    // Kunden: direkt + aus Fahrzeug-Matches
+    const kundenMap = new Map<string, any>()
+    for (const k of (kundenRaw ?? [])) kundenMap.set(k.id, k)
+    for (const a of fahrzeugAuftraege) {
+      const kd = (a.fahrzeug as any)?.kunde as any
+      if (kd?.id && !kundenMap.has(kd.id)) kundenMap.set(kd.id, kd)
+    }
+    const alleKunden = [...kundenMap.values()].slice(0, 5)
 
     const results: Ergebnis[] = [
       // Kunden
@@ -120,28 +123,18 @@ export function GlobalSearch() {
         untertitel: [k.telefon, k.email].filter(Boolean).join(' · '),
         href: `/kunden`,
       })),
-      // Fahrzeuge
-      ...fahrzeuge.map((f: any) => {
-        const k = f.kunde as any
-        return {
-          id: f.id, typ: 'fahrzeug' as const,
-          titel: `${f.kennzeichen} — ${f.marke ?? ''} ${f.modell ?? ''}`.trim(),
-          untertitel: k ? `${k.vorname ?? ''} ${k.nachname ?? ''}`.trim() : '',
-          href: `/fahrzeuge/${f.id}`,
-        }
-      }),
-      // Aufträge
-      ...(auftraegeRaw ?? []).map((a: any) => {
+      // Fahrzeuge → Link zur Auftrag-Detailseite (korrekte ID!)
+      ...fahrzeugAuftraege.map((a: any) => {
         const fz = a.fahrzeug as any
         const kd = fz?.kunde as any
         return {
-          id: a.id, typ: 'auftrag' as const,
-          titel: fz ? `${fz.kennzeichen} — ${fz.marke ?? ''} ${fz.modell ?? ''}`.trim() : 'Auftrag',
+          id: a.id, typ: 'fahrzeug' as const,
+          titel: `${fz?.kennzeichen ?? ''} — ${fz?.marke ?? ''} ${fz?.modell ?? ''}`.trim(),
           untertitel: [
             kd ? `${kd.vorname ?? ''} ${kd.nachname ?? ''}`.trim() : null,
-            (a.arbeiten ?? '').split('\n')[0].substring(0, 50),
+            a.status ? ({ angenommen:'Angenommen', diagnose:'Diagnose', reparatur:'Reparatur', warten_teile:'Wartet auf Teile', fertig:'Fertig', ausgeliefert:'Ausgeliefert' })[a.status as string] : null,
           ].filter(Boolean).join(' · '),
-          href: fz ? `/fahrzeuge/${fz.id}` : `/fahrzeuge`,
+          href: `/fahrzeuge/${a.id}`,
         }
       }),
       // Rechnungen
@@ -221,7 +214,7 @@ export function GlobalSearch() {
       {!offen && (
         <button
           onClick={oeffnen}
-          className="flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 bg-gray-50 hover:bg-gray-100 text-sm text-gray-400 transition-colors min-w-[160px] sm:min-w-[220px]"
+          className="flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 bg-gray-50 hover:bg-gray-100 text-sm text-gray-400 transition-colors min-w-[120px] sm:min-w-[220px]"
         >
           <Search className="w-4 h-4 flex-shrink-0" />
           <span className="flex-1 text-left">Suchen…</span>
@@ -233,7 +226,7 @@ export function GlobalSearch() {
 
       {/* Aufgeklappte Suche */}
       {offen && (
-        <div className="flex items-center gap-2 min-w-[280px] sm:min-w-[360px]">
+        <div className="flex items-center gap-2 w-[200px] sm:w-[360px]">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
             <input
