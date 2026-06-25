@@ -413,7 +413,7 @@ function LiftVisual({ color }: { color: string }) {
   const c = color === 'purple' ? '#9333ea' : color === 'blue' ? '#3b82f6' : '#f97316'
   return (
     <div className="flex justify-center mb-3">
-      <svg width="120" height="180" viewBox="0 0 120 180" fill="none">
+      <svg className="w-full max-w-[140px] h-auto" viewBox="0 0 120 180" fill="none">
         {/* bay floor */}
         <rect x="8" y="8" width="104" height="164" rx="8" fill="#f3f4f6" stroke="#e5e7eb" strokeWidth="2"/>
         {/* lift rails */}
@@ -446,7 +446,7 @@ function LiftVisual({ color }: { color: string }) {
 function EmptyLiftVisual() {
   return (
     <div className="flex justify-center mb-3">
-      <svg width="120" height="180" viewBox="0 0 120 180" fill="none">
+      <svg className="w-full max-w-[140px] h-auto" viewBox="0 0 120 180" fill="none">
         <rect x="8" y="8" width="104" height="164" rx="8" fill="#f9fafb" stroke="#e5e7eb" strokeWidth="2" strokeDasharray="6 4"/>
         <rect x="16" y="16" width="14" height="148" rx="4" fill="#d1d5db"/>
         <rect x="90" y="16" width="14" height="148" rx="4" fill="#d1d5db"/>

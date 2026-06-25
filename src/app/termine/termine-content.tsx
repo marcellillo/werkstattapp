@@ -116,19 +116,19 @@ export function TermineContent({ termine: initialTermine, kunden, fahrzeuge, heb
           </CardHeader>
           <CardContent>
             <form onSubmit={handleAdd} className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="col-span-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="sm:col-span-2">
                   <label className="text-xs text-gray-800 mb-1 block">Titel *</label>
                   <input value={form.titel} onChange={e => setForm(p => ({ ...p, titel: e.target.value }))}
                     placeholder="z.B. TÜV-Prüfer Besuch, Kundenfahrzeug Abholung..."
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
+                    className="w-full px-3 py-3 sm:py-2 border border-gray-200 rounded-xl sm:rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
                 </div>
-                <div>
+                <div className="sm:col-span-2">
                   <label className="text-xs text-gray-800 mb-1 block">Typ</label>
                   <div className="flex gap-2">
                     {(Object.keys(TYP_CONFIG) as TerminTyp[]).map(t => (
                       <button key={t} type="button" onClick={() => setForm(p => ({ ...p, typ: t }))}
-                        className={cn('flex-1 py-1.5 rounded-lg text-xs font-medium border transition-colors',
+                        className={cn('flex-1 py-2.5 sm:py-1.5 rounded-xl sm:rounded-lg text-sm sm:text-xs font-medium border transition-colors',
                           form.typ === t ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400')}>
                         {TYP_CONFIG[t].label}
                       </button>
@@ -138,22 +138,22 @@ export function TermineContent({ termine: initialTermine, kunden, fahrzeuge, heb
                 <div>
                   <label className="text-xs text-gray-800 mb-1 block">Datum *</label>
                   <input type="date" value={form.datum} onChange={e => setForm(p => ({ ...p, datum: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
+                    className="w-full px-3 py-3 sm:py-2 border border-gray-200 rounded-xl sm:rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
                 </div>
                 <div>
                   <label className="text-xs text-gray-800 mb-1 block">Uhrzeit</label>
                   <input type="time" value={form.uhrzeit} onChange={e => setForm(p => ({ ...p, uhrzeit: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
+                    className="w-full px-3 py-3 sm:py-2 border border-gray-200 rounded-xl sm:rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
                 </div>
                 <div>
                   <label className="text-xs text-gray-800 mb-1 block">Dauer (Min.)</label>
                   <input type="number" value={form.dauer_minuten} min={15} step={15} onChange={e => setForm(p => ({ ...p, dauer_minuten: parseInt(e.target.value) }))}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
+                    className="w-full px-3 py-3 sm:py-2 border border-gray-200 rounded-xl sm:rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
                 </div>
                 <div>
                   <label className="text-xs text-gray-800 mb-1 block">Kunde</label>
                   <select value={form.kunden_id} onChange={e => setForm(p => ({ ...p, kunden_id: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+                    className="w-full px-3 py-3 sm:py-2 border border-gray-200 rounded-xl sm:rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
                     <option value="">— Kein Kunde —</option>
                     {kunden.map(k => <option key={k.id} value={k.id}>{k.vorname} {k.nachname}{k.firma ? ` (${k.firma})` : ''}</option>)}
                   </select>
@@ -161,30 +161,30 @@ export function TermineContent({ termine: initialTermine, kunden, fahrzeuge, heb
                 <div>
                   <label className="text-xs text-gray-800 mb-1 block">Fahrzeug</label>
                   <select value={form.fahrzeug_id} onChange={e => setForm(p => ({ ...p, fahrzeug_id: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+                    className="w-full px-3 py-3 sm:py-2 border border-gray-200 rounded-xl sm:rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
                     <option value="">— Kein Fahrzeug —</option>
                     {fahrzeuge.map(f => <option key={f.id} value={f.id}>{f.marke} {f.modell} · {f.kennzeichen}</option>)}
                   </select>
                 </div>
                 {form.typ === 'tuev' && (
-                  <div className="col-span-2">
+                  <div className="sm:col-span-2">
                     <label className="text-xs text-gray-800 mb-1 block flex items-center gap-1">
                       <ShieldCheck className="w-3.5 h-3.5 text-yellow-600" />
                       Bühne reservieren (TÜV)
                     </label>
                     <select value={form.hebebuehne_id} onChange={e => setForm(p => ({ ...p, hebebuehne_id: e.target.value }))}
-                      className="w-full px-3 py-2 border-2 border-yellow-300 bg-yellow-50 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400">
+                      className="w-full px-3 py-3 sm:py-2 border-2 border-yellow-300 bg-yellow-50 rounded-xl sm:rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400">
                       <option value="">— Keine Bühne reservieren —</option>
                       {hebebuehnen.map(h => <option key={h.id} value={h.id}>Bühne {h.nummer} · {h.bezeichnung}</option>)}
                     </select>
                     <p className="text-xs text-yellow-700 mt-1">Die Bühne wird im Dashboard als TÜV-reserviert angezeigt.</p>
                   </div>
                 )}
-                <div className="col-span-2">
+                <div className="sm:col-span-2">
                   <label className="text-xs text-gray-800 mb-1 block">Notizen</label>
                   <textarea value={form.notizen} onChange={e => setForm(p => ({ ...p, notizen: e.target.value }))} rows={2}
                     placeholder="Zusätzliche Informationen..."
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-orange-400" />
+                    className="w-full px-3 py-3 sm:py-2 border border-gray-200 rounded-xl sm:rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-orange-400" />
                 </div>
               </div>
               <div className="flex gap-2">
@@ -199,10 +199,10 @@ export function TermineContent({ termine: initialTermine, kunden, fahrzeuge, heb
       )}
 
       {/* Filter tabs */}
-      <div className="flex gap-2 flex-wrap">
+      <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide -mx-1 px-1">
         {(['alle', 'werkstatt', 'tuev', 'online'] as const).map(f => (
           <button key={f} onClick={() => setFilter(f)}
-            className={cn('px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors',
+            className={cn('flex-shrink-0 px-3 py-2.5 rounded-xl text-sm font-medium border transition-colors',
               filter === f ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400')}>
             {f === 'alle' ? `Alle (${counts.alle})` : `${TYP_CONFIG[f as TerminTyp].label} (${counts[f as TerminTyp]})`}
           </button>

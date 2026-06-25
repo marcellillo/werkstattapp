@@ -108,39 +108,39 @@ export function FahrzeugeContent({ auftraege }: { auftraege: Auftrag[] }) {
       </div>
 
       {/* Search */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
+      <div className="flex flex-col gap-3">
+        <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600" />
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder={tab === 'fremd' ? 'Marke, Modell, Kennzeichen, Kunde...' : 'Marke, Modell, B-Nummer, Farbe...'}
-            className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+            className="w-full pl-9 pr-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
           />
         </div>
         {tab === 'fremd' && (
-          <div className="flex flex-wrap gap-2">
+          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide -mx-1 px-1">
             <button
               onClick={() => setSortByPrio(v => !v)}
               className={cn(
-                'px-3 py-2 rounded-lg text-xs font-medium border transition-colors flex items-center gap-1.5',
+                'flex-shrink-0 px-3 py-2.5 rounded-xl text-sm font-medium border transition-colors flex items-center gap-1.5',
                 sortByPrio
                   ? 'bg-orange-600 text-white border-orange-600'
-                  : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'
+                  : 'bg-white text-gray-600 border-gray-200'
               )}
             >
-              <ArrowUpDown className="w-3 h-3" />
-              Nach Priorität
+              <ArrowUpDown className="w-4 h-4" />
+              Priorität
             </button>
             {STATUS_FILTERS.map(f => (
               <button
                 key={f.value}
                 onClick={() => setStatusFilter(f.value)}
                 className={cn(
-                  'px-3 py-2 rounded-lg text-xs font-medium border transition-colors',
+                  'flex-shrink-0 px-3 py-2.5 rounded-xl text-sm font-medium border transition-colors',
                   statusFilter === f.value
                     ? 'bg-gray-900 text-white border-gray-900'
-                    : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'
+                    : 'bg-white text-gray-600 border-gray-200'
                 )}
               >
                 {f.label}
@@ -150,7 +150,7 @@ export function FahrzeugeContent({ auftraege }: { auftraege: Auftrag[] }) {
         )}
       </div>
 
-      {/* Fremdfahrzeuge — Tabelle */}
+      {/* Fremdfahrzeuge */}
       {tab === 'fremd' && (
         filteredFremd.length === 0 ? (
           <Card>
@@ -164,19 +164,102 @@ export function FahrzeugeContent({ auftraege }: { auftraege: Auftrag[] }) {
               </Link>
             </CardContent>
           </Card>
-        ) : (
-          <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+        ) : (<>
+          {/* Karten-Ansicht: Handy + Tablet (unter xl:) */}
+          <div className="xl:hidden space-y-2">
+            {filteredFremd.map(auftrag => {
+              const teile = auftrag.ersatzteile ?? []
+              const kritisch = teile.filter((t: any) => ['nicht_bestellt', 'bestellt'].includes(t.status)).length
+              const overdue = auftrag.geplante_fertigstellung &&
+                auftrag.geplante_fertigstellung < new Date().toISOString().split('T')[0] &&
+                !['fertig', 'ausgeliefert'].includes(auftrag.status)
+              const prio = berechnePrioritaet(auftrag)
+
+              return (
+                <div
+                  key={auftrag.id}
+                  onClick={() => router.push(`/fahrzeuge/${auftrag.id}`)}
+                  className={cn(
+                    'bg-white border rounded-2xl px-4 py-4 flex items-center gap-4 cursor-pointer active:scale-[0.99] transition-all',
+                    prio.stufe === 'kritisch' ? 'border-red-200 bg-red-50/30' : 'border-gray-200 hover:border-orange-200 hover:shadow-sm'
+                  )}
+                >
+                  {/* Prioritäts-Dot */}
+                  <div className={cn(
+                    'w-1.5 self-stretch rounded-full flex-shrink-0',
+                    prio.stufe === 'kritisch' ? 'bg-red-500' :
+                    prio.stufe === 'hoch'     ? 'bg-orange-400' :
+                    prio.stufe === 'mittel'   ? 'bg-yellow-400' : 'bg-gray-200'
+                  )} />
+
+                  {/* Auto-Icon */}
+                  <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <Car className="w-6 h-6 text-gray-500" />
+                  </div>
+
+                  {/* Inhalt */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="font-semibold text-gray-900 text-base leading-tight truncate">
+                          {auftrag.fahrzeug?.marke} {auftrag.fahrzeug?.modell}
+                        </p>
+                        <p className="text-sm text-gray-500 font-mono mt-0.5">{auftrag.fahrzeug?.kennzeichen}</p>
+                      </div>
+                      <span className={cn(
+                        'flex-shrink-0 inline-flex px-2.5 py-1 rounded-full text-xs font-semibold border mt-0.5',
+                        FAHRZEUG_STATUS_COLOR[auftrag.status]
+                      )}>
+                        {FAHRZEUG_STATUS_LABEL[auftrag.status]}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-3 mt-2 flex-wrap">
+                      {auftrag.kunde && (
+                        <span className="text-sm text-gray-600">
+                          {auftrag.kunde.vorname} {auftrag.kunde.nachname}
+                        </span>
+                      )}
+                      {auftrag.hebebuehne && (
+                        <span className="text-xs bg-blue-50 text-blue-700 border border-blue-100 px-2 py-0.5 rounded-full">
+                          {auftrag.hebebuehne.bezeichnung}
+                        </span>
+                      )}
+                      {kritisch > 0 && (
+                        <span className="text-xs bg-red-50 text-red-600 border border-red-100 px-2 py-0.5 rounded-full flex items-center gap-1">
+                          <Package className="w-3 h-3" /> {kritisch} Teile offen
+                        </span>
+                      )}
+                      {overdue && (
+                        <span className="text-xs text-red-600 font-medium">⚠ Überfällig</span>
+                      )}
+                      {auftrag.geplante_fertigstellung && !overdue && (
+                        <span className="text-xs text-gray-400">
+                          bis {formatDate(auftrag.geplante_fertigstellung)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <ChevronRight className="w-5 h-5 text-gray-300 flex-shrink-0" />
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Tabellen-Ansicht: nur Desktop (xl+) */}
+          <div className="hidden xl:block bg-white border border-gray-200 rounded-xl overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-100">
                     <th className="text-left text-xs font-semibold text-gray-800 uppercase tracking-wide px-4 py-3">Fahrzeug</th>
-                    <th className="text-left text-xs font-semibold text-gray-800 uppercase tracking-wide px-4 py-3 hidden md:table-cell">Kunde</th>
+                    <th className="text-left text-xs font-semibold text-gray-800 uppercase tracking-wide px-4 py-3">Kunde</th>
                     <th className="text-left text-xs font-semibold text-gray-800 uppercase tracking-wide px-4 py-3">Status</th>
-                    <th className="text-left text-xs font-semibold text-gray-800 uppercase tracking-wide px-4 py-3 hidden sm:table-cell">Priorität</th>
-                    <th className="text-left text-xs font-semibold text-gray-800 uppercase tracking-wide px-4 py-3 hidden lg:table-cell">Bühne</th>
-                    <th className="text-left text-xs font-semibold text-gray-800 uppercase tracking-wide px-4 py-3 hidden lg:table-cell">Teile</th>
-                    <th className="text-left text-xs font-semibold text-gray-800 uppercase tracking-wide px-4 py-3 hidden xl:table-cell">Fertig bis</th>
+                    <th className="text-left text-xs font-semibold text-gray-800 uppercase tracking-wide px-4 py-3">Priorität</th>
+                    <th className="text-left text-xs font-semibold text-gray-800 uppercase tracking-wide px-4 py-3">Bühne</th>
+                    <th className="text-left text-xs font-semibold text-gray-800 uppercase tracking-wide px-4 py-3">Teile</th>
+                    <th className="text-left text-xs font-semibold text-gray-800 uppercase tracking-wide px-4 py-3">Fertig bis</th>
                     <th className="w-8 px-4 py-3"></th>
                   </tr>
                 </thead>
@@ -188,96 +271,68 @@ export function FahrzeugeContent({ auftraege }: { auftraege: Auftrag[] }) {
                       auftrag.geplante_fertigstellung < new Date().toISOString().split('T')[0] &&
                       !['fertig', 'ausgeliefert'].includes(auftrag.status)
                     const prio = berechnePrioritaet(auftrag)
-
                     return (
                       <tr key={auftrag.id} onClick={() => router.push(`/fahrzeuge/${auftrag.id}`)} className={cn(
                         'hover:bg-orange-50/30 transition-colors cursor-pointer',
                         prio.stufe === 'kritisch' && 'bg-red-50/40'
                       )}>
-                          <td className="px-4 py-3.5">
-                            <div className="flex items-center gap-3">
-                              <div className="w-9 h-9 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                                <Car className="w-4 h-4 text-gray-800" />
-                              </div>
-                              <div>
-                                <p className="font-medium text-gray-900 text-sm">
-                                  {auftrag.fahrzeug?.marke} {auftrag.fahrzeug?.modell}
-                                </p>
-                                <p className="text-xs text-gray-600 font-mono">{auftrag.fahrzeug?.kennzeichen}</p>
-                              </div>
+                        <td className="px-4 py-3.5">
+                          <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                              <Car className="w-4 h-4 text-gray-800" />
                             </div>
-                          </td>
-                          <td className="px-4 py-3.5 hidden md:table-cell">
-                            <p className="text-sm text-gray-700">
-                              {auftrag.kunde?.vorname} {auftrag.kunde?.nachname}
-                            </p>
-                            {auftrag.kunde?.firma && (
-                              <p className="text-xs text-gray-600">{auftrag.kunde.firma}</p>
-                            )}
-                          </td>
-                          <td className="px-4 py-3.5">
-                            <span className={cn(
-                              'inline-flex px-2.5 py-1 rounded-full text-xs font-semibold border',
-                              FAHRZEUG_STATUS_COLOR[auftrag.status]
-                            )}>
-                              {FAHRZEUG_STATUS_LABEL[auftrag.status]}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3.5 hidden sm:table-cell">
-                            {prio.stufe !== 'normal' ? (
-                              <div className="flex flex-col gap-1">
-                                <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border', PRIORITAET_COLOR[prio.stufe])}>
-                                  <span className={cn('w-1.5 h-1.5 rounded-full', PRIORITAET_DOT[prio.stufe])} />
-                                  {PRIORITAET_LABEL[prio.stufe]}
-                                </span>
-                                {prio.gruende[0] && (
-                                  <span className="text-[10px] text-gray-400 leading-tight">{prio.gruende[0]}</span>
-                                )}
-                              </div>
-                            ) : (
-                              <span className="text-xs text-gray-300">—</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3.5 hidden lg:table-cell">
-                            {auftrag.hebebuehne ? (
-                              <span className="text-sm text-gray-700">{auftrag.hebebuehne.bezeichnung}</span>
-                            ) : (
-                              <span className="text-xs text-gray-300">—</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3.5 hidden lg:table-cell">
-                            {teile.length > 0 ? (
-                              <div className="flex items-center gap-1">
-                                <Package className="w-3.5 h-3.5 text-gray-600" />
-                                <span className="text-sm text-gray-700">{teile.length}</span>
-                                {kritisch > 0 && (
-                                  <span className="text-xs text-red-600 font-medium">({kritisch} offen)</span>
-                                )}
-                              </div>
-                            ) : (
-                              <span className="text-xs text-gray-300">—</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3.5 hidden xl:table-cell">
-                            {auftrag.geplante_fertigstellung ? (
-                              <span className={cn('text-sm', overdue ? 'text-red-600 font-medium' : 'text-gray-700')}>
-                                {formatDate(auftrag.geplante_fertigstellung)}
+                            <div>
+                              <p className="font-medium text-gray-900 text-sm">{auftrag.fahrzeug?.marke} {auftrag.fahrzeug?.modell}</p>
+                              <p className="text-xs text-gray-600 font-mono">{auftrag.fahrzeug?.kennzeichen}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3.5">
+                          <p className="text-sm text-gray-700">{auftrag.kunde?.vorname} {auftrag.kunde?.nachname}</p>
+                          {auftrag.kunde?.firma && <p className="text-xs text-gray-600">{auftrag.kunde.firma}</p>}
+                        </td>
+                        <td className="px-4 py-3.5">
+                          <span className={cn('inline-flex px-2.5 py-1 rounded-full text-xs font-semibold border', FAHRZEUG_STATUS_COLOR[auftrag.status])}>
+                            {FAHRZEUG_STATUS_LABEL[auftrag.status]}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3.5">
+                          {prio.stufe !== 'normal' ? (
+                            <div className="flex flex-col gap-1">
+                              <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border', PRIORITAET_COLOR[prio.stufe])}>
+                                <span className={cn('w-1.5 h-1.5 rounded-full', PRIORITAET_DOT[prio.stufe])} />
+                                {PRIORITAET_LABEL[prio.stufe]}
                               </span>
-                            ) : (
-                              <span className="text-xs text-gray-300">—</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3.5">
-                            <ChevronRight className="w-4 h-4 text-gray-300" />
-                          </td>
-                        </tr>
+                              {prio.gruende[0] && <span className="text-[10px] text-gray-400 leading-tight">{prio.gruende[0]}</span>}
+                            </div>
+                          ) : <span className="text-xs text-gray-300">—</span>}
+                        </td>
+                        <td className="px-4 py-3.5">
+                          {auftrag.hebebuehne ? <span className="text-sm text-gray-700">{auftrag.hebebuehne.bezeichnung}</span> : <span className="text-xs text-gray-300">—</span>}
+                        </td>
+                        <td className="px-4 py-3.5">
+                          {teile.length > 0 ? (
+                            <div className="flex items-center gap-1">
+                              <Package className="w-3.5 h-3.5 text-gray-600" />
+                              <span className="text-sm text-gray-700">{teile.length}</span>
+                              {kritisch > 0 && <span className="text-xs text-red-600 font-medium">({kritisch} offen)</span>}
+                            </div>
+                          ) : <span className="text-xs text-gray-300">—</span>}
+                        </td>
+                        <td className="px-4 py-3.5">
+                          {auftrag.geplante_fertigstellung ? (
+                            <span className={cn('text-sm', overdue ? 'text-red-600 font-medium' : 'text-gray-700')}>{formatDate(auftrag.geplante_fertigstellung)}</span>
+                          ) : <span className="text-xs text-gray-300">—</span>}
+                        </td>
+                        <td className="px-4 py-3.5"><ChevronRight className="w-4 h-4 text-gray-300" /></td>
+                      </tr>
                     )
                   })}
                 </tbody>
               </table>
             </div>
           </div>
-        )
+        </>)
       )}
 
       {/* Eigenfahrzeuge — Karten */}
