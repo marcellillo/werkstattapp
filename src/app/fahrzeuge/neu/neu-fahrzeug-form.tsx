@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Car, User, Plus, Download, Upload, ShieldAlert, Bell, BellOff } from 'lucide-react'
+import { ArrowLeft, Car, User, Plus, Download, Upload, ShieldAlert, Bell, BellOff, ScanLine, Loader2 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { createClient } from '@/lib/supabase/client'
@@ -59,6 +59,10 @@ export function NeuFahrzeugForm({ kunden, hebebuehnen }: Props) {
   const [selectedBNummer, setSelectedBNummer] = useState('')
   const [bestandDatum, setBestandDatum] = useState<string>('')
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const scanInputRef = useRef<HTMLInputElement>(null)
+  const [scanning, setScanning] = useState(false)
+  const [scanFehler, setScanFehler] = useState('')
+  const [scanErfolg, setScanErfolg] = useState(false)
 
   // Fahrzeug fields
   const [fahrzeugTyp, setFahrzeugTyp] = useState<'eigen' | 'fremd'>('fremd')
@@ -179,6 +183,35 @@ export function NeuFahrzeugForm({ kunden, hebebuehnen }: Props) {
     setBilderUrls((ad.images ?? []).map(img => img.ref))
   }
 
+  async function handleScan(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setScanning(true)
+    setScanFehler('')
+    setScanErfolg(false)
+    try {
+      const fd = new FormData()
+      fd.append('bild', file)
+      const res = await fetch('/api/fahrzeugschein-scan', { method: 'POST', body: fd })
+      const data = await res.json()
+      if (!res.ok) { setScanFehler(data.error ?? 'Scan fehlgeschlagen'); return }
+      const d = data.daten
+      if (d.kennzeichen) setKennzeichen(d.kennzeichen)
+      if (d.marke) setMarke(d.marke)
+      if (d.modell) setModell(d.modell)
+      if (d.fahrgestellnummer) setFahrgestellnummer(d.fahrgestellnummer)
+      if (d.baujahr) setBaujahr(String(d.baujahr))
+      if (d.hubraum) setHubraum(String(d.hubraum))
+      if (d.leistung_kw) setLeistungKw(String(d.leistung_kw))
+      setScanErfolg(true)
+    } catch (err: any) {
+      setScanFehler(err.message)
+    } finally {
+      setScanning(false)
+      if (scanInputRef.current) scanInputRef.current.value = ''
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!marke || !modell || !kennzeichen) {
@@ -280,6 +313,37 @@ export function NeuFahrzeugForm({ kunden, hebebuehnen }: Props) {
             <p className="text-xs text-gray-400 mt-0.5">* Pflichtfeld</p>
           </CardHeader>
           <CardContent className="space-y-3">
+            {/* Fahrzeugschein Scan */}
+            <div>
+              <input
+                ref={scanInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={handleScan}
+              />
+              <button
+                type="button"
+                onClick={() => scanInputRef.current?.click()}
+                disabled={scanning}
+                className="w-full flex items-center justify-center gap-2 py-3 border-2 border-dashed border-orange-300 rounded-xl text-sm font-medium text-orange-600 hover:bg-orange-50 transition-colors disabled:opacity-60"
+              >
+                {scanning
+                  ? <><Loader2 className="w-4 h-4 animate-spin" /> Fahrzeugschein wird ausgelesen...</>
+                  : <><ScanLine className="w-4 h-4" /> Fahrzeugschein scannen</>
+                }
+              </button>
+              {scanErfolg && (
+                <p className="text-xs text-green-600 mt-1.5 flex items-center gap-1">
+                  ✓ Fahrzeugdaten erfolgreich eingelesen — bitte prüfen und ggf. ergänzen
+                </p>
+              )}
+              {scanFehler && (
+                <p className="text-xs text-red-600 mt-1.5">{scanFehler}</p>
+              )}
+            </div>
+
             {/* Eigen/Fremd toggle */}
             <div className="flex gap-2 p-1 bg-gray-100 rounded-lg">
               <button

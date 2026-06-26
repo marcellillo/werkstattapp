@@ -37,6 +37,9 @@ interface TeilVorschlag {
 interface KiTeilVorschlag {
   bezeichnung: string
   hinweis: string | null
+  herstellervorgabe: string | null
+  spezifikation: string | null
+  oe_qualitaet_erforderlich: boolean
   preisschaetzung: number | null
   optional: boolean
 }
@@ -900,7 +903,18 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie 
                               className="mt-0.5 accent-blue-600"
                             />
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-gray-900">{v.bezeichnung}</p>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <p className="text-sm font-medium text-gray-900">{v.bezeichnung}</p>
+                                {v.oe_qualitaet_erforderlich && (
+                                  <span className="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-medium">OE erforderlich</span>
+                                )}
+                              </div>
+                              {v.herstellervorgabe && (
+                                <p className="text-xs text-blue-700 font-medium mt-0.5">📋 {v.herstellervorgabe}</p>
+                              )}
+                              {v.spezifikation && (
+                                <p className="text-xs font-mono text-gray-500 mt-0.5">{v.spezifikation}</p>
+                              )}
                               {v.hinweis && <p className="text-xs text-gray-500 mt-0.5">{v.hinweis}</p>}
                             </div>
                             {v.preisschaetzung != null && (

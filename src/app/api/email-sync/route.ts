@@ -335,60 +335,61 @@ export async function POST(req: Request) {
           verarbeitet: false,
         }).select('id').maybeSingle()
 
-        if (auftragId && analyse.status !== 'unbekannt' && analyse.teile.length > 0) {
-          const statusReihenfolge = ['nicht_bestellt', 'bestellt', 'unterwegs', 'geliefert', 'eingebaut']
-
-          for (const teil of analyse.teile) {
-            if (!teil.bezeichnung || teil.bezeichnung === 'Siehe E-Mail') continue
-
-            let query = supabase.from('ersatzteile').select('id, status').eq('auftrag_id', auftragId)
-            if (teil.teilenummer) {
-              query = query.or(`teilenummer.eq.${teil.teilenummer},bezeichnung.ilike.%${teil.bezeichnung.slice(0, 20)}%`)
-            } else {
-              query = query.ilike('bezeichnung', `%${teil.bezeichnung.slice(0, 20)}%`)
-            }
-            const { data: vorhanden } = await query.limit(1).maybeSingle()
-
-            if (vorhanden) {
-              const aktuellIdx = statusReihenfolge.indexOf(vorhanden.status)
-              const neuIdx = statusReihenfolge.indexOf(analyse.status)
-              if (neuIdx > aktuellIdx) {
-                await supabase.from('ersatzteile').update({
-                  status: analyse.status,
-                  lieferant: analyse.lieferant,
-                  ...(analyse.status === 'geliefert' ? { geliefert_am: new Date().toISOString().split('T')[0] } : {}),
-                }).eq('id', vorhanden.id)
-                statusAktualisiert++
+        if (analyse.teile.length > 0 && analyse.status !== 'unbekannt') {
+          // Vorhandene Teile im Auftrag suchen (für Zuordnung im Bestätigungsdialog)
+          const teileMitZuordnung = await Promise.all(analyse.teile
+            .filter(t => t.bezeichnung && t.bezeichnung !== 'Siehe E-Mail')
+            .map(async teil => {
+              let vorhandenId: string | null = null
+              if (auftragId) {
+                let q = supabase.from('ersatzteile').select('id, status').eq('auftrag_id', auftragId)
+                if (teil.teilenummer) {
+                  q = q.or(`teilenummer.eq.${teil.teilenummer},bezeichnung.ilike.%${teil.bezeichnung.slice(0, 20)}%`)
+                } else {
+                  q = q.ilike('bezeichnung', `%${teil.bezeichnung.slice(0, 20)}%`)
+                }
+                const { data: vorh } = await q.limit(1).maybeSingle()
+                if (vorh) vorhandenId = vorh.id
               }
-            } else if (analyse.status === 'bestellt' || analyse.status === 'unterwegs') {
-              await supabase.from('ersatzteile').insert({
-                auftrag_id: auftragId,
-                bezeichnung: teil.bezeichnung,
-                teilenummer: teil.teilenummer,
-                lieferant: analyse.lieferant,
-                menge: teil.menge ?? 1,
-                einzelpreis: teil.einzelpreis,
-                status: analyse.status,
-                bestellt_am: analyse.status === 'bestellt' ? new Date().toISOString().split('T')[0] : null,
-              })
-              neuErstellt++
+              return { ...teil, vorhanden_id: vorhandenId }
+            })
+          )
+
+          // Fahrzeugbezeichnung ermitteln
+          let fahrzeugLabel = ''
+          if (auftragId) {
+            const { data: fzData } = await supabase.from('auftraege')
+              .select('auftrag_nr, fahrzeug:fahrzeuge(marke, modell, kennzeichen)')
+              .eq('id', auftragId).maybeSingle()
+            if (fzData) {
+              const fz = fzData.fahrzeug as any
+              fahrzeugLabel = fz ? `${fz.marke ?? ''} ${fz.modell ?? ''} (${fz.kennzeichen ?? ''})`.trim() : ''
             }
           }
 
-          if (analyse.status === 'geliefert') {
-            await supabase.from('benachrichtigungen').insert({
-              titel: `Teile eingetroffen: ${analyse.lieferant}`,
-              nachricht: `Lieferung von ${analyse.lieferant} eingetroffen. ${analyse.teile.map(t => t.bezeichnung).join(', ')}`,
-              typ: 'teil_eingetroffen',
-              auftrag_id: auftragId,
-              gelesen: false,
-            })
-          }
+          // In Warteschlange speichern statt direkt aktualisieren
+          const { data: queueRow } = await supabase.from('werkstatt_einstellungen')
+            .select('wert').eq('schluessel', 'teile_updates_ausstehend').maybeSingle()
+          const queue: any[] = queueRow?.wert ? JSON.parse(queueRow.wert) : []
+          queue.push({
+            id: `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+            protokoll_id: protokoll?.id ?? null,
+            absender: msg.from.emailAddress.address,
+            betreff: msg.subject,
+            lieferant: analyse.lieferant,
+            auftrag_id: auftragId,
+            fahrzeug_label: fahrzeugLabel,
+            neuer_status: analyse.status,
+            teile: teileMitZuordnung,
+            erstellt_am: new Date().toISOString(),
+          })
+          await supabase.from('werkstatt_einstellungen').upsert(
+            { schluessel: 'teile_updates_ausstehend', wert: JSON.stringify(queue) },
+            { onConflict: 'schluessel' }
+          )
 
-          if (protokoll) {
-            await supabase.from('email_protokoll').update({ verarbeitet: true }).eq('id', protokoll.id)
-          }
-          verarbeitet.push(`${analyse.lieferant}: ${analyse.teile.map(t => t.bezeichnung).join(', ')}`)
+          neuErstellt++
+          verarbeitet.push(`Ausstehend: ${analyse.lieferant} — ${teileMitZuordnung.length} Teile (${analyse.status})`)
         }
 
         await markMessageAsRead(accessToken, msg.id)

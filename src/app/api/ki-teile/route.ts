@@ -27,32 +27,44 @@ export async function POST(req: Request) {
     ? `${fahrzeug.marke ?? ''} ${fahrzeug.modell ?? ''} ${fahrzeug.baujahr ? `(${fahrzeug.baujahr})` : ''} ${fahrzeug.fahrgestellnummer ? `VIN: ${fahrzeug.fahrgestellnummer}` : ''}`.trim()
     : 'unbekanntes Fahrzeug'
 
-  const prompt = `Du bist ein erfahrener Kfz-Meister. Schlage die benötigten Ersatzteile für folgende Werkstattarbeit vor.
+  const prompt = `Du bist ein erfahrener Kfz-Meister mit Zugang zu Herstellerdaten. Schlage die benötigten Ersatzteile vor und prüfe sie gegen die Herstellervorgaben des Fahrzeugs.
 
 Fahrzeug: ${fahrzeugInfo}
 Arbeiten: ${arbeiten}
 
+Für jedes Teil:
+1. Ermittle die Herstellervorgabe (Spezifikation, Norm, OE-Nummer falls bekannt)
+2. Prüfe ob Aftermarket-Teile zulässig sind oder ob OE-Qualität vorgeschrieben ist
+3. Gib konkrete Spezifikationen an (z.B. Ölviskosität, Bremsscheiben-Mindestdicke, Anzugsmoment, Freigabenummer)
+
 Antworte NUR mit einem JSON-Array. Kein Text davor oder danach. Format:
 [
   {
-    "bezeichnung": "Bremsscheiben hinten (Satz)",
-    "hinweis": "passend für Fahrzeugtyp prüfen",
-    "preisschaetzung": 85,
+    "bezeichnung": "Motoröl 5W-30",
+    "hinweis": "Freigabe VW 504.00 / 507.00 zwingend erforderlich",
+    "herstellervorgabe": "VW-Norm 504.00/507.00, Longlife-fähig, min. 4,5 Liter",
+    "spezifikation": "5W-30 ACEA C3, API SN",
+    "oe_qualitaet_erforderlich": false,
+    "preisschaetzung": 45,
     "optional": false
   }
 ]
 
-Regeln:
-- Maximal 8 Teile
-- Nur tatsächlich benötigte Teile (keine Werbung, keine unnötigen Teile)
-- optional=true nur für Teile die situationsabhängig sind (z.B. Bremssattel nur wenn festgesessen)
-- preisschaetzung als Zahl in Euro (Richtwert, kein Gewähr)
-- hinweis kurz und praktisch (max 60 Zeichen), oder null wenn nichts Wichtiges`
+Felder:
+- bezeichnung: Teilename inkl. Menge/Satz
+- hinweis: wichtigster Praxishinweis (max 70 Zeichen)
+- herstellervorgabe: exakte Norm/Freigabe/Vorgabe des Herstellers (null wenn nicht bekannt)
+- spezifikation: technische Kenndaten (Viskosität, Maße, Norm etc.), null wenn nicht relevant
+- oe_qualitaet_erforderlich: true wenn Hersteller ausdrücklich OE oder gleichwertig vorschreibt
+- preisschaetzung: Richtwert in Euro als Zahl
+- optional: true nur wenn situationsabhängig
+
+Maximal 8 Teile. Nur tatsächlich benötigte Teile.`
 
   try {
     const message = await client.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 1024,
+      model: 'claude-sonnet-4-6',
+      max_tokens: 2048,
       messages: [{ role: 'user', content: prompt }],
     })
 

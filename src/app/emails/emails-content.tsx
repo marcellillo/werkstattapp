@@ -3,7 +3,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import {
   Mail, Package, CheckCircle, Truck, AlertCircle, Car,
-  RefreshCw, Settings, Loader2, ArrowRight
+  RefreshCw, Settings, Loader2, ArrowRight, X
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { cn, formatDateTime } from '@/lib/utils'
@@ -14,14 +14,37 @@ const STATUS_CONFIG: Record<string, { icon: typeof Mail; color: string; label: s
   bestellt: { icon: Package, color: 'text-orange-600', label: 'Bestellt' },
 }
 
-export function EmailsContent({ emails, istKonfiguriert, letzterSync }: {
+const STATUS_BADGE: Record<string, string> = {
+  geliefert: 'bg-green-100 text-green-700',
+  unterwegs: 'bg-yellow-100 text-yellow-700',
+  bestellt: 'bg-orange-100 text-orange-700',
+}
+
+export function EmailsContent({ emails, istKonfiguriert, letzterSync, teileUpdates: initialTeileUpdates }: {
   emails: any[]
   istKonfiguriert: boolean
   letzterSync: string | null
+  teileUpdates: any[]
 }) {
   const [syncing, setSyncing] = useState(false)
   const [syncResult, setSyncResult] = useState<any>(null)
   const [lokalEmails, setLokalEmails] = useState(emails)
+  const [teileUpdates, setTeileUpdates] = useState<any[]>(initialTeileUpdates)
+  const [bestaetigenLoading, setBestaetigenLoading] = useState<string | null>(null)
+
+  async function handleTeileAktion(id: string, aktion: 'bestaetigen' | 'ablehnen') {
+    setBestaetigenLoading(id)
+    try {
+      await fetch('/api/teile-updates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, aktion }),
+      })
+      setTeileUpdates(prev => prev.filter(u => u.id !== id))
+    } finally {
+      setBestaetigenLoading(null)
+    }
+  }
 
   async function syncStarten() {
     setSyncing(true)
@@ -92,6 +115,77 @@ export function EmailsContent({ emails, istKonfiguriert, letzterSync }: {
               <p className="font-mono text-xs">{syncResult.error}</p>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Teile-Erkennungen Bestätigung */}
+      {teileUpdates.length > 0 && (
+        <div className="space-y-3">
+          <h2 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+            <Package className="w-4 h-4 text-orange-500" />
+            {teileUpdates.length} Teile-Erkennung{teileUpdates.length !== 1 ? 'en' : ''} warten auf Bestätigung
+          </h2>
+          {teileUpdates.map(update => (
+            <Card key={update.id} className="border-orange-200">
+              <CardContent className="p-4 space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-semibold text-gray-900">{update.lieferant}</span>
+                      <span className={cn('text-xs px-2 py-0.5 rounded-full font-medium', STATUS_BADGE[update.neuer_status] ?? 'bg-gray-100 text-gray-600')}>
+                        {update.neuer_status}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-0.5 truncate">{update.betreff}</p>
+                    {update.fahrzeug_label && (
+                      <p className="text-xs text-gray-600 flex items-center gap-1 mt-1">
+                        <Car className="w-3.5 h-3.5" />{update.fahrzeug_label}
+                      </p>
+                    )}
+                    {!update.auftrag_id && (
+                      <p className="text-xs text-amber-600 mt-1">⚠ Kein Auftrag gefunden — Teile werden neu angelegt wenn bestätigt</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="bg-gray-50 rounded-lg divide-y divide-gray-100">
+                  {update.teile.map((teil: any, i: number) => (
+                    <div key={i} className="px-3 py-2 flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-sm text-gray-800 font-medium">{teil.bezeichnung}</p>
+                        {teil.teilenummer && <p className="text-xs font-mono text-gray-400">{teil.teilenummer}</p>}
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <p className="text-xs text-gray-500">{teil.menge}x</p>
+                        {teil.einzelpreis && <p className="text-xs font-semibold text-gray-700">{teil.einzelpreis.toFixed(2)} €</p>}
+                        {teil.vorhanden_id
+                          ? <p className="text-xs text-blue-600">im Auftrag ✓</p>
+                          : <p className="text-xs text-gray-400">neu</p>
+                        }
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleTeileAktion(update.id, 'bestaetigen')}
+                    disabled={bestaetigenLoading === update.id}
+                    className="flex-1 py-2 bg-orange-600 hover:bg-orange-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-60"
+                  >
+                    {bestaetigenLoading === update.id ? 'Wird übernommen...' : `✓ ${update.teile.length} Teile übernehmen`}
+                  </button>
+                  <button
+                    onClick={() => handleTeileAktion(update.id, 'ablehnen')}
+                    disabled={bestaetigenLoading === update.id}
+                    className="px-3 py-2 border border-gray-200 text-gray-500 hover:text-gray-700 text-sm rounded-lg transition-colors disabled:opacity-60"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
         </div>
       )}
 

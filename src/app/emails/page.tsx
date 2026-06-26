@@ -30,6 +30,9 @@ export default async function EmailsPage() {
   }
 
   const istKonfiguriert = !!(cfg.ms_tenant_id && cfg.ms_client_id && cfg.ms_client_secret)
+  const teileUpdatesAusstehend = cfg.teile_updates_ausstehend
+    ? JSON.parse(cfg.teile_updates_ausstehend)
+    : []
 
   return (
     <AppLayout title="E-Mail-Protokoll">
@@ -37,6 +40,7 @@ export default async function EmailsPage() {
         emails={(emails ?? []) as any[]}
         istKonfiguriert={istKonfiguriert}
         letzterSync={cfg.letzter_email_sync ?? null}
+        teileUpdates={teileUpdatesAusstehend}
       />
     </AppLayout>
   )
