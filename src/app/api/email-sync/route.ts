@@ -179,7 +179,6 @@ export async function POST() {
     const relevanteMessages = messages.filter(msg =>
       msg.hasAttachments || rechnungsKeywords.test(msg.subject ?? '')
     )
-    verarbeitet.push(`📊 ${messages.length} E-Mails total, ${relevanteMessages.length} relevant`)
 
     for (const msg of relevanteMessages) {
       try {
@@ -191,19 +190,16 @@ export async function POST() {
             fehler.push(`Anhang-Fehler "${msg.subject?.slice(0, 30)}": ${e.message}`)
           }
         }
-        verarbeitet.push(`📧 "${msg.subject?.slice(0, 40)}" — Anhänge=${anhaenge.length}`)
-
         let analyse: EmailAnalyse | null = null
 
         if (anthropic) {
           try {
             analyse = await analysiereEmailMitClaude(anthropic, msg, anhaenge)
-            verarbeitet.push(`🤖 Claude: typ=${analyse.typ}, lieferant=${analyse.lieferant}, teile=${analyse.teile.length}`)
           } catch (e: any) {
-            fehler.push(`Claude-Fehler "${msg.subject}": ${e.message}`)
+            fehler.push(`Claude-Fehler "${msg.subject?.slice(0, 30)}": ${e.message}`)
           }
         } else {
-          fehler.push(`Kein Claude API-Key`)
+          fehler.push(`Kein Claude API-Key — bitte unter Einstellungen eintragen`)
         }
 
         // Fallback auf Regex wenn Claude nicht verfuegbar

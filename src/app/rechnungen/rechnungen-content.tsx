@@ -91,7 +91,6 @@ export function RechnungenContent({ rechnungen: initial, isAdmin = false }: { re
       const duplikate_str = data.duplikate > 0 ? ` (${data.duplikate} Duplikate übersprungen)` : ''
       let msg = `${data.emailsGeprueft} E-Mails geprüft — ${rech_str}${teile_str}${duplikate_str}`
       if (data.fehler?.length > 0) msg += `\n⚠️ ${data.fehler.join('\n⚠️ ')}`
-      if (data.verarbeitet?.length > 0) msg += `\n✓ ${data.verarbeitet.join('\n✓ ')}`
       setErfolg(msg)
     } catch (e: any) { setFehler(e.message) }
     finally { setSyncing(false) }
