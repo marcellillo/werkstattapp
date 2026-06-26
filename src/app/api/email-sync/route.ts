@@ -136,10 +136,20 @@ Regeln:
   return JSON.parse(cleaned) as EmailAnalyse
 }
 
-export async function POST() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Nicht angemeldet' }, { status: 401 })
+export async function POST(req: Request) {
+  // Interner Cron-Aufruf oder eingeloggter User
+  const cronToken = req.headers.get('x-cron-internal')
+  const isCron = cronToken && cronToken === (process.env.CRON_SECRET ?? 'cron')
+
+  let supabase: any
+  if (isCron) {
+    const { createAdminClient } = await import('@/lib/supabase/admin')
+    supabase = createAdminClient()
+  } else {
+    supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'Nicht angemeldet' }, { status: 401 })
+  }
 
   const { data: rows } = await supabase.from('werkstatt_einstellungen').select('schluessel, wert')
   const cfg: Record<string, string> = {}

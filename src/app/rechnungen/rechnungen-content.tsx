@@ -1,5 +1,5 @@
 'use client'
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Receipt, Upload, X, ChevronDown, ChevronUp, Package, Loader2, CheckCircle, AlertCircle, Mail, AlertTriangle, Euro, Trash2 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -46,6 +46,21 @@ export function RechnungenContent({ rechnungen: initial, isAdmin = false }: { re
   const [loesching, setLoesching] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const supabase = createClient()
+
+  // Auto-Sync alle 30 Minuten wenn die Seite offen ist
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch('/api/email-sync', { method: 'POST' })
+        const data = await res.json()
+        if (data.rechnungenImportiert > 0) {
+          const res2 = await fetch('/api/rechnung-import/list')
+          if (res2.ok) { const { rechnungen: neu } = await res2.json(); setRechnungen(neu) }
+        }
+      } catch { /* still fehlgeschlagen, ignorieren */ }
+    }, 30 * 60 * 1000)
+    return () => clearInterval(interval)
+  }, [])
 
   async function loeschenBestaetigen(id: string) {
     setLoesching(true)

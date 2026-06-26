@@ -13,9 +13,26 @@ export default async function KundenPage() {
     .select('*')
     .order('nachname')
 
+  const { data: kundenMitAuftraegen } = await supabase
+    .from('kunden')
+    .select(`
+      *,
+      fahrzeuge(
+        id, marke, modell, kennzeichen, baujahr,
+        auftraege(
+          id, auftrag_nr, status, arbeiten, erstellt_am,
+          geplante_fertigstellung, einnahmen
+        )
+      )
+    `)
+    .order('nachname')
+
   return (
     <AppLayout title="Kunden">
-      <KundenContent kunden={(kunden ?? []) as any[]} />
+      <KundenContent
+        kunden={(kunden ?? []) as any[]}
+        kundenMitAuftraegen={(kundenMitAuftraegen ?? []) as any[]}
+      />
     </AppLayout>
   )
 }
