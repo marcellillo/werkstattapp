@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useRef, useMemo } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Car, User, Wrench, Package, Calendar, Plus, Trash2, CheckCircle, Clock, Circle, ChevronRight, ShieldCheck, Search, Printer, Receipt, Ban, UserCheck, ClipboardCheck, X, Sparkles } from 'lucide-react'
+import { ArrowLeft, Car, User, Wrench, Package, Calendar, Plus, Trash2, CheckCircle, Clock, Circle, ChevronRight, ShieldCheck, Search, Printer, Receipt, Ban, UserCheck, ClipboardCheck, X, Sparkles, MessageSquare, Mail, Phone } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { cn, formatDate, formatDateTime } from '@/lib/utils'
@@ -658,6 +658,63 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie 
               </CardContent>
             </Card>
           )}
+
+          {/* Kunden-Benachrichtigung wenn fertig */}
+          {auftrag.status === 'fertig' && kunde && (kunde.mobil || kunde.telefon || kunde.email) && (() => {
+            const name = `${fahrzeug?.marke ?? ''} ${fahrzeug?.modell ?? ''}`.trim()
+            const kz = fahrzeug?.kennzeichen ?? ''
+            const kundenName = `${kunde.vorname} ${kunde.nachname}`.trim()
+            const smsText = `Hallo ${kunde.vorname}, Ihr Fahrzeug ${name}${kz ? ` (${kz})` : ''} ist fertig und kann abgeholt werden. Herzliche Grüße, Ihre Kfz-Werkstatt`
+            const tel = kunde.mobil || kunde.telefon || ''
+            const telClean = tel.replace(/\s+/g, '').replace(/^0/, '+49')
+            return (
+              <Card className="border-green-300 bg-green-50">
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center gap-2 text-base text-green-800">
+                    <MessageSquare className="w-5 h-5 text-green-600" />
+                    Kunden benachrichtigen
+                  </CardTitle>
+                  <p className="text-xs text-green-700">Fahrzeug ist fertig — {kundenName} informieren</p>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <textarea
+                    readOnly
+                    value={smsText}
+                    rows={3}
+                    className="w-full px-3 py-2 border border-green-200 rounded-lg text-sm bg-white text-gray-800 resize-none"
+                  />
+                  <div className="flex flex-wrap gap-2">
+                    {tel && (
+                      <a
+                        href={`sms:${tel}?body=${encodeURIComponent(smsText)}`}
+                        className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors"
+                      >
+                        <Phone className="w-4 h-4" /> SMS senden
+                      </a>
+                    )}
+                    {tel && (
+                      <a
+                        href={`https://wa.me/${telClean}?text=${encodeURIComponent(smsText)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 px-4 py-2 bg-[#25D366] hover:bg-[#1ebe5a] text-white text-sm font-medium rounded-lg transition-colors"
+                      >
+                        <MessageSquare className="w-4 h-4" /> WhatsApp
+                      </a>
+                    )}
+                    {kunde.email && (
+                      <a
+                        href={`mailto:${kunde.email}?subject=${encodeURIComponent(`Ihr Fahrzeug ${name} ist fertig`)}&body=${encodeURIComponent(smsText)}`}
+                        className="flex items-center gap-2 px-4 py-2 border border-green-300 text-green-700 hover:bg-green-100 text-sm font-medium rounded-lg transition-colors"
+                      >
+                        <Mail className="w-4 h-4" /> E-Mail
+                      </a>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          })()}
 
           {/* Work Description */}
           <Card>
