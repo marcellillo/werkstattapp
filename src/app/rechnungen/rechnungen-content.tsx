@@ -321,35 +321,28 @@ export function RechnungenContent({ rechnungen: initial, isAdmin = false }: { re
 
                     {/* Positionen */}
                     {r.positionen.length > 0 ? (
-                      <div className="overflow-x-auto">
-                        <table className="w-full">
-                          <thead>
-                            <tr className="border-t border-slate-100">
-                              <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wide px-5 py-2.5">Bezeichnung</th>
-                              <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wide px-4 py-2.5 hidden sm:table-cell">Teile-Nr.</th>
-                              <th className="text-right text-xs font-semibold text-slate-500 uppercase tracking-wide px-4 py-2.5">Menge</th>
-                              <th className="text-right text-xs font-semibold text-slate-500 uppercase tracking-wide px-4 py-2.5">Einzelpreis</th>
-                              <th className="text-right text-xs font-semibold text-slate-500 uppercase tracking-wide px-5 py-2.5">Gesamt</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-50">
-                            {r.positionen.map(p => (
-                              <tr key={p.id} className="row-interactive">
-                                <td className="px-5 py-3"><div className="flex items-center gap-2"><Package className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" /><span className="text-sm text-slate-800">{p.bezeichnung}</span></div></td>
-                                <td className="px-4 py-3 hidden sm:table-cell"><span className="text-xs font-mono text-slate-500">{p.teilenummer ?? '—'}</span></td>
-                                <td className="px-4 py-3 text-right text-sm text-slate-700">{p.menge}x</td>
-                                <td className="px-4 py-3 text-right text-sm text-slate-700">{p.einzelpreis != null ? `${p.einzelpreis.toFixed(2)} €` : '—'}</td>
-                                <td className="px-5 py-3 text-right text-sm font-medium text-slate-900">{p.gesamtpreis != null ? `${p.gesamtpreis.toFixed(2)} €` : '—'}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                          <tfoot>
-                            <tr className="border-t border-slate-200 bg-slate-50">
-                              <td colSpan={4} className="px-5 py-3 text-sm font-semibold text-slate-700 text-right">Summe</td>
-                              <td className="px-5 py-3 text-right text-sm font-bold text-orange-600">{r.gesamt != null ? `${r.gesamt.toFixed(2)} €` : '—'}</td>
-                            </tr>
-                          </tfoot>
-                        </table>
+                      <div className="border-t border-slate-100">
+                        <div className="divide-y divide-slate-50">
+                          {r.positionen.map(p => (
+                            <div key={p.id} className="px-4 py-3 flex items-start gap-3">
+                              <Package className="w-3.5 h-3.5 text-slate-400 flex-shrink-0 mt-0.5" />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm text-slate-800 font-medium">{p.bezeichnung}</p>
+                                {p.teilenummer && <p className="text-xs font-mono text-slate-400 mt-0.5">{p.teilenummer}</p>}
+                              </div>
+                              <div className="text-right flex-shrink-0">
+                                <p className="text-sm font-semibold text-slate-900">
+                                  {p.gesamtpreis != null ? `${p.gesamtpreis.toFixed(2)} €` : p.einzelpreis != null ? `${p.einzelpreis.toFixed(2)} €` : '—'}
+                                </p>
+                                <p className="text-xs text-slate-400">{p.menge}x {p.einzelpreis != null ? `${p.einzelpreis.toFixed(2)} €` : ''}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="border-t border-slate-200 bg-slate-50 px-4 py-3 flex justify-between items-center">
+                          <span className="text-sm font-semibold text-slate-700">Summe</span>
+                          <span className="text-sm font-bold text-orange-600">{r.gesamt != null ? `${r.gesamt.toFixed(2)} €` : '—'}</span>
+                        </div>
                       </div>
                     ) : (
                       <div className="px-5 py-4 flex items-center gap-2 text-slate-400 text-sm border-t border-slate-100">
