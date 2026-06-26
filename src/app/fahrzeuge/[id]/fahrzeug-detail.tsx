@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useRef, useMemo } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Car, User, Wrench, Package, Calendar, Plus, Trash2, CheckCircle, Clock, Circle, ChevronRight, ShieldCheck, Search, Printer, Receipt, Ban, UserCheck, ClipboardCheck, X } from 'lucide-react'
+import { ArrowLeft, Car, User, Wrench, Package, Calendar, Plus, Trash2, CheckCircle, Clock, Circle, ChevronRight, ShieldCheck, Search, Printer, Receipt, Ban, UserCheck, ClipboardCheck, X, Sparkles } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { cn, formatDate, formatDateTime } from '@/lib/utils'
@@ -34,6 +34,13 @@ interface TeilVorschlag {
   einzelpreis: number | null
 }
 
+interface KiTeilVorschlag {
+  bezeichnung: string
+  hinweis: string | null
+  preisschaetzung: number | null
+  optional: boolean
+}
+
 export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie }: Props) {
   const [auftrag, setAuftrag] = useState(initialAuftrag)
   const [teile, setTeile] = useState<Ersatzteil[]>((initialAuftrag.ersatzteile as Ersatzteil[]) ?? [])
@@ -56,6 +63,11 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie 
   const [savingService, setSavingService] = useState(false)
   const [buehneWarnung, setBuehneWarnung] = useState<FahrzeugStatus | null>(null)
   const [buehneWahl, setBuehneWahl] = useState('')
+  const [kiVorschlaege, setKiVorschlaege] = useState<KiTeilVorschlag[]>([])
+  const [kiAusgewaehlt, setKiAusgewaehlt] = useState<Set<number>>(new Set())
+  const [kiLaden, setKiLaden] = useState(false)
+  const [kiError, setKiError] = useState<string | null>(null)
+  const [showKiVorschlaege, setShowKiVorschlaege] = useState(false)
   const [storniereBestaetigung, setStorniereBestaetigung] = useState(false)
   const [stornieren, setStornieren] = useState(false)
   const [mitarbeiter, setMitarbeiter] = useState<any[]>([])
@@ -141,6 +153,52 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie 
     }))
     setSuchbegriff(v.bezeichnung)
     setShowVorschlaege(false)
+  }
+
+  async function kiTeileVorschlagen() {
+    if (!arbeiten.trim()) return
+    setKiLaden(true)
+    setKiError(null)
+    setKiVorschlaege([])
+    setShowKiVorschlaege(true)
+    try {
+      const fz = initialAuftrag.fahrzeug as any
+      const res = await fetch('/api/ki-teile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          arbeiten,
+          fahrzeug: fz ? { marke: fz.marke, modell: fz.modell, baujahr: fz.baujahr, fahrgestellnummer: fz.fahrgestellnummer } : null,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setKiError(data.error ?? 'Fehler'); return }
+      setKiVorschlaege(data.teile ?? [])
+      const defaultSelected = new Set<number>(
+        (data.teile ?? []).map((_: KiTeilVorschlag, i: number) => i).filter((i: number) => !(data.teile[i] as KiTeilVorschlag).optional)
+      )
+      setKiAusgewaehlt(defaultSelected)
+    } catch (e: any) {
+      setKiError(e.message)
+    } finally {
+      setKiLaden(false)
+    }
+  }
+
+  async function kiTeileUebernehmen() {
+    const ausgewaehlt = kiVorschlaege.filter((_, i) => kiAusgewaehlt.has(i))
+    for (const v of ausgewaehlt) {
+      const { data } = await supabase.from('ersatzteile').insert({
+        auftrag_id: auftrag.id,
+        bezeichnung: v.bezeichnung,
+        menge: 1,
+        einzelpreis: v.preisschaetzung ?? null,
+        status: 'nicht_bestellt',
+      }).select().single()
+      if (data) setTeile(prev => [...prev, data as Ersatzteil])
+    }
+    setShowKiVorschlaege(false)
+    setKiVorschlaege([])
   }
 
   async function saveArbeiten() {
@@ -677,14 +735,28 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie 
                 <Package className="w-5 h-5 text-yellow-500" />
                 Ersatzteile ({teile.length})
               </CardTitle>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setShowAddTeil(v => !v)}
-                className="gap-1"
-              >
-                <Plus className="w-4 h-4" /> Teil hinzufügen
-              </Button>
+              <div className="flex items-center gap-2">
+                {arbeiten.trim() && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={kiTeileVorschlagen}
+                    disabled={kiLaden}
+                    className="gap-1 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    {kiLaden ? 'KI lädt...' : 'KI-Vorschlag'}
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setShowAddTeil(v => !v)}
+                  className="gap-1"
+                >
+                  <Plus className="w-4 h-4" /> Teil hinzufügen
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="space-y-3">
               {/* Add form */}
@@ -775,6 +847,78 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie 
                     <Button onClick={handleAddTeil} size="sm" className="bg-orange-600 hover:bg-orange-700 text-white">Hinzufügen</Button>
                     <Button onClick={() => { setShowAddTeil(false); setSuchbegriff(''); setNewTeil({ bezeichnung: '', teilenummer: '', lieferant: '', menge: 1, einzelpreis: '' }) }} size="sm" variant="ghost">Abbrechen</Button>
                   </div>
+                </div>
+              )}
+
+              {/* KI-Vorschlag Panel */}
+              {showKiVorschlaege && (
+                <div className="border border-blue-200 bg-blue-50 rounded-lg p-3 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-blue-600" />
+                      <span className="text-sm font-medium text-blue-800">KI-Teilevorschlag</span>
+                    </div>
+                    <button onClick={() => setShowKiVorschlaege(false)} className="text-blue-400 hover:text-blue-600">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  {kiLaden && (
+                    <div className="text-sm text-blue-600 py-2 text-center">Analysiere Arbeiten...</div>
+                  )}
+                  {kiError && (
+                    <div className="text-sm text-red-600 py-2">{kiError}</div>
+                  )}
+
+                  {kiVorschlaege.length > 0 && (
+                    <>
+                      <div className="space-y-2">
+                        {kiVorschlaege.map((v, i) => (
+                          <label key={i} className={cn(
+                            'flex items-start gap-3 p-2.5 rounded-lg border cursor-pointer transition-colors',
+                            kiAusgewaehlt.has(i)
+                              ? 'bg-white border-blue-300'
+                              : 'bg-white/50 border-blue-100 opacity-60'
+                          )}>
+                            <input
+                              type="checkbox"
+                              checked={kiAusgewaehlt.has(i)}
+                              onChange={() => {
+                                setKiAusgewaehlt(prev => {
+                                  const next = new Set(prev)
+                                  next.has(i) ? next.delete(i) : next.add(i)
+                                  return next
+                                })
+                              }}
+                              className="mt-0.5 accent-blue-600"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-gray-900">{v.bezeichnung}</p>
+                              {v.hinweis && <p className="text-xs text-gray-500 mt-0.5">{v.hinweis}</p>}
+                            </div>
+                            {v.preisschaetzung != null && (
+                              <span className="text-sm font-semibold text-gray-700 flex-shrink-0">
+                                ~{v.preisschaetzung.toFixed(0)} €
+                              </span>
+                            )}
+                          </label>
+                        ))}
+                      </div>
+                      <div className="flex gap-2 pt-1">
+                        <Button
+                          size="sm"
+                          onClick={kiTeileUebernehmen}
+                          disabled={kiAusgewaehlt.size === 0}
+                          className="bg-blue-600 hover:bg-blue-700 text-white"
+                        >
+                          {kiAusgewaehlt.size} Teil{kiAusgewaehlt.size !== 1 ? 'e' : ''} übernehmen
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => setShowKiVorschlaege(false)}>
+                          Abbrechen
+                        </Button>
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
 
