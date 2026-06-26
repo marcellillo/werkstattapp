@@ -229,7 +229,8 @@ export function NeuFahrzeugForm({ kunden, hebebuehnen }: Props) {
 
       if (!fahrzeug) throw new Error('Fahrzeug konnte nicht erstellt werden')
 
-      const auftragNr = `AU-${Date.now().toString().slice(-6)}`
+      const finSuffix = fahrgestellnummer ? fahrgestellnummer.slice(-6).toUpperCase() : Date.now().toString().slice(-6)
+      const auftragNr = `AU-${finSuffix}`
       const { data: auftrag } = await supabase.from('auftraege').insert({
         auftrag_nr: auftragNr,
         fahrzeug_id: fahrzeug.id,
