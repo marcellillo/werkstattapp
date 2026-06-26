@@ -56,7 +56,7 @@ html {
 
 /* Main content bottom padding: clears bottom nav + iPhone home indicator */
 .main-content-pb {
-  padding-bottom: max(6rem, calc(5rem + env(safe-area-inset-bottom, 0px)));
+  padding-bottom: max(8rem, calc(6rem + env(safe-area-inset-bottom, 0px)));
 }
 
 /* Hide scrollbar utility */
