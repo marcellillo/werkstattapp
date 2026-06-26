@@ -230,14 +230,21 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie 
   }
 
   async function saveTuev() {
+    let neueNaechsteHu = naechsteHu
+    if (tuevErgebnis === 'bestanden' && tuevTermin) {
+      const basis = new Date(tuevTermin)
+      basis.setFullYear(basis.getFullYear() + 2)
+      neueNaechsteHu = basis.toISOString().split('T')[0]
+      setNaechsteHu(neueNaechsteHu)
+    }
     await supabase.from('auftraege').update({
       tuev_kandidat: tuevKandidat,
       tuev_termin: tuevTermin || null,
       tuev_ergebnis: tuevErgebnis || null,
     }).eq('id', auftrag.id)
-    if (naechsteHu) {
+    if (neueNaechsteHu) {
       await supabase.from('fahrzeuge').update({
-        naechste_hauptuntersuchung: naechsteHu,
+        naechste_hauptuntersuchung: neueNaechsteHu,
         tuev_erinnerung: true,
       }).eq('id', (auftrag.fahrzeug as any)?.id)
     }

@@ -243,7 +243,7 @@ export function NeuFahrzeugForm({ kunden, hebebuehnen }: Props) {
       }).select().single()
 
       if (auftrag) {
-        router.push(`/fahrzeuge/${auftrag.id}`)
+        router.push('/dashboard')
       }
     } catch (err: any) {
       setError(err.message ?? 'Fehler beim Speichern')
@@ -696,7 +696,7 @@ export function NeuFahrzeugForm({ kunden, hebebuehnen }: Props) {
             disabled={saving}
             className="bg-orange-600 hover:bg-orange-700 text-white flex-1"
           >
-            {saving ? 'Anlegen...' : 'Fahrzeug anlegen'}
+            {saving ? 'Anlegen...' : 'Auftrag anlegen'}
           </Button>
           <Link href="/fahrzeuge">
             <Button type="button" variant="ghost">Abbrechen</Button>
