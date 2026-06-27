@@ -71,6 +71,7 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie 
   const [kiLaden, setKiLaden] = useState(false)
   const [kiError, setKiError] = useState<string | null>(null)
   const [showKiVorschlaege, setShowKiVorschlaege] = useState(false)
+  const [fertigEmailStatus, setFertigEmailStatus] = useState<'idle' | 'senden' | 'ok' | 'fehler'>('idle')
   const [storniereBestaetigung, setStorniereBestaetigung] = useState(false)
   const [stornieren, setStornieren] = useState(false)
   const [mitarbeiter, setMitarbeiter] = useState<any[]>([])
@@ -702,12 +703,28 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie 
                       </a>
                     )}
                     {kunde.email && (
-                      <a
-                        href={`mailto:${kunde.email}?subject=${encodeURIComponent(`Ihr Fahrzeug ${name} ist fertig`)}&body=${encodeURIComponent(smsText)}`}
-                        className="flex items-center gap-2 px-4 py-2 border border-green-300 text-green-700 hover:bg-green-100 text-sm font-medium rounded-lg transition-colors"
+                      <button
+                        onClick={async () => {
+                          setFertigEmailStatus('senden')
+                          try {
+                            const res = await fetch('/api/rechnung-email', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ auftrag_id: auftrag.id, typ: 'fertig' }),
+                            })
+                            const data = await res.json()
+                            if (!res.ok) throw new Error(data.error ?? 'Fehler')
+                            setFertigEmailStatus('ok')
+                          } catch {
+                            setFertigEmailStatus('fehler')
+                          }
+                        }}
+                        disabled={fertigEmailStatus === 'senden' || fertigEmailStatus === 'ok'}
+                        className="flex items-center gap-2 px-4 py-2 border border-green-300 text-green-700 hover:bg-green-100 text-sm font-medium rounded-lg transition-colors disabled:opacity-60"
                       >
-                        <Mail className="w-4 h-4" /> E-Mail
-                      </a>
+                        <Mail className="w-4 h-4" />
+                        {fertigEmailStatus === 'senden' ? 'Wird gesendet…' : fertigEmailStatus === 'ok' ? '✓ E-Mail gesendet' : fertigEmailStatus === 'fehler' ? '⚠ Fehler' : 'E-Mail senden'}
+                      </button>
                     )}
                   </div>
                 </CardContent>
