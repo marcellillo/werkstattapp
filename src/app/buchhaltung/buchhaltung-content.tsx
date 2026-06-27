@@ -87,9 +87,9 @@ export function BuchhaltungContent({ auftraege, ausgaben, kundenRechnungen: init
 
   const einnahmenNetto = useMemo(() => auftraege.map(a => ({
     ...a,
-    netto:  kleinunternehmer ? a.einnahmen : a.einnahmen / 1.19,
-    brutto: a.einnahmen,
-    mwst:   kleinunternehmer ? 0 : a.einnahmen - a.einnahmen / 1.19,
+    netto:  kleinunternehmer ? (a.einnahmen ?? 0) : (a.einnahmen ?? 0) / 1.19,
+    brutto: a.einnahmen ?? 0,
+    mwst:   kleinunternehmer ? 0 : (a.einnahmen ?? 0) - (a.einnahmen ?? 0) / 1.19,
     monat:      new Date(a.erstellt_am).getMonth(),
     monatJahr:  new Date(a.erstellt_am).getFullYear(),
   })), [auftraege, kleinunternehmer])

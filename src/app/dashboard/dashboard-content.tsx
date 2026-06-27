@@ -100,7 +100,7 @@ const auftragMap = new Map<string, Auftrag>()
 
   const dialog = buehnen.find(b => isDialog(b))
   const normalBuehnen = buehnen.filter(b => !isDialog(b))
-  const unassigned = auftraege.filter(a => !a.hebebuehne_id && !['fertig','ausgeliefert'].includes(a.status))
+  const unassigned = auftraege.filter(a => !a.hebebuehne_id && !['fertig','ausgeliefert','storniert'].includes(a.status))
 
   const stats = [
     { label: 'Offene Aufträge', value: offeneAuftraege, icon: Wrench, color: 'text-blue-600', bg: 'bg-blue-50', href: '/fahrzeuge' },

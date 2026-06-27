@@ -82,10 +82,16 @@ export function RechnungenContent({ rechnungen: initial, isAdmin = false }: { re
       ? { ...x, bezahlt: neuBezahlt, bezahlt_am: neuBezahlt ? heute : null }
       : x
     ))
-    await supabase.from('rechnungen').update({
+    const { error } = await supabase.from('rechnungen').update({
       bezahlt: neuBezahlt,
       bezahlt_am: neuBezahlt ? heute : null,
     }).eq('id', r.id)
+    if (error) {
+      setRechnungen(prev => prev.map(x => x.id === r.id
+        ? { ...x, bezahlt: r.bezahlt, bezahlt_am: r.bezahlt_am }
+        : x
+      ))
+    }
   }
 
   async function emailSync() {

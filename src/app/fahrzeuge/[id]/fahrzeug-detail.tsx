@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useRef, useMemo } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Car, User, Wrench, Package, Calendar, Plus, Trash2, CheckCircle, Clock, Circle, ChevronRight, ShieldCheck, Search, Printer, Receipt, Ban, UserCheck, ClipboardCheck, X, Sparkles, MessageSquare, Mail, Phone } from 'lucide-react'
+import { ArrowLeft, Car, User, Wrench, Package, Calendar, Plus, Trash2, CheckCircle, Clock, Circle, ChevronRight, ShieldCheck, Search, Printer, Receipt, Ban, UserCheck, ClipboardCheck, X, Sparkles, MessageSquare, Mail, Phone, Camera } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { cn, formatDate, formatDateTime } from '@/lib/utils'
@@ -78,6 +78,10 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie 
   const [zugewiesenAn, setZugewiesenAn] = useState<string>(initialAuftrag.zugewiesen_an ?? '')
   const [checklisteZiel, setChecklisteZiel] = useState<FahrzeugStatus | null>(null)
   const [checklisteAbgehakt, setChecklisteAbgehakt] = useState<Record<string, boolean>>({})
+  const [showKundeModal, setShowKundeModal] = useState(false)
+  const [kundeSearch, setKundeSearch] = useState('')
+  const [kundenListe, setKundenListe] = useState<any[]>([])
+  const [kundeZuweisenLoading, setKundeZuweisenLoading] = useState(false)
   const supabase = createClient()
 
   const CHECKLISTE_FERTIG = [
@@ -298,6 +302,30 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie 
     }
   }
 
+  async function ladeKunden(search: string) {
+    let q = supabase.from('kunden').select('id, vorname, nachname, firma, telefon, mobil').order('nachname')
+    if (search.trim()) {
+      q = q.or(`vorname.ilike.%${search}%,nachname.ilike.%${search}%,firma.ilike.%${search}%`)
+    }
+    const { data } = await q.limit(20)
+    setKundenListe(data ?? [])
+  }
+
+  async function handleKundeZuweisen(kundeId: string) {
+    setKundeZuweisenLoading(true)
+    const { data: updatedAuftrag } = await supabase
+      .from('auftraege')
+      .update({ kunden_id: kundeId })
+      .eq('id', auftrag.id)
+      .select('*, fahrzeug:fahrzeuge(*), kunde:kunden(*), ersatzteile(*)')
+      .single()
+    if (updatedAuftrag) setAuftrag(updatedAuftrag as any)
+    setKundeZuweisenLoading(false)
+    setShowKundeModal(false)
+    setKundeSearch('')
+    setKundenListe([])
+  }
+
   async function handleStornieren() {
     setStornieren(true)
     // Teile zurück ins Lager (geliefert), außer nicht_bestellt
@@ -400,6 +428,16 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie 
               <Ban className="w-3.5 h-3.5" /> Stornieren
             </button>
           )}
+          <Link href={`/fahrzeuge/${auftrag.id}/annahme`}>
+            <Button variant="outline" size="sm" className="gap-2 border-blue-200 text-blue-700 hover:border-blue-400 hover:bg-blue-50">
+              <ClipboardCheck className="w-4 h-4" /> Annahme
+            </Button>
+          </Link>
+          <Link href={`/fahrzeuge/${auftrag.id}/fotos`}>
+            <Button variant="outline" size="sm" className="gap-2 border-purple-200 text-purple-700 hover:border-purple-400 hover:bg-purple-50">
+              <Camera className="w-4 h-4" /> Fotos
+            </Button>
+          </Link>
           <Link href={`/fahrzeuge/${auftrag.id}/protokoll`} target="_blank">
             <Button variant="outline" size="sm" className="gap-2">
               <Printer className="w-4 h-4" /> Protokoll
@@ -641,22 +679,68 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie 
           </Card>
 
           {/* Customer Card */}
-          {kunde && (
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <User className="w-5 h-5 text-blue-500" />
-                  Kunde
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="text-sm space-y-1">
-                <p className="font-medium text-gray-900">{kunde.vorname} {kunde.nachname}</p>
-                {kunde.firma && <p className="text-gray-800">{kunde.firma}</p>}
-                {kunde.telefon && <p className="text-gray-800">📞 {kunde.telefon}</p>}
-                {kunde.mobil && <p className="text-gray-800">📱 {kunde.mobil}</p>}
-                {kunde.ort && <p className="text-gray-800">📍 {kunde.ort}</p>}
-              </CardContent>
-            </Card>
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <User className="w-5 h-5 text-blue-500" />
+                Kunde
+                {!kunde && (
+                  <Button size="sm" variant="outline" className="ml-auto text-xs h-7 px-2" onClick={() => { setShowKundeModal(true); ladeKunden('') }}>
+                    + Zuweisen
+                  </Button>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm space-y-1">
+              {kunde ? (
+                <>
+                  <p className="font-medium text-gray-900">{(kunde as any).vorname} {(kunde as any).nachname}</p>
+                  {(kunde as any).firma && <p className="text-gray-800">{(kunde as any).firma}</p>}
+                  {(kunde as any).telefon && <p className="text-gray-800">📞 {(kunde as any).telefon}</p>}
+                  {(kunde as any).mobil && <p className="text-gray-800">📱 {(kunde as any).mobil}</p>}
+                  {(kunde as any).ort && <p className="text-gray-800">📍 {(kunde as any).ort}</p>}
+                  <button className="text-xs text-blue-500 underline mt-1" onClick={() => { setShowKundeModal(true); ladeKunden('') }}>Kunden ändern</button>
+                </>
+              ) : (
+                <p className="text-gray-400 italic">Kein Kunde zugewiesen</p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Kunden zuweisen Modal */}
+          {showKundeModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowKundeModal(false)}>
+              <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-6" onClick={e => e.stopPropagation()}>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-semibold">Kunden zuweisen</h2>
+                  <button onClick={() => setShowKundeModal(false)}><X className="w-5 h-5 text-gray-400" /></button>
+                </div>
+                <input
+                  autoFocus
+                  className="w-full border rounded-lg px-3 py-2 text-sm mb-3"
+                  placeholder="Name oder Firma suchen…"
+                  value={kundeSearch}
+                  onChange={e => { setKundeSearch(e.target.value); ladeKunden(e.target.value) }}
+                />
+                <div className="space-y-1 max-h-72 overflow-y-auto">
+                  {kundenListe.length === 0 && (
+                    <p className="text-sm text-gray-400 text-center py-4">Keine Kunden gefunden</p>
+                  )}
+                  {kundenListe.map(k => (
+                    <button
+                      key={k.id}
+                      className="w-full text-left px-3 py-2 rounded-lg hover:bg-blue-50 transition-colors"
+                      disabled={kundeZuweisenLoading}
+                      onClick={() => handleKundeZuweisen(k.id)}
+                    >
+                      <p className="font-medium text-sm">{k.vorname} {k.nachname}</p>
+                      {k.firma && <p className="text-xs text-gray-500">{k.firma}</p>}
+                      {(k.telefon || k.mobil) && <p className="text-xs text-gray-400">{k.mobil || k.telefon}</p>}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
           )}
 
           {/* Kunden-Benachrichtigung wenn fertig */}

@@ -4,7 +4,7 @@ import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Car, Users, Package, Calendar,
   Bell, Settings, LogOut, BarChart2,
-  Mail, CalendarClock, Layers, Receipt, History, BookOpen, ShieldAlert, Wrench
+  Mail, CalendarClock, Layers, Receipt, History, BookOpen, ShieldAlert, Wrench, ClipboardCheck
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
@@ -15,6 +15,7 @@ import { useBenachrichtigungenAnzahl } from '@/hooks/use-benachrichtigungen-anza
 const navItems = [
   { href: '/dashboard',          label: 'Dashboard',         icon: LayoutDashboard, key: 'dashboard' },
   { href: '/hebebuehnen',        label: 'Hebebühnen',         icon: Layers,          key: 'hebebuehnen' },
+  { href: '/annahme',            label: 'Annahme',            icon: ClipboardCheck,  key: 'annahme' },
   { href: '/fahrzeuge',          label: 'Fahrzeuge',          icon: Car,             key: 'fahrzeuge' },
   { href: '/termine',            label: 'Termine',            icon: CalendarClock,   key: 'termine' },
   { href: '/kunden',             label: 'Kunden',             icon: Users,           key: 'kunden' },

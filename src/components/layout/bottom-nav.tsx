@@ -5,7 +5,7 @@ import { useState } from 'react'
 import {
   LayoutDashboard, Car, Layers, CalendarClock, Menu, X,
   Users, Package, Calendar, Bell, BarChart2, Mail, Settings,
-  LogOut, Receipt, History, BookOpen, ShieldAlert, Wrench
+  LogOut, Receipt, History, BookOpen, ShieldAlert, Wrench, ClipboardCheck
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
@@ -16,8 +16,8 @@ import { useBenachrichtigungenAnzahl } from '@/hooks/use-benachrichtigungen-anza
 const mainItemDefs = [
   { href: '/dashboard',   label: 'Dashboard', icon: LayoutDashboard, key: 'dashboard' },
   { href: '/hebebuehnen', label: 'Bühnen',    icon: Layers,           key: 'hebebuehnen' },
+  { href: '/annahme',     label: 'Annahme',   icon: ClipboardCheck,   key: 'annahme' },
   { href: '/fahrzeuge',   label: 'Fahrzeuge', icon: Car,              key: 'fahrzeuge' },
-  { href: '/termine',     label: 'Termine',   icon: CalendarClock,    key: 'termine' },
 ]
 
 const moreItemDefs = [

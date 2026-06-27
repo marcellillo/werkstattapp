@@ -315,7 +315,7 @@ export async function POST(req: Request) {
           if (fz) {
             const { data: a } = await supabase.from('auftraege').select('id')
               .eq('fahrzeug_id', fz.id)
-              .not('status', 'in', '("fertig","ausgeliefert","storniert")')
+              .not('status', 'in', '(fertig,ausgeliefert,storniert)')
               .order('erstellt_am', { ascending: false }).limit(1).maybeSingle()
             if (a) auftragId = a.id
           }

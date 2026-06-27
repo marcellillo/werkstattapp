@@ -30,12 +30,13 @@ type KundeMitAuftraegen = Kunde & {
 }
 
 const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
-  neu:                { label: 'Neu',              bg: 'bg-blue-100',   text: 'text-blue-700' },
-  in_arbeit:          { label: 'In Arbeit',        bg: 'bg-orange-100', text: 'text-orange-700' },
-  warten_auf_teile:   { label: 'Warten auf Teile', bg: 'bg-yellow-100', text: 'text-yellow-700' },
-  fertig:             { label: 'Fertig',           bg: 'bg-green-100',  text: 'text-green-700' },
-  ausgeliefert:       { label: 'Ausgeliefert',     bg: 'bg-gray-100',   text: 'text-gray-600' },
-  storniert:          { label: 'Storniert',        bg: 'bg-red-100',    text: 'text-red-600' },
+  angenommen:   { label: 'Angenommen',      bg: 'bg-blue-100',   text: 'text-blue-700' },
+  diagnose:     { label: 'Diagnose',        bg: 'bg-purple-100', text: 'text-purple-700' },
+  reparatur:    { label: 'In Arbeit',       bg: 'bg-orange-100', text: 'text-orange-700' },
+  warten_teile: { label: 'Warten auf Teile',bg: 'bg-yellow-100', text: 'text-yellow-700' },
+  fertig:       { label: 'Fertig',          bg: 'bg-green-100',  text: 'text-green-700' },
+  ausgeliefert: { label: 'Ausgeliefert',    bg: 'bg-gray-100',   text: 'text-gray-600' },
+  storniert:    { label: 'Storniert',       bg: 'bg-red-100',    text: 'text-red-600' },
 }
 
 function StatusBadge({ status }: { status?: string }) {

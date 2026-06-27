@@ -724,6 +724,7 @@ export function EinstellungenContent({ initialConfig, profile, userEmail, urlErr
                   {([
                     { key: 'dashboard',          label: 'Dashboard' },
                     { key: 'hebebuehnen',         label: 'Hebebühnen' },
+                    { key: 'annahme',             label: 'Annahme' },
                     { key: 'fahrzeuge',           label: 'Fahrzeuge' },
                     { key: 'termine',             label: 'Termine' },
                     { key: 'kunden',              label: 'Kunden' },
