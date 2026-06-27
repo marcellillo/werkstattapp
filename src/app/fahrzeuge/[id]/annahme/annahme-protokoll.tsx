@@ -68,7 +68,7 @@ export function AnnahmeProtokoll({ auftrag: initialAuftrag, firma }: Props) {
 
       <div className="no-print bg-gray-50 min-h-screen">
         {/* Header */}
-        <div className="bg-white border-b px-4 py-3 flex items-center gap-3">
+        <div className="bg-white border-b px-4 pt-safe pb-3 pt-3 flex items-center gap-3" style={{ paddingTop: 'max(12px, env(safe-area-inset-top))' }}>
           <Link href={`/fahrzeuge/${auftrag.id}`}>
             <Button variant="ghost" size="sm"><ArrowLeft className="w-4 h-4 mr-1" />Zurück</Button>
           </Link>
