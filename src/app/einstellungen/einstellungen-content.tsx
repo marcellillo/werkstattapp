@@ -20,6 +20,8 @@ interface Config {
   graph_email: string
   graph_refresh_token: string
   anthropic_api_key: string
+  resend_api_key: string
+  firma_absender_email: string
   // Firmendaten
   firma_name: string
   firma_strasse: string
@@ -58,6 +60,9 @@ export function EinstellungenContent({ initialConfig, profile, userEmail, urlErr
   const [testMsg, setTestMsg] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [showApiKey, setShowApiKey] = useState(false)
+  const [showResendKey, setShowResendKey] = useState(false)
+  const [resendTestStatus, setResendTestStatus] = useState<'idle' | 'testing' | 'ok' | 'fehler'>('idle')
+  const [resendTestMsg, setResendTestMsg] = useState('')
   const supabase = createClient()
 
   const isKonfiguriert = !!(config.imap_email && config.imap_password)
@@ -560,6 +565,112 @@ export function EinstellungenContent({ initialConfig, profile, userEmail, urlErr
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
             {saved ? 'Gespeichert!' : 'Speichern'}
           </button>
+        </CardContent>
+      </Card>
+
+      {/* E-Mail-Versand (Resend) */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Mail className="w-5 h-5 text-blue-500" />
+            E-Mail-Versand (Rechnungen & Benachrichtigungen)
+            {config.resend_api_key && (
+              <span className="ml-auto text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full flex items-center gap-1">
+                <CheckCircle className="w-3 h-3" /> Aktiv
+              </span>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-800">
+            <p className="font-medium mb-1">Rechnungen direkt aus der App per E-Mail versenden</p>
+            <p>Mit <strong>Resend</strong> werden Rechnungen und Fertig-Benachrichtigungen automatisch an Kunden gesendet. Kostenlos bis 100 E-Mails/Monat.</p>
+            <a href="https://resend.com/signup" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 mt-2 text-blue-700 font-medium hover:underline text-xs">
+              resend.com kostenlos registrieren <ExternalLink className="w-3 h-3" />
+            </a>
+          </div>
+
+          <div>
+            <label className="text-xs font-medium text-gray-700 mb-1 block">
+              Resend API Key
+              <span className="ml-1 text-gray-400 font-normal">(von resend.com → API Keys)</span>
+            </label>
+            <div className="relative">
+              <input
+                type={showResendKey ? 'text' : 'password'}
+                value={config.resend_api_key}
+                onChange={e => setConfig(c => ({ ...c, resend_api_key: e.target.value }))}
+                placeholder="re_••••••••••••••••••••••••"
+                className="w-full px-3 py-2.5 pr-10 border border-gray-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-400"
+              />
+              <button type="button" onClick={() => setShowResendKey(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                {showResendKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs font-medium text-gray-700 mb-1 block">
+              Absender-E-Mail
+              <span className="ml-1 text-gray-400 font-normal">(muss in Resend verifiziert sein)</span>
+            </label>
+            <input
+              type="email"
+              value={config.firma_absender_email}
+              onChange={e => setConfig(c => ({ ...c, firma_absender_email: e.target.value }))}
+              placeholder="rechnung@deinewerkstatt.de"
+              className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+            />
+            <p className="text-xs text-gray-400 mt-1">
+              Zum Testen geht auch <code className="bg-gray-100 px-1 rounded">onboarding@resend.dev</code> — dann kommt die E-Mail von Resend, nicht von dir.
+            </p>
+          </div>
+
+          {resendTestStatus !== 'idle' && (
+            <div className={`rounded-xl p-3 text-sm border ${resendTestStatus === 'ok' ? 'bg-green-50 border-green-200 text-green-800' : resendTestStatus === 'fehler' ? 'bg-red-50 border-red-200 text-red-800' : 'bg-blue-50 border-blue-200 text-blue-800'}`}>
+              {resendTestStatus === 'testing' ? 'Test-E-Mail wird gesendet…' : resendTestMsg}
+            </div>
+          )}
+
+          <div className="flex gap-3 flex-wrap">
+            <button
+              onClick={speichern}
+              disabled={saving}
+              className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-medium transition-colors disabled:opacity-50"
+            >
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              {saved ? 'Gespeichert!' : 'Speichern'}
+            </button>
+            {config.resend_api_key && config.firma_absender_email && (
+              <button
+                onClick={async () => {
+                  await speichern()
+                  setResendTestStatus('testing')
+                  setResendTestMsg('')
+                  try {
+                    const res = await fetch('/api/rechnung-email/test', { method: 'POST' })
+                    const data = await res.json()
+                    if (res.ok) {
+                      setResendTestStatus('ok')
+                      setResendTestMsg(`✓ Test-E-Mail gesendet an ${data.an}`)
+                    } else {
+                      setResendTestStatus('fehler')
+                      setResendTestMsg(data.error ?? 'Fehler beim Senden')
+                    }
+                  } catch (e: any) {
+                    setResendTestStatus('fehler')
+                    setResendTestMsg(e.message)
+                  }
+                }}
+                className="flex items-center gap-2 px-4 py-2.5 border border-blue-300 text-blue-700 hover:bg-blue-50 rounded-xl text-sm font-medium transition-colors"
+              >
+                <Mail className="w-4 h-4" /> Test-E-Mail senden
+              </button>
+            )}
+          </div>
+          <p className="text-xs text-gray-400">
+            Domain verifizieren: <a href="https://resend.com/domains" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline inline-flex items-center gap-0.5">resend.com/domains <ExternalLink className="w-3 h-3" /></a>
+          </p>
         </CardContent>
       </Card>
 

@@ -41,6 +41,8 @@ export default async function EinstellungenPage({
           graph_email: cfg.graph_email ?? '',
           graph_refresh_token: cfg.graph_refresh_token ?? '',
           anthropic_api_key: cfg.anthropic_api_key ?? '',
+          resend_api_key: cfg.resend_api_key ?? '',
+          firma_absender_email: cfg.firma_absender_email ?? '',
           firma_name: cfg.firma_name ?? '',
           firma_strasse: cfg.firma_strasse ?? '',
           firma_plz: cfg.firma_plz ?? '',
