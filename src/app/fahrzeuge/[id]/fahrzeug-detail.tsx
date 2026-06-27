@@ -235,9 +235,8 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie 
   async function saveTuev() {
     let neueNaechsteHu = naechsteHu
     if (tuevErgebnis === 'bestanden' && tuevTermin) {
-      const basis = new Date(tuevTermin)
-      basis.setFullYear(basis.getFullYear() + 2)
-      neueNaechsteHu = basis.toISOString().split('T')[0]
+      const [y, m, d] = tuevTermin.split('-')
+      neueNaechsteHu = `${parseInt(y) + 2}-${m}-${d}`
       setNaechsteHu(neueNaechsteHu)
     }
     await supabase.from('auftraege').update({

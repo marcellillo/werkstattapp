@@ -420,7 +420,7 @@ export function RechnungDruck({ auftrag, firma }: { auftrag: any; firma: Record<
               <>
                 <tr className="section-header"><td colSpan={6}>Sonstiges</td></tr>
                 <tr>
-                  <td>{teile.length + 2}</td>
+                  <td>{teile.length + 2 + (kleinteilNetto > 0 ? 1 : 0)}</td>
                   <td>Sonstige Leistungen</td>
                   <td>—</td>
                   <td className="ta-right">1</td>
