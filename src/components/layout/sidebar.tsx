@@ -88,7 +88,7 @@ export function Sidebar() {
           if (visibleItems.length === 0) return null
           return (
             <div key={group.label}>
-              <p className="px-3 mb-1 text-[10px] font-semibold uppercase tracking-widest text-slate-500 select-none">
+              <p className="px-3 mb-1.5 text-[11px] font-bold uppercase tracking-widest text-slate-400 select-none border-t border-slate-800 pt-3">
                 {group.label}
               </p>
               <div className="space-y-0.5">
