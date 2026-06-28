@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useRef, useMemo } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Car, User, Wrench, Package, Calendar, Plus, Trash2, CheckCircle, Clock, Circle, ChevronRight, ShieldCheck, Search, Printer, Receipt, Ban, UserCheck, ClipboardCheck, X, Sparkles, MessageSquare, Mail, Phone, Camera } from 'lucide-react'
+import { ArrowLeft, Car, User, Wrench, Package, Calendar, Plus, Trash2, CheckCircle, Clock, Circle, ChevronRight, ShieldCheck, Search, Printer, Receipt, Ban, UserCheck, ClipboardCheck, X, Sparkles, MessageSquare, Mail, Phone, Camera, FolderOpen } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { cn, formatDate, formatDateTime } from '@/lib/utils'
@@ -428,6 +428,11 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie 
               <Ban className="w-3.5 h-3.5" /> Stornieren
             </button>
           )}
+          <Link href={`/fahrzeuge/${auftrag.id}/mappe`}>
+            <Button variant="outline" size="sm" className="gap-2 border-orange-200 text-orange-700 hover:border-orange-400 hover:bg-orange-50 font-semibold">
+              <FolderOpen className="w-4 h-4" /> Mappe
+            </Button>
+          </Link>
           <Link href={`/fahrzeuge/${auftrag.id}/annahme`}>
             <Button variant="outline" size="sm" className="gap-2 border-blue-200 text-blue-700 hover:border-blue-400 hover:bg-blue-50">
               <ClipboardCheck className="w-4 h-4" /> Annahme
