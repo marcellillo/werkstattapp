@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useRef, useMemo } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { ArrowLeft, Car, User, Wrench, Package, Calendar, Plus, Trash2, CheckCircle, Clock, Circle, ChevronRight, ShieldCheck, Search, Printer, Receipt, Ban, UserCheck, ClipboardCheck, X, Sparkles, MessageSquare, Mail, Phone, Camera, FolderOpen } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -82,7 +83,10 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie 
   const [kundeSearch, setKundeSearch] = useState('')
   const [kundenListe, setKundenListe] = useState<any[]>([])
   const [kundeZuweisenLoading, setKundeZuweisenLoading] = useState(false)
+  const [loeschenBestaetigung, setLoeschenBestaetigung] = useState(false)
+  const [loeschen, setLoeschen] = useState(false)
   const supabase = createClient()
+  const router = useRouter()
 
   const CHECKLISTE_FERTIG = [
     { id: 'arbeiten', label: 'Alle Arbeiten wurden erledigt' },
@@ -345,6 +349,17 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie 
     setStornieren(false)
   }
 
+  async function handleLoeschen() {
+    setLoeschen(true)
+    // Teile löschen
+    await supabase.from('ersatzteile').delete().eq('auftrag_id', auftrag.id)
+    // Fotos löschen
+    await supabase.from('auftrag_fotos').delete().eq('auftrag_id', auftrag.id)
+    // Auftrag löschen
+    await supabase.from('auftraege').delete().eq('id', auftrag.id)
+    router.push('/fahrzeuge')
+  }
+
   async function handleBuehneUndStatus(hebebuehne_id: string) {
     if (!hebebuehne_id || !buehneWarnung) return
     const hebebuehne = hebebuehnen.find(h => h.id === hebebuehne_id) ?? undefined
@@ -428,6 +443,12 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie 
               <Ban className="w-3.5 h-3.5" /> Stornieren
             </button>
           )}
+          <button
+            onClick={() => setLoeschenBestaetigung(true)}
+            className="flex items-center gap-1.5 text-xs font-medium text-red-700 hover:text-red-800 hover:bg-red-100 border border-red-300 hover:border-red-400 px-3 py-1.5 rounded-lg transition-colors"
+          >
+            <Trash2 className="w-3.5 h-3.5" /> Löschen
+          </button>
           <Link href={`/fahrzeuge/${auftrag.id}/mappe`}>
             <Button variant="outline" size="sm" className="gap-2 border-orange-200 text-orange-700 hover:border-orange-400 hover:bg-orange-50 font-semibold">
               <FolderOpen className="w-4 h-4" /> Mappe
@@ -571,6 +592,44 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie 
                 className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 disabled:opacity-50 rounded-xl text-sm font-medium text-white transition-colors"
               >
                 {stornieren ? 'Wird storniert…' : 'Ja, stornieren'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Löschen-Bestätigung */}
+      {loeschenBestaetigung && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
+                <Trash2 className="w-5 h-5 text-red-600" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-900">Auftrag endgültig löschen?</h3>
+                <p className="text-sm text-gray-500">Diese Aktion kann nicht rückgängig gemacht werden.</p>
+              </div>
+            </div>
+            <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-800 space-y-1">
+              <p className="font-medium">Folgendes wird dauerhaft gelöscht:</p>
+              <p>• Der Auftrag <strong>{auftrag.auftrag_nr}</strong></p>
+              {teile.length > 0 && <p>• <strong>{teile.length} Ersatzteile</strong></p>}
+              <p>• Alle Fotos und das Annahmeprotokoll</p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setLoeschenBestaetigung(false)}
+                className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                Abbrechen
+              </button>
+              <button
+                onClick={handleLoeschen}
+                disabled={loeschen}
+                className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 disabled:opacity-50 rounded-xl text-sm font-medium text-white transition-colors"
+              >
+                {loeschen ? 'Wird gelöscht…' : 'Ja, löschen'}
               </button>
             </div>
           </div>
