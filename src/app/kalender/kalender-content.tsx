@@ -538,6 +538,46 @@ export function KalenderContent({
   const today      = new Date().toISOString().split('T')[0]
   const ueberfaellig = mitDatum.filter(a => a.geplante_fertigstellung < today)
 
+  // Automatische TÜV- und Service-Erinnerungen (30 & 60 Tage vorher)
+  const autoErinnerungen = useMemo(() => {
+    const events: any[] = []
+    for (const f of fahrzeuge) {
+      if (f.tuev_erinnerung && f.naechste_hauptuntersuchung) {
+        const hu = new Date(f.naechste_hauptuntersuchung + 'T00:00:00')
+        for (const tage of [60, 30]) {
+          const d = new Date(hu)
+          d.setDate(d.getDate() - tage)
+          events.push({
+            id: `tuev-${f.id}-${tage}`,
+            titel: `TÜV in ${tage} Tagen — ${f.kennzeichen}`,
+            datum: d.toISOString().split('T')[0],
+            typ: 'tuev',
+            isAuto: true,
+            fahrzeug: f,
+            beschreibung: `${f.marke} ${f.modell} · HU fällig am ${new Date(f.naechste_hauptuntersuchung + 'T00:00:00').toLocaleDateString('de-DE')}`,
+          })
+        }
+      }
+      if (f.naechster_service_datum) {
+        const sv = new Date(f.naechster_service_datum + 'T00:00:00')
+        for (const tage of [60, 30]) {
+          const d = new Date(sv)
+          d.setDate(d.getDate() - tage)
+          events.push({
+            id: `service-${f.id}-${tage}`,
+            titel: `Service in ${tage} Tagen — ${f.kennzeichen}`,
+            datum: d.toISOString().split('T')[0],
+            typ: 'werkstatt',
+            isAuto: true,
+            fahrzeug: f,
+            beschreibung: `${f.marke} ${f.modell} · Service fällig am ${new Date(f.naechster_service_datum + 'T00:00:00').toLocaleDateString('de-DE')}`,
+          })
+        }
+      }
+    }
+    return events
+  }, [fahrzeuge])
+
   async function setFertigstellung(auftragId: string, datum: string) {
     setAuftraege(prev => prev.map(a => a.id === auftragId ? { ...a, geplante_fertigstellung: datum } : a))
     setSettingDateFor(null)
@@ -577,7 +617,10 @@ export function KalenderContent({
   }
   function getTermineForDate(date: Date) {
     const d = date.toISOString().split('T')[0]
-    return termine.filter(t => t.datum === d)
+    return [
+      ...termine.filter(t => t.datum === d),
+      ...autoErinnerungen.filter(t => t.datum === d),
+    ]
   }
 
   return (
@@ -615,6 +658,8 @@ export function KalenderContent({
       <div className="flex flex-wrap gap-3 text-xs">
         <span className="flex items-center gap-1.5 text-gray-500"><span className="w-3 h-3 rounded-sm bg-orange-200 inline-block" /> Fertigstellung</span>
         <span className="flex items-center gap-1.5 text-gray-500"><span className="w-3 h-3 rounded-sm bg-red-200 inline-block" /> Überfällig</span>
+        <span className="flex items-center gap-1.5 text-gray-500"><span className="w-3 h-3 rounded-sm bg-yellow-200 inline-block" /> TÜV-Erinnerung</span>
+        <span className="flex items-center gap-1.5 text-gray-500"><span className="w-3 h-3 rounded-sm bg-blue-200 inline-block" /> Service-Erinnerung</span>
         <span className="flex items-center gap-1.5 text-gray-500"><span className="w-3 h-3 rounded-sm bg-blue-200 inline-block" /> Werkstatttermin</span>
         <span className="flex items-center gap-1.5 text-gray-500"><span className="w-3 h-3 rounded-sm bg-yellow-200 inline-block" /> TÜV</span>
       </div>

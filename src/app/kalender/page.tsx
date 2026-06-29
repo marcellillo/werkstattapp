@@ -36,7 +36,7 @@ export default async function KalenderPage() {
       .order('nachname'),
     supabase
       .from('fahrzeuge')
-      .select('id, kennzeichen, marke, modell, kunde_id')
+      .select('id, kennzeichen, marke, modell, kunde_id, naechste_hauptuntersuchung, tuev_erinnerung, naechster_service_datum')
       .order('kennzeichen'),
   ])
 
