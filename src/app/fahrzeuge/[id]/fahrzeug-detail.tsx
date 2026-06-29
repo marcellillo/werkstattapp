@@ -1475,7 +1475,11 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie 
 
       {/* Gefahrenzone */}
       <div className="border border-red-200 rounded-xl p-4 bg-red-50">
-        <p className="text-xs font-semibold text-red-500 uppercase tracking-wide mb-3">Gefahrenzone</p>
+        <p className="text-xs font-semibold text-red-500 uppercase tracking-wide mb-1">Gefahrenzone</p>
+        <p className="text-xs text-red-400 mb-3">
+          <strong>Stornieren</strong> markiert den Auftrag als abgebrochen — er bleibt sichtbar und ist rückgängig machbar. &nbsp;
+          <strong>Löschen</strong> entfernt den Auftrag dauerhaft aus der Datenbank.
+        </p>
         <div className="flex flex-col sm:flex-row gap-2">
           {auftrag.status !== 'storniert' && (
             <button
