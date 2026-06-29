@@ -86,6 +86,12 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie 
   const [loeschenBestaetigung, setLoeschenBestaetigung] = useState(false)
   const [loeschen, setLoeschen] = useState(false)
   const [linkKopiert, setLinkKopiert] = useState(false)
+  const [showUebergabe, setShowUebergabe] = useState(false)
+  const [uebergabeKm, setUebergabeKm] = useState('')
+  const [uebergabeTank, setUebergabeTank] = useState(50)
+  const [uebergabeSchaeden, setUebergabeSchaeden] = useState('')
+  const [uebergabeZustand, setUebergabeZustand] = useState('gut')
+  const [uebergabeSaving, setUebergabeSaving] = useState(false)
   const supabase = createClient()
   const router = useRouter()
 
@@ -304,7 +310,29 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie 
       fetch('/api/push/send', { method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: '✅ Auftrag fertig', body: `${name} (${kz}) ist fertig zur Abholung`, url: `/fahrzeuge/${auftrag.id}`, tag: 'fertig' })
       }).catch(() => {})
+      // Übergabeprotokoll vorausfüllen mit Annahme-Daten als Ausgangswert
+      const a = auftrag as any
+      setUebergabeKm(String(a.annahme_km ?? ''))
+      setUebergabeTank(a.annahme_tank ?? 50)
+      setUebergabeSchaeden('')
+      setUebergabeZustand('gut')
+      setShowUebergabe(true)
     }
+  }
+
+  async function handleUebergabeSpeichern(ueberspringen = false) {
+    if (!ueberspringen) {
+      setUebergabeSaving(true)
+      await supabase.from('auftraege').update({
+        uebergabe_km: uebergabeKm ? parseInt(uebergabeKm) : null,
+        uebergabe_tank: uebergabeTank,
+        uebergabe_schaeden: uebergabeSchaeden || null,
+        uebergabe_zustand: uebergabeZustand,
+        uebergabe_datum: new Date().toISOString(),
+      }).eq('id', auftrag.id)
+      setUebergabeSaving(false)
+    }
+    setShowUebergabe(false)
   }
 
   async function ladeKunden(search: string) {
@@ -552,6 +580,126 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie 
           </div>
         )
       })()}
+
+      {/* Übergabeprotokoll */}
+      {showUebergabe && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-5 my-auto">
+            {/* Header */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0">
+                  <ClipboardCheck className="w-5 h-5 text-orange-600" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-gray-900 text-lg">Übergabeprotokoll</h3>
+                  <p className="text-sm text-gray-500">{auftrag.fahrzeug?.marke} {auftrag.fahrzeug?.modell} · {auftrag.fahrzeug?.kennzeichen}</p>
+                </div>
+              </div>
+              <button onClick={() => handleUebergabeSpeichern(true)} className="text-gray-400 hover:text-gray-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Kilometerstand */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Kilometerstand bei Abholung</label>
+              <div className="relative">
+                <input
+                  type="number"
+                  value={uebergabeKm}
+                  onChange={e => setUebergabeKm(e.target.value)}
+                  placeholder="z. B. 85000"
+                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 pr-12"
+                />
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-medium">km</span>
+              </div>
+              {(auftrag as any).annahme_km && (
+                <p className="text-xs text-gray-400 mt-1">Bei Annahme: {((auftrag as any).annahme_km as number).toLocaleString('de-DE')} km
+                  {uebergabeKm && parseInt(uebergabeKm) > (auftrag as any).annahme_km
+                    ? ` · +${(parseInt(uebergabeKm) - (auftrag as any).annahme_km).toLocaleString('de-DE')} km gefahren`
+                    : ''}
+                </p>
+              )}
+            </div>
+
+            {/* Tankstand */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Tankstand</label>
+              <div className="flex gap-2">
+                {[0, 25, 50, 75, 100].map(v => (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => setUebergabeTank(v)}
+                    className={cn(
+                      'flex-1 py-2.5 rounded-xl border-2 text-xs font-bold transition-all',
+                      uebergabeTank === v
+                        ? 'border-orange-500 bg-orange-500 text-white'
+                        : 'border-gray-200 text-gray-600 hover:border-orange-300'
+                    )}
+                  >
+                    {v === 0 ? 'Leer' : v === 25 ? '¼' : v === 50 ? '½' : v === 75 ? '¾' : 'Voll'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Zustand */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Fahrzeugzustand</label>
+              <div className="grid grid-cols-4 gap-2">
+                {(['sehr_gut', 'gut', 'maessig', 'schlecht'] as const).map(z => {
+                  const labels: Record<string, string> = { sehr_gut: 'Sehr gut', gut: 'Gut', maessig: 'Mäßig', schlecht: 'Schlecht' }
+                  const colors: Record<string, string> = { sehr_gut: 'border-green-500 bg-green-500 text-white', gut: 'border-blue-500 bg-blue-500 text-white', maessig: 'border-yellow-500 bg-yellow-500 text-white', schlecht: 'border-red-500 bg-red-500 text-white' }
+                  return (
+                    <button
+                      key={z}
+                      type="button"
+                      onClick={() => setUebergabeZustand(z)}
+                      className={cn(
+                        'py-2 rounded-xl border-2 text-xs font-bold transition-all',
+                        uebergabeZustand === z ? colors[z] : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                      )}
+                    >
+                      {labels[z]}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Schäden / Anmerkungen */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Sichtbare Schäden / Anmerkungen</label>
+              <textarea
+                value={uebergabeSchaeden}
+                onChange={e => setUebergabeSchaeden(e.target.value)}
+                rows={3}
+                placeholder="z. B. Kratzer hinten links, keine neuen Schäden …"
+                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-orange-400"
+              />
+            </div>
+
+            {/* Buttons */}
+            <div className="flex gap-3 pt-1">
+              <button
+                onClick={() => handleUebergabeSpeichern(true)}
+                className="flex-1 px-4 py-3 border border-gray-200 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+              >
+                Überspringen
+              </button>
+              <button
+                onClick={() => handleUebergabeSpeichern(false)}
+                disabled={uebergabeSaving}
+                className="flex-1 px-4 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-sm font-bold transition-colors disabled:opacity-60"
+              >
+                {uebergabeSaving ? 'Speichern …' : '✓ Protokoll speichern'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Stornieren-Bestätigung */}
       {storniereBestaetigung && (
