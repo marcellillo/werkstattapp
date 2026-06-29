@@ -105,9 +105,7 @@ const auftragMap = new Map<string, Auftrag>()
   const normalBuehnen = buehnen.filter(b => !isDialog(b))
   const unassigned = auftraege.filter(a => !a.hebebuehne_id && !['fertig','ausgeliefert','storniert'].includes(a.status))
 
-  const fmtEuro = (v: number) => v >= 1000
-    ? `${(v / 1000).toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} k€`
-    : `${v.toLocaleString('de-DE', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} €`
+  const fmtEuro = (v: number) => `${v.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`
 
   const stats = [
     { label: 'Offene Aufträge', value: offeneAuftraege, display: String(offeneAuftraege), icon: Wrench, color: 'text-blue-600', bg: 'bg-blue-50', href: '/fahrzeuge' },
