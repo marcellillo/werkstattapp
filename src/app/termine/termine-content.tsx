@@ -1,11 +1,12 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Calendar, Plus, ShieldCheck, Globe, Phone, Clock, Car, User, Trash2, CheckCircle, X } from 'lucide-react'
+import { Calendar, Plus, ShieldCheck, Globe, Phone, Clock, Car, User, Trash2, CheckCircle, X, MessageCircle, Mail } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { cn, formatDate } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
+import { useEffect } from 'react'
 import type { TerminTyp, TerminStatus } from '@/types/database'
 
 const TYP_CONFIG: Record<TerminTyp, { label: string; icon: typeof Calendar; color: string; bg: string }> = {
@@ -23,6 +24,17 @@ const STATUS_CONFIG: Record<TerminStatus, { label: string; color: string }> = {
 
 const today = new Date().toISOString().split('T')[0]
 
+// Kundendaten aus der Beschreibung extrahieren (gespeichert vom /api/buchen Endpunkt)
+function parseBeschreibung(desc: string): Record<string, string> {
+  const result: Record<string, string> = {}
+  if (!desc) return result
+  for (const line of desc.split('\n')) {
+    const [key, ...rest] = line.split(': ')
+    if (key && rest.length) result[key.trim()] = rest.join(': ').trim()
+  }
+  return result
+}
+
 export function TermineContent({ termine: initialTermine, kunden, fahrzeuge, hebebuehnen }: {
   termine: any[]; kunden: any[]; fahrzeuge: any[]; hebebuehnen: any[]
 }) {
@@ -30,6 +42,7 @@ export function TermineContent({ termine: initialTermine, kunden, fahrzeuge, heb
   const [showForm, setShowForm] = useState(false)
   const [filter, setFilter] = useState<'alle' | TerminTyp>('alle')
   const [saving, setSaving] = useState(false)
+  const [bestaetigenModal, setBestaetigenModal] = useState<any>(null)
   const supabase = createClient()
   const searchParams = useSearchParams()
 
@@ -47,6 +60,9 @@ export function TermineContent({ termine: initialTermine, kunden, fahrzeuge, heb
   const upcoming = filtered.filter(t => t.datum >= today && t.status !== 'abgesagt')
   const past = filtered.filter(t => t.datum < today || t.status === 'erledigt' || t.status === 'abgesagt')
 
+  // Online-Buchungen die noch offen sind — oben hervorheben
+  const offeneOnlineBuchungen = termine.filter(t => t.quelle === 'website' && t.status === 'offen')
+
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault()
     if (!form.titel || !form.datum) return
@@ -62,16 +78,21 @@ export function TermineContent({ termine: initialTermine, kunden, fahrzeuge, heb
     setSaving(false)
   }
 
-  async function handleStatus(id: string, status: TerminStatus) {
-    const termin = termine.find(t => t.id === id)
-    const freigeben = status === 'erledigt' && termin?.hebebuehne_id
-    setTermine(p => p.map(t => t.id === id
-      ? { ...t, status, hebebuehne_id: freigeben ? null : t.hebebuehne_id, hebebuehne: freigeben ? null : t.hebebuehne }
-      : t
+  async function handleStatus(id: string, status: TerminStatus, termin?: any) {
+    const t = termin ?? termine.find(x => x.id === id)
+    const freigeben = status === 'erledigt' && t?.hebebuehne_id
+    setTermine(p => p.map(x => x.id === id
+      ? { ...x, status, hebebuehne_id: freigeben ? null : x.hebebuehne_id, hebebuehne: freigeben ? null : x.hebebuehne }
+      : x
     ))
     const update: any = { status }
     if (freigeben) update.hebebuehne_id = null
     await supabase.from('termine').update(update).eq('id', id)
+
+    // Bei Online-Buchung: Bestätigungsmodal anzeigen
+    if (status === 'bestaetigt' && t?.quelle === 'website') {
+      setBestaetigenModal(t)
+    }
   }
 
   async function handleDelete(id: string) {
@@ -94,17 +115,52 @@ export function TermineContent({ termine: initialTermine, kunden, fahrzeuge, heb
         </Button>
       </div>
 
-      {/* Website integration hint */}
-      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start gap-3">
-        <Globe className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-        <div>
-          <p className="font-medium text-blue-800 text-sm">Online-Terminbuchung verbinden</p>
-          <p className="text-sm text-blue-600 mt-0.5">
-            Sobald Sie den Admin-Zugang Ihrer Website mitteilen, können Online-Buchungen automatisch hier erscheinen.
-            Bis dahin können Sie Termine manuell anlegen.
-          </p>
+      {/* Offene Online-Buchungen — Attention-Banner */}
+      {offeneOnlineBuchungen.length > 0 && (
+        <div className="bg-blue-50 border border-blue-300 rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Globe className="w-5 h-5 text-blue-600" />
+            <span className="font-semibold text-blue-800 text-sm">
+              {offeneOnlineBuchungen.length} neue Online-Buchung{offeneOnlineBuchungen.length > 1 ? 'en' : ''} — Bestätigung ausstehend
+            </span>
+          </div>
+          <div className="space-y-2">
+            {offeneOnlineBuchungen.map(t => {
+              const info = parseBeschreibung(t.beschreibung ?? '')
+              return (
+                <div key={t.id} className="bg-white rounded-lg border border-blue-200 p-3 flex flex-col sm:flex-row sm:items-center gap-3">
+                  <div className="flex-1">
+                    <p className="font-semibold text-gray-900 text-sm">{t.titel}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {formatDate(t.datum)}{t.uhrzeit ? ` · ${t.uhrzeit.slice(0,5)} Uhr` : ''}
+                    </p>
+                    {info['Telefon'] && (
+                      <p className="text-xs text-gray-600 mt-0.5">📞 {info['Telefon']}</p>
+                    )}
+                    {info['E-Mail'] && (
+                      <p className="text-xs text-gray-600">✉️ {info['E-Mail']}</p>
+                    )}
+                  </div>
+                  <div className="flex gap-2 flex-shrink-0">
+                    <button
+                      onClick={() => handleStatus(t.id, 'bestaetigt', t)}
+                      className="flex items-center gap-1.5 px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold rounded-lg transition-colors"
+                    >
+                      <CheckCircle className="w-3.5 h-3.5" /> Bestätigen
+                    </button>
+                    <button
+                      onClick={() => handleStatus(t.id, 'abgesagt', t)}
+                      className="flex items-center gap-1.5 px-3 py-2 border border-red-200 text-red-600 hover:bg-red-50 text-xs font-medium rounded-lg transition-colors"
+                    >
+                      <X className="w-3.5 h-3.5" /> Ablehnen
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Add form */}
       {showForm && (
@@ -214,7 +270,7 @@ export function TermineContent({ termine: initialTermine, kunden, fahrzeuge, heb
         <div>
           <h2 className="text-sm font-semibold text-gray-800 uppercase tracking-wide mb-3">Anstehend</h2>
           <div className="space-y-2">
-            {upcoming.map(t => <TerminCard key={t.id} termin={t} onStatus={handleStatus} onDelete={handleDelete} />)}
+            {upcoming.map(t => <TerminCard key={t.id} termin={t} onStatus={(id, s) => handleStatus(id, s, t)} onDelete={handleDelete} />)}
           </div>
         </div>
       )}
@@ -224,7 +280,7 @@ export function TermineContent({ termine: initialTermine, kunden, fahrzeuge, heb
         <div>
           <h2 className="text-sm font-semibold text-gray-800 uppercase tracking-wide mb-3">Vergangen</h2>
           <div className="space-y-2 opacity-70">
-            {past.slice(0, 10).map(t => <TerminCard key={t.id} termin={t} onStatus={handleStatus} onDelete={handleDelete} />)}
+            {past.slice(0, 10).map(t => <TerminCard key={t.id} termin={t} onStatus={(id, s) => handleStatus(id, s, t)} onDelete={handleDelete} />)}
           </div>
         </div>
       )}
@@ -235,6 +291,95 @@ export function TermineContent({ termine: initialTermine, kunden, fahrzeuge, heb
           <p className="text-gray-800">Keine Termine vorhanden</p>
         </CardContent></Card>
       )}
+
+      {/* Bestätigungs-Modal */}
+      {bestaetigenModal && (
+        <BestaetigenModal
+          termin={bestaetigenModal}
+          onClose={() => setBestaetigenModal(null)}
+        />
+      )}
+    </div>
+  )
+}
+
+function BestaetigenModal({ termin, onClose }: { termin: any; onClose: () => void }) {
+  const info = parseBeschreibung(termin.beschreibung ?? '')
+  const kundenName = info['Kunde'] ?? termin.titel.split(' – ')[1] ?? ''
+  const telefon = info['Telefon'] ?? ''
+  const email = info['E-Mail'] ?? ''
+  const datum = formatDate(termin.datum)
+  const uhrzeit = termin.uhrzeit ? termin.uhrzeit.slice(0, 5) + ' Uhr' : ''
+  const leistung = termin.titel.split(' – ')[0] ?? termin.titel
+
+  const waText = encodeURIComponent(
+    `Hallo${kundenName ? ' ' + kundenName.split(' ')[0] : ''},\n\nIhr Termin bei Helios Automobile GmbH ist bestätigt ✅\n\n📅 ${datum}${uhrzeit ? ' · ' + uhrzeit : ''}\n🔧 ${leistung}\n\nBei Fragen erreichen Sie uns unter 05351 / 59913-14.\n\nBis bald!\nIhr Helios-Team`
+  )
+  const waLink = telefon
+    ? `https://wa.me/${telefon.replace(/[\s\-+]/g, '').replace(/^0/, '49')}?text=${waText}`
+    : null
+
+  const mailSubject = encodeURIComponent('Ihr Termin ist bestätigt – Helios Automobile GmbH')
+  const mailBody = encodeURIComponent(
+    `Sehr geehrte/r ${kundenName},\n\nIhr Termin bei uns ist bestätigt:\n\n📅 ${datum}${uhrzeit ? ' · ' + uhrzeit : ''}\n🔧 ${leistung}\n\nAdresse: Emmastraße 23, 38350 Helmstedt\n\nBei Fragen: 05351 / 59913-14 oder info@heliosautomobile.de\n\nMit freundlichen Grüßen\nIhr Helios Automobile GmbH Team`
+  )
+  const mailLink = email ? `mailto:${email}?subject=${mailSubject}&body=${mailBody}` : null
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+              <CheckCircle className="w-5 h-5 text-green-600" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-gray-900">Termin bestätigt!</h3>
+              <p className="text-sm text-gray-500">Kunden jetzt benachrichtigen?</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="bg-gray-50 rounded-xl p-3 text-sm space-y-1">
+          {kundenName && <p className="font-medium text-gray-800">{kundenName}</p>}
+          <p className="text-gray-600">{datum}{uhrzeit ? ' · ' + uhrzeit : ''}</p>
+          <p className="text-gray-600">{leistung}</p>
+          {telefon && <p className="text-gray-500">📞 {telefon}</p>}
+          {email && <p className="text-gray-500">✉️ {email}</p>}
+        </div>
+
+        <div className="space-y-2">
+          {waLink ? (
+            <a href={waLink} target="_blank" rel="noopener noreferrer" onClick={onClose}
+              className="flex items-center justify-center gap-2 w-full py-3 bg-green-500 hover:bg-green-600 text-white rounded-xl text-sm font-semibold transition-colors">
+              <MessageCircle className="w-4 h-4" /> Per WhatsApp bestätigen
+            </a>
+          ) : (
+            <div className="flex items-center justify-center gap-2 w-full py-3 bg-gray-100 text-gray-400 rounded-xl text-sm cursor-not-allowed">
+              <MessageCircle className="w-4 h-4" /> WhatsApp (keine Telefonnummer)
+            </div>
+          )}
+
+          {mailLink ? (
+            <a href={mailLink} onClick={onClose}
+              className="flex items-center justify-center gap-2 w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold transition-colors">
+              <Mail className="w-4 h-4" /> Per E-Mail bestätigen
+            </a>
+          ) : (
+            <div className="flex items-center justify-center gap-2 w-full py-3 bg-gray-100 text-gray-400 rounded-xl text-sm cursor-not-allowed">
+              <Mail className="w-4 h-4" /> E-Mail (keine Adresse hinterlegt)
+            </div>
+          )}
+        </div>
+
+        <button onClick={onClose}
+          className="w-full py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 transition-colors">
+          Später benachrichtigen
+        </button>
+      </div>
     </div>
   )
 }
@@ -246,9 +391,11 @@ function TerminCard({ termin, onStatus, onDelete }: {
   const cfg = TYP_CONFIG[termin.typ as TerminTyp] ?? TYP_CONFIG.werkstatt
   const statusCfg = STATUS_CONFIG[termin.status as TerminStatus] ?? STATUS_CONFIG.offen
   const isPast = termin.datum < today
+  const isOnline = termin.quelle === 'website'
 
   return (
-    <div className={cn('bg-white border rounded-xl overflow-hidden transition-shadow hover:shadow-sm', isPast ? 'border-gray-100' : 'border-gray-200')}>
+    <div className={cn('bg-white border rounded-xl overflow-hidden transition-shadow hover:shadow-sm',
+      isPast ? 'border-gray-100' : isOnline ? 'border-blue-200' : 'border-gray-200')}>
       <div className="flex items-center gap-3 p-3 cursor-pointer" onClick={() => setOpen(v => !v)}>
         <div className={cn('w-12 h-12 rounded-xl flex flex-col items-center justify-center flex-shrink-0', cfg.bg)}>
           <span className={cn('text-sm font-bold', cfg.color)}>
@@ -287,6 +434,9 @@ function TerminCard({ termin, onStatus, onDelete }: {
 
       {open && (
         <div className="border-t border-gray-100 p-3 bg-gray-50/50 space-y-3">
+          {termin.beschreibung && (
+            <p className="text-sm text-gray-600 whitespace-pre-line">{termin.beschreibung}</p>
+          )}
           {termin.notizen && <p className="text-sm text-gray-600">{termin.notizen}</p>}
           <div className="flex flex-wrap gap-2">
             {(['offen', 'bestaetigt', 'erledigt', 'abgesagt'] as TerminStatus[]).map(s => (
@@ -305,4 +455,3 @@ function TerminCard({ termin, onStatus, onDelete }: {
     </div>
   )
 }
-
