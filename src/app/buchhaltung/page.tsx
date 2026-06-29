@@ -26,7 +26,7 @@ export default async function BuchhaltungPage() {
       .order('datum', { ascending: false }),
     supabase
       .from('kunden_rechnungen')
-      .select('*, kunde:kunden(vorname, nachname), fahrzeug:fahrzeuge(kennzeichen, marke, modell)')
+      .select('*, kunde:kunden(vorname, nachname, telefon), fahrzeug:fahrzeuge(kennzeichen, marke, modell)')
       .order('erstellt_am', { ascending: false }),
     supabase
       .from('werkstatt_einstellungen')

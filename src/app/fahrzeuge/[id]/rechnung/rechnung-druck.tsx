@@ -282,7 +282,19 @@ export function RechnungDruck({ auftrag, firma }: { auftrag: any; firma: Record<
       `}</style>
 
       <button className="no-print back-btn" onClick={() => history.back()}>← Zurück</button>
-      <button className="no-print print-btn" onClick={() => window.print()} style={{right: '160px'}}>Drucken / PDF</button>
+      <button className="no-print print-btn" onClick={() => window.print()} style={{right: '280px'}}>🖨 Drucken / PDF</button>
+      <button
+        className="no-print"
+        onClick={() => {
+          const tel = kd.telefon?.replace(/\D/g, '') ?? ''
+          const msg = encodeURIComponent(
+            `Guten Tag ${kd.vorname ?? ''} ${kd.nachname ?? ''},\n\nIhre Rechnung Nr. ${rechnungsNr} liegt vor.\nGesamtbetrag: ${fmtEuro(gesamtBrutto)}\nZahlungsziel: ${zahlungsziel.toLocaleDateString('de-DE')}\n\nBitte Rechnungsnummer ${rechnungsNr} bei Überweisung angeben.${firma.firma_telefon ? `\n\nBei Fragen: ${firma.firma_telefon}` : ''}`
+          )
+          const url = tel ? `https://wa.me/${tel}?text=${msg}` : `https://wa.me/?text=${msg}`
+          window.open(url, '_blank')
+        }}
+        style={{position:'fixed',top:'16px',right:'150px',background:'#16a34a',color:'white',border:'none',borderRadius:'6px',padding:'8px 16px',fontSize:'13px',fontWeight:600,cursor:'pointer',zIndex:999}}
+      >📱 WhatsApp</button>
       <button className="no-print" onClick={() => setEmailModalOffen(true)} style={{position:'fixed',top:'16px',right:'16px',background:'#2563eb',color:'white',border:'none',borderRadius:'6px',padding:'8px 16px',fontSize:'13px',fontWeight:600,cursor:'pointer',zIndex:999}}>✉ Per E-Mail</button>
       {emailModalOffen && <EmailModal auftrag={auftrag} firma={firma} onClose={() => setEmailModalOffen(false)} />}
 

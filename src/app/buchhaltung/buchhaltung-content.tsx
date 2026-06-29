@@ -3,7 +3,7 @@ import { useState, useMemo } from 'react'
 import {
   TrendingUp, TrendingDown, Euro, Download,
   ChevronDown, ChevronUp, ArrowUpRight, ArrowDownRight, Eye, EyeOff,
-  Receipt, CheckCircle, Clock, AlertTriangle, Mail, Link as LinkIcon
+  Receipt, CheckCircle, Clock, AlertTriangle, Mail, Link as LinkIcon, MessageCircle
 } from 'lucide-react'
 import Link from 'next/link'
 import { Card, CardContent } from '@/components/ui/card'
@@ -52,7 +52,7 @@ type KundenRechnung = {
   bezahlt_am: string | null
   faellig_am: string | null
   erstellt_am: string
-  kunde: { vorname: string | null; nachname: string | null } | null
+  kunde: { vorname: string | null; nachname: string | null; telefon: string | null } | null
   fahrzeug: { kennzeichen: string; marke: string | null; modell: string | null } | null
 }
 
@@ -240,6 +240,25 @@ export function BuchhaltungContent({ auftraege, ausgaben, kundenRechnungen: init
             </div>
           </div>
 
+          {/* Zahlungserinnerungen Banner */}
+          {ueberfaelligeRechnungen.length > 0 && (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-red-800">
+                  {ueberfaelligeRechnungen.length} überfällige {ueberfaelligeRechnungen.length === 1 ? 'Rechnung' : 'Rechnungen'} · {fmtEuro(ueberfaelligeRechnungen.reduce((s, r) => s + r.betrag_brutto, 0))}
+                </p>
+                <p className="text-xs text-red-600 mt-0.5">Klicke auf <MessageCircle className="w-3 h-3 inline" /> neben einer Rechnung um eine WhatsApp-Erinnerung zu senden.</p>
+              </div>
+              <button
+                onClick={() => setRechnungFilter('ueberfaellig')}
+                className="flex-shrink-0 text-xs font-semibold text-red-700 border border-red-300 bg-white px-3 py-1.5 rounded-lg hover:bg-red-50 transition-colors"
+              >
+                Anzeigen
+              </button>
+            </div>
+          )}
+
           {/* Filter */}
           <div className="flex gap-2 flex-wrap">
             {([
@@ -335,6 +354,22 @@ export function BuchhaltungContent({ auftraege, ausgaben, kundenRechnungen: init
                           ? <><CheckCircle className="w-3.5 h-3.5" /> Bezahlt</>
                           : <><Clock className="w-3.5 h-3.5" /> Als bezahlt</>}
                       </button>
+                      {!bezahlt && r.kunde?.telefon && (
+                        <a
+                          href={`https://wa.me/${r.kunde.telefon.replace(/\D/g, '')}?text=${encodeURIComponent(`Guten Tag ${r.kunde.vorname ?? ''} ${r.kunde.nachname ?? ''},\n\nwir möchten Sie freundlich an die offene Rechnung Nr. ${r.rechnungs_nr} über ${fmtEuro(r.betrag_brutto)} erinnern.${r.faellig_am ? `\nZahlungsziel war der ${new Date(r.faellig_am).toLocaleDateString('de-DE')}.` : ''}\n\nVielen Dank!`)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="Zahlungserinnerung per WhatsApp"
+                          className={cn(
+                            'p-1.5 rounded-lg border transition-colors',
+                            ueberfaellig
+                              ? 'border-red-200 bg-red-50 text-red-600 hover:bg-red-100'
+                              : 'border-slate-200 text-slate-400 hover:text-green-600 hover:border-green-200'
+                          )}
+                        >
+                          <MessageCircle className="w-3.5 h-3.5" />
+                        </a>
+                      )}
                     </div>
                   </div>
                 )

@@ -934,6 +934,8 @@ function MonthView({ currentDate, getAuftraegeForDate, getTermineForDate }: {
 }
 
 // ── Week View ───────────────────────────────────────────────────────────────
+const HOURS = Array.from({ length: 11 }, (_, i) => i + 8) // 08 – 18
+
 function WeekView({ currentDate, getAuftraegeForDate, getTermineForDate }: {
   currentDate: Date; getAuftraegeForDate: (d: Date) => any[]; getTermineForDate: (d: Date) => any[]
 }) {
@@ -943,43 +945,96 @@ function WeekView({ currentDate, getAuftraegeForDate, getTermineForDate }: {
   const WEEKDAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
 
   return (
-    <div className="grid grid-cols-7 gap-2">
-      {days.map((day, i) => {
-        const dayAuftraege = getAuftraegeForDate(day)
-        const dayTermine   = getTermineForDate(day)
-        const dateStr = day.toISOString().split('T')[0]
-        const isToday = dateStr === today
-        return (
-          <div key={dateStr} className={cn('bg-white border rounded-xl p-2 min-h-[120px]', isToday ? 'border-orange-400' : 'border-gray-200')}>
-            <p className={cn('text-xs font-semibold mb-1.5', isToday ? 'text-orange-600' : 'text-gray-700')}>
-              {WEEKDAYS[i]} {day.getDate()}
-            </p>
-            {dayTermine.map(t => {
-              const cfg = getTerminCfg(t.typ)
+    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+      {/* Day headers */}
+      <div className="grid border-b border-gray-100" style={{gridTemplateColumns: '48px repeat(7, 1fr)'}}>
+        <div className="border-r border-gray-100" />
+        {days.map((day, i) => {
+          const dateStr = day.toISOString().split('T')[0]
+          const isToday = dateStr === today
+          const allItems = [...getTermineForDate(day), ...getAuftraegeForDate(day)]
+          return (
+            <div key={dateStr} className={cn('py-2 px-1 text-center border-r border-gray-100 last:border-r-0', isToday ? 'bg-orange-50' : '')}>
+              <p className={cn('text-xs font-semibold', isToday ? 'text-orange-600' : 'text-gray-500')}>{WEEKDAYS[i]}</p>
+              <p className={cn('text-sm font-bold', isToday ? 'text-orange-600' : 'text-gray-800')}>{day.getDate()}</p>
+              {allItems.length > 0 && <div className={cn('w-1.5 h-1.5 rounded-full mx-auto mt-0.5', isToday ? 'bg-orange-400' : 'bg-blue-400')} />}
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Ganztägig row */}
+      {days.some(d => {
+        const ts = getTermineForDate(d).filter(t => !t.uhrzeit)
+        const as = getAuftraegeForDate(d)
+        return ts.length > 0 || as.length > 0
+      }) && (
+        <div className="grid border-b border-gray-100" style={{gridTemplateColumns: '48px repeat(7, 1fr)'}}>
+          <div className="border-r border-gray-100 flex items-center justify-center py-1">
+            <span className="text-[10px] text-gray-400 writing-mode-vertical" style={{writingMode:'vertical-lr',transform:'rotate(180deg)'}}>Ganztag</span>
+          </div>
+          {days.map(day => {
+            const dateStr = day.toISOString().split('T')[0]
+            const isToday = dateStr === today
+            const termineGanztag = getTermineForDate(day).filter(t => !t.uhrzeit)
+            const auftraege = getAuftraegeForDate(day)
+            return (
+              <div key={dateStr} className={cn('border-r border-gray-100 last:border-r-0 p-1 min-h-[36px]', isToday ? 'bg-orange-50/50' : '')}>
+                {termineGanztag.map(t => {
+                  const cfg = getTerminCfg(t.typ)
+                  return (
+                    <div key={t.id} className={cn('text-[10px] px-1.5 py-0.5 rounded font-medium truncate mb-0.5 border', cfg.color)}>{t.titel}</div>
+                  )
+                })}
+                {auftraege.map(a => {
+                  const overdue = a.geplante_fertigstellung < today
+                  return (
+                    <Link key={a.id} href={`/fahrzeuge/${a.id}`}>
+                      <div className={cn('text-[10px] px-1.5 py-0.5 rounded font-medium truncate mb-0.5 border',
+                        overdue ? 'bg-red-100 text-red-700 border-red-300' : 'bg-orange-100 text-orange-700 border-orange-300')}>
+                        {a.fahrzeug?.kennzeichen}{overdue ? ' ⚠' : ''}
+                      </div>
+                    </Link>
+                  )
+                })}
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Time grid */}
+      <div className="overflow-y-auto" style={{maxHeight: '480px'}}>
+        {HOURS.map(hour => (
+          <div key={hour} className="grid border-b border-gray-50 last:border-b-0" style={{gridTemplateColumns: '48px repeat(7, 1fr)', minHeight: '52px'}}>
+            <div className="border-r border-gray-100 flex items-start justify-end pr-2 pt-1 flex-shrink-0">
+              <span className="text-[10px] text-gray-400 font-mono">{String(hour).padStart(2,'0')}:00</span>
+            </div>
+            {days.map(day => {
+              const dateStr = day.toISOString().split('T')[0]
+              const isToday = dateStr === today
+              const termineAtHour = getTermineForDate(day).filter(t => {
+                if (!t.uhrzeit) return false
+                const h = parseInt(t.uhrzeit.slice(0, 2))
+                return h === hour
+              })
               return (
-                <div key={t.id} className={cn('text-xs px-2 py-1 rounded-lg mb-1 font-medium truncate border', cfg.color)}>
-                  {t.uhrzeit ? t.uhrzeit.slice(0,5) + ' ' : ''}{t.titel}
+                <div key={dateStr} className={cn('border-r border-gray-50 last:border-r-0 p-0.5', isToday ? 'bg-orange-50/30' : 'hover:bg-gray-50/50')}>
+                  {termineAtHour.map(t => {
+                    const cfg = getTerminCfg(t.typ)
+                    return (
+                      <div key={t.id} className={cn('text-[10px] px-1.5 py-1 rounded font-medium truncate border mb-0.5', cfg.color)}>
+                        <span className="font-bold">{t.uhrzeit.slice(0,5)}</span> {t.titel}
+                        {t.dauer_minuten && <span className="opacity-60"> {t.dauer_minuten}'</span>}
+                      </div>
+                    )
+                  })}
                 </div>
               )
             })}
-            {dayAuftraege.map(a => {
-              const overdue = a.geplante_fertigstellung < today
-              return (
-                <Link key={a.id} href={`/fahrzeuge/${a.id}`}>
-                  <div className={cn('text-xs px-2 py-1 rounded-lg mb-1 font-medium truncate border',
-                    overdue ? 'bg-red-100 text-red-700 border-red-300' : FAHRZEUG_STATUS_COLOR[a.status as FahrzeugStatus])}>
-                    {a.fahrzeug?.marke} {a.fahrzeug?.modell}
-                    {overdue && ' ⚠'}
-                  </div>
-                </Link>
-              )
-            })}
-            {dayAuftraege.length === 0 && dayTermine.length === 0 && (
-              <p className="text-xs text-gray-200 text-center mt-4">—</p>
-            )}
           </div>
-        )
-      })}
+        ))}
+      </div>
     </div>
   )
 }
@@ -992,65 +1047,87 @@ function DayView({ currentDate, getAuftraegeForDate, getTermineForDate }: {
   const dayTermine   = getTermineForDate(currentDate)
   const today        = new Date().toISOString().split('T')[0]
 
-  if (dayAuftraege.length === 0 && dayTermine.length === 0) {
-    return (
-      <Card>
-        <CardContent className="py-12 text-center">
-          <Calendar className="w-10 h-10 mx-auto mb-2 text-gray-300" />
-          <p className="text-gray-500">Keine Einträge an diesem Tag</p>
-        </CardContent>
-      </Card>
-    )
-  }
+  const termineGanztag = dayTermine.filter(t => !t.uhrzeit)
+  const termineZeit    = dayTermine.filter(t => !!t.uhrzeit)
 
   return (
-    <div className="space-y-3">
-      {dayTermine.map(t => {
-        const cfg = getTerminCfg(t.typ)
-        const Icon = cfg.icon
-        return (
-          <Card key={t.id} className={cn('border', cfg.color.includes('yellow') ? 'border-yellow-200' : cfg.color.includes('purple') ? 'border-purple-200' : 'border-blue-200')}>
-            <CardContent className="p-4 flex items-center gap-4">
-              <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0', cfg.bg)}>
-                <Icon className="w-5 h-5 text-gray-600" />
+    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+      {/* Ganztägige Einträge */}
+      {(termineGanztag.length > 0 || dayAuftraege.length > 0) && (
+        <div className="border-b border-gray-100 p-3 space-y-2">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Ganztägig / Fertigstellungen</p>
+          {termineGanztag.map(t => {
+            const cfg = getTerminCfg(t.typ)
+            const Icon = cfg.icon
+            return (
+              <div key={t.id} className={cn('flex items-center gap-3 px-3 py-2.5 rounded-xl border', cfg.color)}>
+                <Icon className="w-4 h-4 flex-shrink-0" />
+                <span className="text-sm font-medium flex-1 min-w-0 truncate">{t.titel}</span>
+                {t.dauer_minuten && <span className="text-xs opacity-60">{t.dauer_minuten} Min.</span>}
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-gray-900">{t.titel}</p>
-                <p className="text-sm text-gray-500">
-                  {t.uhrzeit ? `${t.uhrzeit.slice(0,5)} Uhr` : 'Ganztägig'}
-                  {t.dauer_minuten ? ` · ${t.dauer_minuten} Min.` : ''}
-                </p>
-              </div>
-              <span className={cn('text-xs px-2 py-0.5 rounded-full border font-medium flex-shrink-0', cfg.color)}>{cfg.label}</span>
-            </CardContent>
-          </Card>
-        )
-      })}
-      {dayAuftraege.map(a => {
-        const overdue = a.geplante_fertigstellung < today
-        return (
-          <Link key={a.id} href={`/fahrzeuge/${a.id}`}>
-            <Card className={cn('hover:border-orange-300 transition-colors', overdue && 'border-red-200')}>
-              <CardContent className="p-4 flex items-center gap-4">
-                <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0', overdue ? 'bg-red-100' : 'bg-orange-100')}>
-                  <Car className={cn('w-5 h-5', overdue ? 'text-red-500' : 'text-orange-500')} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-gray-900">{a.fahrzeug?.marke} {a.fahrzeug?.modell}</p>
-                  <p className="text-sm text-gray-500">{a.fahrzeug?.kennzeichen}{a.kunde ? ` · ${a.kunde.vorname} ${a.kunde.nachname}` : ''}</p>
-                  {a.arbeiten && <p className="text-xs text-gray-400 mt-1">{a.arbeiten}</p>}
-                </div>
-                <div className="text-right flex-shrink-0">
-                  <span className={cn('inline-flex px-3 py-1 rounded-full text-xs border font-medium', FAHRZEUG_STATUS_COLOR[a.status as FahrzeugStatus])}>
+            )
+          })}
+          {dayAuftraege.map(a => {
+            const overdue = a.geplante_fertigstellung < today
+            return (
+              <Link key={a.id} href={`/fahrzeuge/${a.id}`}>
+                <div className={cn('flex items-center gap-3 px-3 py-2.5 rounded-xl border', overdue ? 'bg-red-100 border-red-300 text-red-700' : 'bg-orange-100 border-orange-300 text-orange-700')}>
+                  <Car className="w-4 h-4 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <span className="text-sm font-medium">{a.fahrzeug?.marke} {a.fahrzeug?.modell} · {a.fahrzeug?.kennzeichen}</span>
+                    {a.kunde && <span className="text-xs opacity-70 ml-2">{a.kunde.vorname} {a.kunde.nachname}</span>}
+                  </div>
+                  <span className={cn('text-xs px-2 py-0.5 rounded-full border font-medium flex-shrink-0', FAHRZEUG_STATUS_COLOR[a.status as FahrzeugStatus])}>
                     {FAHRZEUG_STATUS_LABEL[a.status as FahrzeugStatus]}
                   </span>
-                  {overdue && <p className="text-xs text-red-600 font-medium mt-1 flex items-center gap-1 justify-end"><AlertTriangle className="w-3 h-3" />Überfällig</p>}
+                  {overdue && <AlertTriangle className="w-4 h-4 flex-shrink-0" />}
                 </div>
-              </CardContent>
-            </Card>
-          </Link>
-        )
-      })}
+              </Link>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Zeit-Einträge */}
+      {termineZeit.length === 0 && dayAuftraege.length === 0 && termineGanztag.length === 0 ? (
+        <div className="py-12 text-center">
+          <Calendar className="w-10 h-10 mx-auto mb-2 text-gray-200" />
+          <p className="text-gray-400 text-sm">Keine Einträge an diesem Tag</p>
+        </div>
+      ) : (
+        <div className="overflow-y-auto" style={{maxHeight: '480px'}}>
+          {HOURS.map(hour => {
+            const events = termineZeit.filter(t => parseInt(t.uhrzeit.slice(0, 2)) === hour)
+            return (
+              <div key={hour} className={cn('flex border-b border-gray-50 last:border-b-0', events.length > 0 ? 'bg-blue-50/30' : '')} style={{minHeight: '52px'}}>
+                <div className="w-16 flex-shrink-0 flex items-start justify-end pr-3 pt-2">
+                  <span className="text-xs text-gray-400 font-mono">{String(hour).padStart(2,'0')}:00</span>
+                </div>
+                <div className="flex-1 border-l border-gray-100 p-1 space-y-1">
+                  {events.map(t => {
+                    const cfg = getTerminCfg(t.typ)
+                    const Icon = cfg.icon
+                    return (
+                      <div key={t.id} className={cn('flex items-center gap-2 px-3 py-2 rounded-xl border', cfg.color)}>
+                        <Icon className="w-4 h-4 flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold truncate">{t.titel}</p>
+                          <p className="text-xs opacity-70">
+                            {t.uhrzeit.slice(0,5)} Uhr
+                            {t.dauer_minuten ? ` · ${t.dauer_minuten} Min.` : ''}
+                            {t.fahrzeug?.kennzeichen ? ` · ${t.fahrzeug.kennzeichen}` : ''}
+                          </p>
+                        </div>
+                        <span className={cn('text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0', cfg.color)}>{cfg.label}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
