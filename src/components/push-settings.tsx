@@ -3,7 +3,7 @@ import { Bell, BellOff, BellRing, Loader2 } from 'lucide-react'
 import { usePush } from '@/hooks/use-push'
 
 export function PushSettings() {
-  const { status, subscribe, unsubscribe } = usePush()
+  const { status, error, subscribe, unsubscribe } = usePush()
 
   if (status === 'unsupported') {
     return (
@@ -47,6 +47,9 @@ export function PushSettings() {
         </div>
       </div>
 
+      {error && (
+        <p className="text-xs text-red-500 mt-1 col-span-2">{error}</p>
+      )}
       {status === 'loading' ? (
         <Loader2 className="w-5 h-5 text-gray-400 animate-spin" />
       ) : status === 'subscribed' ? (

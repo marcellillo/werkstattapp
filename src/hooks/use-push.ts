@@ -10,6 +10,7 @@ function urlBase64ToUint8Array(base64String: string) {
 
 export function usePush() {
   const [status, setStatus] = useState<'unsupported' | 'denied' | 'subscribed' | 'unsubscribed' | 'loading'>('loading')
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
@@ -54,8 +55,9 @@ export function usePush() {
         body: JSON.stringify(sub),
       })
       setStatus('subscribed')
-    } catch (e) {
+    } catch (e: any) {
       console.error('Push subscribe error:', e)
+      setError(e?.message ?? String(e))
       setStatus('unsubscribed')
     }
   }
@@ -79,5 +81,5 @@ export function usePush() {
     }
   }
 
-  return { status, subscribe, unsubscribe }
+  return { status, error, subscribe, unsubscribe }
 }
