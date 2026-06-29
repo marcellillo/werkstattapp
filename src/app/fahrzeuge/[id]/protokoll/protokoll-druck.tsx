@@ -39,7 +39,7 @@ export function ProtokolllDruck({ auftrag, rechnungen }: { auftrag: any; rechnun
           .no-print { display: none !important; }
           body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         }
-        .page { font-family: Arial, sans-serif; font-size: 11px; color: #111; max-width: 794px; margin: 0 auto; padding: 20px; }
+        .page { font-family: Arial, sans-serif; font-size: 11px; color: #111; max-width: 794px; margin: 0 auto; padding: 20px; padding-top: calc(max(10px, env(safe-area-inset-top)) + 58px); }
         .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 18px; border-bottom: 2px solid #ea580c; padding-bottom: 12px; }
         .logo-block h1 { font-size: 20px; font-weight: 700; color: #ea580c; margin: 0 0 2px; }
         .logo-block p { font-size: 10px; color: #666; margin: 0; }
@@ -71,14 +71,16 @@ export function ProtokolllDruck({ auftrag, rechnungen }: { auftrag: any; rechnun
         .sig-space { height: 40px; }
         .footer { margin-top: 16px; border-top: 1px solid #e2e8f0; padding-top: 8px; font-size: 9px; color: #94a3b8; text-align: center; }
         .highlight-box { background: #fff7ed; border: 1px solid #fed7aa; border-radius: 4px; padding: 6px 10px; display: flex; align-items: center; justify-content: space-between; }
-        .print-btn { position: fixed; top: 16px; right: 16px; background: #ea580c; color: white; border: none; border-radius: 6px; padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer; z-index: 999; }
-        .print-btn:hover { background: #c2410c; }
-        .back-btn { position: fixed; top: 16px; left: 16px; background: white; color: #334155; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer; z-index: 999; }
-        .back-btn:hover { background: #f8fafc; }
+        .action-bar { position: fixed; top: 0; left: 0; right: 0; z-index: 999; display: flex; align-items: center; gap: 8px; padding: 10px 16px; padding-top: max(10px, env(safe-area-inset-top)); background: rgba(255,255,255,0.95); backdrop-filter: blur(8px); border-bottom: 1px solid #e2e8f0; }
+        .action-bar button { padding: 7px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; }
+        .btn-back { background: white; color: #334155; border: 1px solid #e2e8f0 !important; }
+        .btn-print { background: #ea580c; color: white; margin-left: auto; }
       `}</style>
 
-      <button className="no-print back-btn" onClick={() => history.back()}>← Zurück</button>
-      <button className="no-print print-btn" onClick={() => window.print()}>Drucken</button>
+      <div className="no-print action-bar">
+        <button className="btn-back" onClick={() => history.back()}>← Zurück</button>
+        <button className="btn-print" onClick={() => window.print()}>🖨 Drucken</button>
+      </div>
 
       <div className="page">
         {/* Header */}
@@ -163,7 +165,6 @@ export function ProtokolllDruck({ auftrag, rechnungen }: { auftrag: any; rechnun
                   <tr>
                     <th>Bezeichnung</th>
                     <th>Teilenummer</th>
-                    <th>Lieferant</th>
                     <th className="ta-right">Menge</th>
                     <th className="ta-right">Einzelpreis</th>
                     <th className="ta-right">Gesamt</th>
@@ -175,7 +176,6 @@ export function ProtokolllDruck({ auftrag, rechnungen }: { auftrag: any; rechnun
                     <tr key={t.id}>
                       <td>{t.bezeichnung}</td>
                       <td>{t.teilenummer ?? '—'}</td>
-                      <td>{t.lieferant ?? '—'}</td>
                       <td className="ta-right">{t.menge}</td>
                       <td className="ta-right">{fmtEuro(t.einzelpreis)}</td>
                       <td className="ta-right">{fmtEuro((t.einzelpreis ?? 0) * (t.menge ?? 1))}</td>
@@ -184,7 +184,7 @@ export function ProtokolllDruck({ auftrag, rechnungen }: { auftrag: any; rechnun
                   ))}
                   {teile.length > 0 && (
                     <tr className="tr-total">
-                      <td colSpan={5} className="ta-right">Teile gesamt:</td>
+                      <td colSpan={4} className="ta-right">Teile gesamt:</td>
                       <td className="ta-right">{fmtEuro(teileGesamt)}</td>
                       <td></td>
                     </tr>

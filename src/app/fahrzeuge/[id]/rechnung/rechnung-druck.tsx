@@ -277,25 +277,31 @@ export function RechnungDruck({ auftrag, firma }: { auftrag: any; firma: Record<
         /* Fußzeile */
         .footer { margin-top: 14px; border-top: 1px solid #e2e8f0; padding-top: 8px; font-size: 8.5px; color: #94a3b8; text-align: center; line-height: 1.6; }
 
-        .print-btn { position: fixed; top: max(16px, env(safe-area-inset-top, 16px)); right: 16px; background: #ea580c; color: white; border: none; border-radius: 6px; padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer; z-index: 999; }
-        .back-btn { position: fixed; top: max(16px, env(safe-area-inset-top, 16px)); left: 16px; background: white; color: #334155; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer; z-index: 999; }
+        .action-bar { position: fixed; top: 0; left: 0; right: 0; z-index: 999; display: flex; align-items: center; gap: 8px; padding: 10px 12px; padding-top: max(10px, env(safe-area-inset-top)); background: rgba(255,255,255,0.96); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border-bottom: 1px solid #e2e8f0; }
+        .action-bar button, .action-bar a { padding: 8px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; text-decoration: none; white-space: nowrap; }
+        .btn-back { background: #f1f5f9; color: #334155; }
+        .btn-print { background: #ea580c; color: white; }
+        .btn-wa { background: #16a34a; color: white; }
+        .btn-email { background: #2563eb; color: white; }
+        .page { padding-top: calc(max(10px, env(safe-area-inset-top)) + 60px); }
       `}</style>
 
-      <button className="no-print back-btn" onClick={() => history.back()}>← Zurück</button>
-      <button className="no-print print-btn" onClick={() => window.print()} style={{right: '280px'}}>🖨 Drucken / PDF</button>
-      <button
-        className="no-print"
-        onClick={() => {
-          const tel = kd.telefon?.replace(/\D/g, '') ?? ''
-          const msg = encodeURIComponent(
-            `Guten Tag ${kd.vorname ?? ''} ${kd.nachname ?? ''},\n\nIhre Rechnung Nr. ${rechnungsNr} liegt vor.\nGesamtbetrag: ${fmtEuro(gesamtBrutto)}\nZahlungsziel: ${zahlungsziel.toLocaleDateString('de-DE')}\n\nBitte Rechnungsnummer ${rechnungsNr} bei Überweisung angeben.${firma.firma_telefon ? `\n\nBei Fragen: ${firma.firma_telefon}` : ''}`
-          )
-          const url = tel ? `https://wa.me/${tel}?text=${msg}` : `https://wa.me/?text=${msg}`
-          window.open(url, '_blank')
-        }}
-        style={{position:'fixed',top:'max(16px, env(safe-area-inset-top, 16px))',right:'150px',background:'#16a34a',color:'white',border:'none',borderRadius:'6px',padding:'8px 16px',fontSize:'13px',fontWeight:600,cursor:'pointer',zIndex:999}}
-      >📱 WhatsApp</button>
-      <button className="no-print" onClick={() => setEmailModalOffen(true)} style={{position:'fixed',top:'max(16px, env(safe-area-inset-top, 16px))',right:'16px',background:'#2563eb',color:'white',border:'none',borderRadius:'6px',padding:'8px 16px',fontSize:'13px',fontWeight:600,cursor:'pointer',zIndex:999}}>✉ Per E-Mail</button>
+      <div className="no-print action-bar">
+        <button className="btn-back" onClick={() => history.back()}>← Zurück</button>
+        <button className="btn-print" onClick={() => window.print()}>🖨 PDF</button>
+        <button
+          className="btn-wa"
+          onClick={() => {
+            const tel = kd.telefon?.replace(/\D/g, '') ?? ''
+            const msg = encodeURIComponent(
+              `Guten Tag ${kd.vorname ?? ''} ${kd.nachname ?? ''},\n\nIhre Rechnung Nr. ${rechnungsNr} liegt vor.\nGesamtbetrag: ${fmtEuro(gesamtBrutto)}\nZahlungsziel: ${zahlungsziel.toLocaleDateString('de-DE')}\n\nBitte Rechnungsnummer ${rechnungsNr} bei Überweisung angeben.${firma.firma_telefon ? `\n\nBei Fragen: ${firma.firma_telefon}` : ''}`
+            )
+            const url = tel ? `https://wa.me/${tel}?text=${msg}` : `https://wa.me/?text=${msg}`
+            window.open(url, '_blank')
+          }}
+        >📱 WhatsApp</button>
+        <button className="btn-email" onClick={() => setEmailModalOffen(true)}>✉ E-Mail</button>
+      </div>
       {emailModalOffen && <EmailModal auftrag={auftrag} firma={firma} onClose={() => setEmailModalOffen(false)} />}
 
       <div className="page">
