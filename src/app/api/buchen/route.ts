@@ -1,5 +1,8 @@
+export const runtime = 'nodejs'
+
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+import webpush from 'web-push'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -58,6 +61,39 @@ export async function POST(req: NextRequest) {
   if (error) {
     console.error('Termin insert error:', error)
     return NextResponse.json({ error: 'Fehler beim Speichern' }, { status: 500, headers })
+  }
+
+  // Push-Benachrichtigung an alle abonnierten Geräte senden
+  try {
+    webpush.setVapidDetails(
+      process.env.VAPID_EMAIL!,
+      process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
+      process.env.VAPID_PRIVATE_KEY!,
+    )
+    const { data: subs } = await supabase.from('push_subscriptions').select('*')
+    if (subs?.length) {
+      const datumFormatted = new Date(datum + 'T00:00:00').toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
+      const payload = JSON.stringify({
+        title: '📅 Neue Online-Buchung',
+        body: `${vorname} ${nachname} · ${leistung} · ${datumFormatted}${uhrzeit ? ' ' + uhrzeit : ''}`,
+        url: '/termine',
+        tag: 'online-buchung',
+      })
+      await Promise.allSettled(
+        subs.map(sub =>
+          webpush.sendNotification(
+            { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+            payload,
+          ).catch(async (err: any) => {
+            if (err.statusCode === 410 || err.statusCode === 404) {
+              await supabase.from('push_subscriptions').delete().eq('endpoint', sub.endpoint)
+            }
+          })
+        )
+      )
+    }
+  } catch (e) {
+    console.error('Push error:', e)
   }
 
   return NextResponse.json({ success: true }, { headers })
