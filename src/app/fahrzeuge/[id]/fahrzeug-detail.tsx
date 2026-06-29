@@ -429,52 +429,30 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie 
             <ArrowLeft className="w-4 h-4" /> Zurück
           </Button>
         </Link>
-        <div className="flex items-center gap-2">
-          {auftrag.status === 'storniert' && (
-            <span className="flex items-center gap-1.5 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 px-3 py-1.5 rounded-lg">
-              <Ban className="w-3.5 h-3.5" /> Storniert
-            </span>
-          )}
-          {auftrag.status !== 'storniert' && (
-            <button
-              onClick={() => setStorniereBestaetigung(true)}
-              className="flex items-center gap-1.5 text-xs font-medium text-red-600 hover:text-red-700 hover:bg-red-50 border border-red-200 hover:border-red-300 px-3 py-1.5 rounded-lg transition-colors"
-            >
-              <Ban className="w-3.5 h-3.5" /> Stornieren
-            </button>
-          )}
-          <button
-            onClick={() => setLoeschenBestaetigung(true)}
-            className="flex items-center gap-1.5 text-xs font-medium text-red-700 hover:text-red-800 hover:bg-red-100 border border-red-300 hover:border-red-400 px-3 py-1.5 rounded-lg transition-colors"
-          >
-            <Trash2 className="w-3.5 h-3.5" /> Löschen
-          </button>
-          <Link href={`/fahrzeuge/${auftrag.id}/mappe`}>
-            <Button variant="outline" size="sm" className="gap-2 border-orange-200 text-orange-700 hover:border-orange-400 hover:bg-orange-50 font-semibold">
-              <FolderOpen className="w-4 h-4" /> Mappe
-            </Button>
-          </Link>
-          <Link href={`/fahrzeuge/${auftrag.id}/annahme`}>
-            <Button variant="outline" size="sm" className="gap-2 border-blue-200 text-blue-700 hover:border-blue-400 hover:bg-blue-50">
-              <ClipboardCheck className="w-4 h-4" /> Annahme
-            </Button>
-          </Link>
-          <Link href={`/fahrzeuge/${auftrag.id}/fotos`}>
-            <Button variant="outline" size="sm" className="gap-2 border-purple-200 text-purple-700 hover:border-purple-400 hover:bg-purple-50">
-              <Camera className="w-4 h-4" /> Fotos
-            </Button>
-          </Link>
-          <Link href={`/fahrzeuge/${auftrag.id}/protokoll`} target="_blank">
-            <Button variant="outline" size="sm" className="gap-2">
-              <Printer className="w-4 h-4" /> Protokoll
-            </Button>
-          </Link>
-          <Link href={`/fahrzeuge/${auftrag.id}/rechnung`} target="_blank">
-            <Button variant="outline" size="sm" className="gap-2 border-green-200 text-green-700 hover:border-green-400 hover:bg-green-50">
-              <Receipt className="w-4 h-4" /> Rechnung
-            </Button>
-          </Link>
-        </div>
+        {auftrag.status === 'storniert' && (
+          <span className="flex items-center gap-1.5 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 px-3 py-1.5 rounded-lg">
+            <Ban className="w-3.5 h-3.5" /> Storniert
+          </span>
+        )}
+      </div>
+
+      {/* Schnellaktionen */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+        <Link href={`/fahrzeuge/${auftrag.id}/mappe`} className="flex items-center gap-3 px-4 py-3 rounded-xl border border-orange-200 bg-orange-50 text-orange-700 hover:bg-orange-100 hover:border-orange-300 transition-colors font-semibold text-sm">
+          <FolderOpen className="w-4 h-4 flex-shrink-0" /> Auftragsmappe
+        </Link>
+        <Link href={`/fahrzeuge/${auftrag.id}/annahme`} className="flex items-center gap-3 px-4 py-3 rounded-xl border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:border-blue-300 transition-colors text-sm">
+          <ClipboardCheck className="w-4 h-4 flex-shrink-0" /> Annahmeprotokoll
+        </Link>
+        <Link href={`/fahrzeuge/${auftrag.id}/fotos`} className="flex items-center gap-3 px-4 py-3 rounded-xl border border-purple-200 bg-purple-50 text-purple-700 hover:bg-purple-100 hover:border-purple-300 transition-colors text-sm">
+          <Camera className="w-4 h-4 flex-shrink-0" /> Fotos
+        </Link>
+        <Link href={`/fahrzeuge/${auftrag.id}/protokoll`} target="_blank" className="flex items-center gap-3 px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100 hover:border-gray-300 transition-colors text-sm">
+          <Printer className="w-4 h-4 flex-shrink-0" /> Werkstattprotokoll
+        </Link>
+        <Link href={`/fahrzeuge/${auftrag.id}/rechnung`} target="_blank" className="flex items-center gap-3 px-4 py-3 rounded-xl border border-green-200 bg-green-50 text-green-700 hover:bg-green-100 hover:border-green-300 transition-colors text-sm">
+          <Receipt className="w-4 h-4 flex-shrink-0" /> Rechnung
+        </Link>
       </div>
 
       {/* Checkliste vor Fertig / Ausgeliefert */}
@@ -1492,6 +1470,27 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie 
               </CardContent>
             </Card>
           )}
+        </div>
+      </div>
+
+      {/* Gefahrenzone */}
+      <div className="border border-red-200 rounded-xl p-4 bg-red-50">
+        <p className="text-xs font-semibold text-red-500 uppercase tracking-wide mb-3">Gefahrenzone</p>
+        <div className="flex flex-col sm:flex-row gap-2">
+          {auftrag.status !== 'storniert' && (
+            <button
+              onClick={() => setStorniereBestaetigung(true)}
+              className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-red-300 bg-white text-red-600 hover:bg-red-100 text-sm font-medium transition-colors"
+            >
+              <Ban className="w-4 h-4" /> Auftrag stornieren
+            </button>
+          )}
+          <button
+            onClick={() => setLoeschenBestaetigung(true)}
+            className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-red-400 bg-red-600 text-white hover:bg-red-700 text-sm font-medium transition-colors"
+          >
+            <Trash2 className="w-4 h-4" /> Auftrag endgültig löschen
+          </button>
         </div>
       </div>
     </div>
