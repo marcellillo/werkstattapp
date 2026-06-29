@@ -46,10 +46,12 @@ export async function POST(req: NextRequest) {
     nachricht ? `Nachricht: ${nachricht}` : null,
   ].filter(Boolean).join('\n')
 
-  // Kunde suchen oder neu anlegen (Duplikat-Prüfung per Telefon oder E-Mail)
+  // ── 1. Kunde: Duplikat per Telefon → E-Mail → neu anlegen ──────────────
   let kundeId: string | null = null
   try {
-    let existing = null
+    let existing: any = null
+    const kzNorm = kennzeichen?.toUpperCase().replace(/\s+/g, '') ?? null
+
     if (telefon) {
       const { data } = await supabase.from('kunden').select('id').eq('telefon', telefon).maybeSingle()
       existing = data
@@ -62,16 +64,60 @@ export async function POST(req: NextRequest) {
       kundeId = existing.id
     } else {
       const { data: neuerKunde } = await supabase.from('kunden').insert({
-        vorname,
-        nachname,
+        vorname, nachname,
         telefon: telefon || null,
         email: email || null,
-        quelle: 'online-buchung',
       }).select('id').single()
       if (neuerKunde) kundeId = neuerKunde.id
     }
+
+    // ── 2. Fahrzeug: Duplikat per Kennzeichen → neu anlegen ─────────────
+    let fahrzeugId: string | null = null
+    if (kzNorm) {
+      const { data: existingFz } = await supabase.from('fahrzeuge').select('id').eq('kennzeichen', kzNorm).maybeSingle()
+      if (existingFz) {
+        fahrzeugId = existingFz.id
+        // Kunden-Verknüpfung aktualisieren falls noch nicht gesetzt
+        if (kundeId) await supabase.from('fahrzeuge').update({ kunden_id: kundeId }).eq('id', fahrzeugId).is('kunden_id', null)
+      } else {
+        // marke_modell z.B. "VW Golf" → marke="VW", modell="Golf"
+        const parts = (marke_modell ?? '').trim().split(/\s+/)
+        const marke = parts[0] || null
+        const modell = parts.slice(1).join(' ') || null
+        const { data: neuesFz } = await supabase.from('fahrzeuge').insert({
+          kunden_id: kundeId,
+          fahrzeug_typ: 'kunde',
+          kennzeichen: kzNorm,
+          marke,
+          modell,
+        }).select('id').single()
+        if (neuesFz) fahrzeugId = neuesFz.id
+      }
+    }
+
+    // ── 3. Auftrag anlegen ────────────────────────────────────────────────
+    if (fahrzeugId) {
+      const auftragNr = `AU-${Date.now().toString().slice(-6)}`
+      const fehlendeDaten = [
+        !marke_modell && 'Fahrzeugmodell',
+        !email && 'E-Mail',
+      ].filter(Boolean)
+      const hinweis = fehlendeDaten.length
+        ? `\n\n⚠️ Noch zu erfragen: ${fehlendeDaten.join(', ')}`
+        : ''
+
+      await supabase.from('auftraege').insert({
+        auftrag_nr: auftragNr,
+        fahrzeug_id: fahrzeugId,
+        kunden_id: kundeId,
+        status: 'angenommen',
+        arbeiten: leistung,
+        geplante_fertigstellung: datum,
+        notizen: `Online-Buchung vom ${datum}${uhrzeit ? ' ' + uhrzeit + ' Uhr' : ''}${nachricht ? '\nKundenwunsch: ' + nachricht : ''}${hinweis}`,
+      })
+    }
   } catch (e) {
-    console.error('Kunde upsert error:', e)
+    console.error('Kunde/Fahrzeug/Auftrag error:', e)
   }
 
   const { error } = await supabase.from('termine').insert({
