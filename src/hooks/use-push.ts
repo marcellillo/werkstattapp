@@ -18,23 +18,32 @@ export function usePush() {
     }
     if (Notification.permission === 'denied') { setStatus('denied'); return }
 
-    navigator.serviceWorker.ready.then(reg =>
-      reg.pushManager.getSubscription()
-    ).then(sub => {
-      setStatus(sub ? 'subscribed' : 'unsubscribed')
-    })
+    const timeout = setTimeout(() => setStatus('unsubscribed'), 5000)
+
+    Promise.race([
+      navigator.serviceWorker.ready,
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 4000)),
+    ])
+      .then(reg => (reg as ServiceWorkerRegistration).pushManager.getSubscription())
+      .then(sub => { clearTimeout(timeout); setStatus(sub ? 'subscribed' : 'unsubscribed') })
+      .catch(() => { clearTimeout(timeout); setStatus('unsubscribed') })
   }, [])
 
   async function subscribe() {
     setStatus('loading')
     try {
-      const reg = await navigator.serviceWorker.register('/sw.js')
-      await navigator.serviceWorker.ready
-
       const permission = await Notification.requestPermission()
       if (permission !== 'granted') { setStatus('denied'); return }
 
-      const sub = await reg.pushManager.subscribe({
+      const reg = await navigator.serviceWorker.register('/sw.js')
+
+      // Wait for service worker with timeout
+      const ready = await Promise.race([
+        navigator.serviceWorker.ready,
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('SW timeout')), 8000)),
+      ])
+
+      const sub = await (ready as ServiceWorkerRegistration).pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!),
       })
@@ -45,7 +54,8 @@ export function usePush() {
         body: JSON.stringify(sub),
       })
       setStatus('subscribed')
-    } catch {
+    } catch (e) {
+      console.error('Push subscribe error:', e)
       setStatus('unsubscribed')
     }
   }
