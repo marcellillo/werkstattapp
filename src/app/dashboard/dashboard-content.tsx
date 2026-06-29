@@ -4,7 +4,7 @@ import Link from 'next/link'
 import {
   Car, User, Wrench, Package, Calendar, Plus, X,
   ChevronRight, AlertTriangle, CheckCircle, ClipboardList,
-  ShieldCheck, Tag, Clock
+  ShieldCheck, Tag, Clock, TrendingUp, Euro
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { cn, formatDate } from '@/lib/utils'
@@ -31,6 +31,8 @@ interface Props {
   eigenFahrzeuge: number
   tuevBuehnenTermine: any[]
   mitarbeiter: any[]
+  monatsumsatz: number
+  offeneRechnungenSumme: number
 }
 
 const STATUS_ORDER: FahrzeugStatus[] = ['angenommen','diagnose','reparatur','warten_teile','fertig','ausgeliefert']
@@ -47,7 +49,8 @@ function isDialog(b: BuehneExt) {
 
 export function DashboardContent({
   hebebuehnen: initBuehnen, auftraege: initAuftraege,
-  offeneAuftraege, wartendeTeile, fertigeHeute, ueberfaellig, naechsteTermine, eigenFahrzeuge, tuevBuehnenTermine, mitarbeiter
+  offeneAuftraege, wartendeTeile, fertigeHeute, ueberfaellig, naechsteTermine, eigenFahrzeuge, tuevBuehnenTermine, mitarbeiter,
+  monatsumsatz, offeneRechnungenSumme
 }: Props) {
   const [buehnen, setBuehnen] = useState<BuehneExt[]>(initBuehnen)
   const [auftraege, setAuftraege] = useState<Auftrag[]>(initAuftraege)
@@ -102,25 +105,31 @@ const auftragMap = new Map<string, Auftrag>()
   const normalBuehnen = buehnen.filter(b => !isDialog(b))
   const unassigned = auftraege.filter(a => !a.hebebuehne_id && !['fertig','ausgeliefert','storniert'].includes(a.status))
 
+  const fmtEuro = (v: number) => v >= 1000
+    ? `${(v / 1000).toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} k€`
+    : `${v.toLocaleString('de-DE', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} €`
+
   const stats = [
-    { label: 'Offene Aufträge', value: offeneAuftraege, icon: Wrench, color: 'text-blue-600', bg: 'bg-blue-50', href: '/fahrzeuge' },
-    { label: 'Wartende Teile', value: wartendeTeile, icon: Package, color: 'text-yellow-600', bg: 'bg-yellow-50', href: '/fahrzeuge' },
-    { label: 'Heute fertig', value: fertigeHeute, icon: CheckCircle, color: 'text-green-600', bg: 'bg-green-50', href: '/fahrzeuge' },
-    { label: 'Überfällig', value: ueberfaellig, icon: AlertTriangle, color: 'text-red-600', bg: 'bg-red-50', href: '/fahrzeuge' },
-    { label: 'Lagerbestand', value: eigenFahrzeuge, icon: Tag, color: 'text-purple-600', bg: 'bg-purple-50', href: '/fahrzeuge' },
+    { label: 'Offene Aufträge', value: offeneAuftraege, display: String(offeneAuftraege), icon: Wrench, color: 'text-blue-600', bg: 'bg-blue-50', href: '/fahrzeuge' },
+    { label: 'Wartende Teile', value: wartendeTeile, display: String(wartendeTeile), icon: Package, color: 'text-yellow-600', bg: 'bg-yellow-50', href: '/fahrzeuge' },
+    { label: 'Heute fertig', value: fertigeHeute, display: String(fertigeHeute), icon: CheckCircle, color: 'text-green-600', bg: 'bg-green-50', href: '/fahrzeuge' },
+    { label: 'Überfällig', value: ueberfaellig, display: String(ueberfaellig), icon: AlertTriangle, color: 'text-red-600', bg: 'bg-red-50', href: '/fahrzeuge' },
+    { label: 'Lagerbestand', value: eigenFahrzeuge, display: String(eigenFahrzeuge), icon: Tag, color: 'text-purple-600', bg: 'bg-purple-50', href: '/fahrzeuge' },
+    { label: 'Umsatz diesen Monat', value: monatsumsatz, display: fmtEuro(monatsumsatz), icon: TrendingUp, color: 'text-emerald-600', bg: 'bg-emerald-50', href: '/buchhaltung' },
+    { label: 'Offene Eingangsrechnungen', value: offeneRechnungenSumme, display: fmtEuro(offeneRechnungenSumme), icon: Euro, color: 'text-orange-600', bg: 'bg-orange-50', href: '/rechnungen' },
   ]
 
   return (
     <div className="space-y-6">
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-        {stats.map(({ label, value, icon: Icon, color, bg, href }) => (
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {stats.map(({ label, display, icon: Icon, color, bg, href }) => (
           <Link key={label} href={href}>
             <Card className="card-hover cursor-pointer"><CardContent className="p-5">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-slate-500">{label}</p>
-                  <p className="text-3xl font-bold text-slate-900 mt-1 stat-number">{value}</p>
+                  <p className="text-3xl font-bold text-slate-900 mt-1 stat-number">{display}</p>
                 </div>
                 <div className={`w-12 h-12 ${bg} rounded-xl flex items-center justify-center`}>
                   <Icon className={`w-6 h-6 ${color}`} />

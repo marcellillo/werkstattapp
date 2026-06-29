@@ -185,26 +185,29 @@ export function ServiceWeckerContent({ fahrzeuge: initialFahrzeuge }: { fahrzeug
         </div>
       </div>
 
-      {/* Alarm-Banner */}
+      {/* Alarm-Banner mit Batch-Button */}
       {(ueberfaellig.length > 0 || kritisch.length > 0) && (
         <div className={cn(
-          'rounded-xl p-4 flex items-start gap-3 border',
+          'rounded-xl p-4 border',
           ueberfaellig.length > 0 ? 'bg-red-50 border-red-200' : 'bg-orange-50 border-orange-200'
         )}>
-          <AlertTriangle className={cn('w-5 h-5 flex-shrink-0 mt-0.5', ueberfaellig.length > 0 ? 'text-red-500' : 'text-orange-500')} />
-          <div>
-            <p className={cn('text-sm font-semibold', ueberfaellig.length > 0 ? 'text-red-800' : 'text-orange-800')}>
-              {ueberfaellig.length > 0
-                ? `${ueberfaellig.length} Fahrzeug${ueberfaellig.length > 1 ? 'e haben' : ' hat'} den Service-Termin überschritten`
-                : `${kritisch.length} Fahrzeug${kritisch.length > 1 ? 'e' : ''} in weniger als 30 Tagen fällig`}
-            </p>
-            <p className="text-xs text-gray-600 mt-0.5">
-              {[...ueberfaellig, ...kritisch].slice(0, 4).map(f =>
-                `${f.kennzeichen}${f.kunde ? ` (${f.kunde.nachname})` : ''}`
-              ).join(' · ')}
-              {ueberfaellig.length + kritisch.length > 4 && ` · +${ueberfaellig.length + kritisch.length - 4} weitere`}
-            </p>
+          <div className="flex items-start gap-3">
+            <AlertTriangle className={cn('w-5 h-5 flex-shrink-0 mt-0.5', ueberfaellig.length > 0 ? 'text-red-500' : 'text-orange-500')} />
+            <div className="flex-1">
+              <p className={cn('text-sm font-semibold', ueberfaellig.length > 0 ? 'text-red-800' : 'text-orange-800')}>
+                {ueberfaellig.length > 0
+                  ? `${ueberfaellig.length} Fahrzeug${ueberfaellig.length > 1 ? 'e haben' : ' hat'} den Service-Termin überschritten`
+                  : `${kritisch.length} Fahrzeug${kritisch.length > 1 ? 'e' : ''} in weniger als 30 Tagen fällig`}
+              </p>
+              <p className="text-xs text-gray-600 mt-0.5">
+                {[...ueberfaellig, ...kritisch].slice(0, 4).map(f =>
+                  `${f.kennzeichen}${f.kunde ? ` (${f.kunde.nachname})` : ''}`
+                ).join(' · ')}
+                {ueberfaellig.length + kritisch.length > 4 && ` · +${ueberfaellig.length + kritisch.length - 4} weitere`}
+              </p>
+            </div>
           </div>
+          <BatchBenachrichtigung fahrzeuge={[...ueberfaellig, ...kritisch]} />
         </div>
       )}
 
@@ -412,5 +415,74 @@ export function ServiceWeckerContent({ fahrzeuge: initialFahrzeuge }: { fahrzeug
         </div>
       )}
     </div>
+  )
+}
+
+function BatchBenachrichtigung({ fahrzeuge }: { fahrzeuge: any[] }) {
+  const [open, setOpen] = useState(false)
+  const mitTelefon = fahrzeuge.filter(f => f.kunde?.telefon)
+  const [gesendet, setGesendet] = useState<Set<string>>(new Set())
+
+  if (mitTelefon.length === 0) return null
+
+  return (
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        className="mt-3 flex items-center gap-2 w-full justify-center py-2 bg-white border border-current rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors opacity-90"
+      >
+        <MessageCircle className="w-4 h-4" />
+        Alle {mitTelefon.length} per WhatsApp benachrichtigen
+      </button>
+
+      {open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <h3 className="font-semibold text-gray-900">Service-Erinnerungen senden</h3>
+              <button onClick={() => setOpen(false)} className="text-gray-400 hover:text-gray-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="overflow-y-auto flex-1 p-4 space-y-2">
+              {mitTelefon.map(f => {
+                const clean = f.kunde.telefon.replace(/\s+/g, '').replace(/^0/, '49')
+                const text = encodeURIComponent(
+                  `Guten Tag ${f.kunde.vorname ?? ''},\n\nfür Ihr Fahrzeug ${f.kennzeichen} (${f.marke} ${f.modell}) steht der nächste Service an.\n\nGerne vereinbaren wir einen Termin. Wann passt es Ihnen?\n\nMit freundlichen Grüßen\nHelios Automobile GmbH`
+                )
+                const done = gesendet.has(f.id)
+                return (
+                  <a
+                    key={f.id}
+                    href={`https://wa.me/${clean}?text=${text}`}
+                    target="_blank" rel="noopener noreferrer"
+                    onClick={() => setGesendet(p => new Set([...p, f.id]))}
+                    className={cn(
+                      'flex items-center gap-3 p-3 rounded-xl border transition-colors',
+                      done ? 'bg-green-50 border-green-200' : 'bg-white border-gray-200 hover:border-green-300 hover:bg-green-50'
+                    )}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900">{f.kennzeichen} · {f.marke} {f.modell}</p>
+                      <p className="text-xs text-gray-500">{f.kunde.vorname} {f.kunde.nachname} · {f.kunde.telefon}</p>
+                    </div>
+                    {done
+                      ? <Check className="w-4 h-4 text-green-600 flex-shrink-0" />
+                      : <MessageCircle className="w-4 h-4 text-green-600 flex-shrink-0" />
+                    }
+                  </a>
+                )
+              })}
+            </div>
+            <div className="px-5 py-4 border-t border-gray-100">
+              <p className="text-xs text-gray-500 mb-3">{gesendet.size} von {mitTelefon.length} gesendet</p>
+              <button onClick={() => setOpen(false)} className="w-full py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 transition-colors">
+                Schließen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   )
 }

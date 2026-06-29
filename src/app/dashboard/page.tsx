@@ -8,12 +8,19 @@ export default async function DashboardPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
+  const monatStart = new Date()
+  monatStart.setDate(1)
+  monatStart.setHours(0, 0, 0, 0)
+  const monatStartStr = monatStart.toISOString()
+
   const [
     { data: hebebuehnenRaw },
     { data: auftraegeRaw },
     { data: termineRaw },
     { count: eigenCount },
     { data: mitarbeiterRaw },
+    { data: monatRechnungen },
+    { data: offeneRechnungenRaw },
   ] = await Promise.all([
     supabase.from('hebebuehnen').select('*').order('position').order('nummer'),
     supabase
@@ -25,6 +32,8 @@ export default async function DashboardPage() {
     supabase.from('termine').select('*, kunde:kunden(vorname,nachname), fahrzeug:fahrzeuge(kennzeichen,marke,modell)').gte('datum', new Date().toISOString().split('T')[0]).not('status', 'eq', 'abgesagt').order('datum').order('uhrzeit').limit(20),
     supabase.from('fahrzeuge').select('*', { count: 'exact', head: true }).eq('fahrzeug_typ', 'eigen'),
     supabase.from('profiles').select('id, full_name, role').order('full_name'),
+    supabase.from('kunden_rechnungen').select('betrag_brutto').gte('erstellt_am', monatStartStr),
+    supabase.from('rechnungen').select('gesamt').eq('bezahlt', false),
   ])
 
   const hebebuehnen = (hebebuehnenRaw ?? []) as any[]
@@ -62,6 +71,9 @@ export default async function DashboardPage() {
     !['fertig', 'ausgeliefert'].includes(a.status)
   ).length
 
+  const monatsumsatz = (monatRechnungen ?? []).reduce((s: number, r: any) => s + (r.betrag_brutto ?? 0), 0)
+  const offeneRechnungenSumme = (offeneRechnungenRaw ?? []).reduce((s: number, r: any) => s + (r.gesamt ?? 0), 0)
+
   return (
     <AppLayout title="Hebebühnen">
       <DashboardContent
@@ -75,6 +87,8 @@ export default async function DashboardPage() {
         eigenFahrzeuge={eigenCount ?? 0}
         tuevBuehnenTermine={tuevBuehnenTermine}
         mitarbeiter={(mitarbeiterRaw ?? []) as any[]}
+        monatsumsatz={monatsumsatz}
+        offeneRechnungenSumme={offeneRechnungenSumme}
       />
     </AppLayout>
   )

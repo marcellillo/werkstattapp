@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Car, User, Wrench, Package, Calendar, Plus, Trash2, CheckCircle, Clock, Circle, ChevronRight, ShieldCheck, Search, Printer, Receipt, Ban, UserCheck, ClipboardCheck, X, Sparkles, MessageSquare, Mail, Phone, Camera, FolderOpen } from 'lucide-react'
+import { ArrowLeft, Car, User, Wrench, Package, Calendar, Plus, Trash2, CheckCircle, Clock, Circle, ChevronRight, ShieldCheck, Search, Printer, Receipt, Ban, UserCheck, ClipboardCheck, X, Sparkles, MessageSquare, Mail, Phone, Camera, FolderOpen, Share2, Copy, Check } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { cn, formatDate, formatDateTime } from '@/lib/utils'
@@ -85,6 +85,7 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie 
   const [kundeZuweisenLoading, setKundeZuweisenLoading] = useState(false)
   const [loeschenBestaetigung, setLoeschenBestaetigung] = useState(false)
   const [loeschen, setLoeschen] = useState(false)
+  const [linkKopiert, setLinkKopiert] = useState(false)
   const supabase = createClient()
   const router = useRouter()
 
@@ -453,6 +454,22 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie 
         <Link href={`/fahrzeuge/${auftrag.id}/rechnung`} target="_blank" className="flex items-center gap-3 px-4 py-3 rounded-xl border border-green-200 bg-green-50 text-green-700 hover:bg-green-100 hover:border-green-300 transition-colors text-sm">
           <Receipt className="w-4 h-4 flex-shrink-0" /> Rechnung
         </Link>
+        <button
+          onClick={async () => {
+            const url = `${window.location.origin}/status/${auftrag.id}`
+            if (navigator.share) {
+              navigator.share({ title: `Auftragsstatus – ${(auftrag.fahrzeug as any)?.kennzeichen ?? ''}`, url })
+            } else {
+              await navigator.clipboard.writeText(url)
+              setLinkKopiert(true)
+              setTimeout(() => setLinkKopiert(false), 2500)
+            }
+          }}
+          className="flex items-center gap-3 px-4 py-3 rounded-xl border border-teal-200 bg-teal-50 text-teal-700 hover:bg-teal-100 hover:border-teal-300 transition-colors text-sm"
+        >
+          {linkKopiert ? <Check className="w-4 h-4 flex-shrink-0" /> : <Share2 className="w-4 h-4 flex-shrink-0" />}
+          {linkKopiert ? 'Link kopiert!' : 'Status-Link'}
+        </button>
       </div>
 
       {/* Checkliste vor Fertig / Ausgeliefert */}
