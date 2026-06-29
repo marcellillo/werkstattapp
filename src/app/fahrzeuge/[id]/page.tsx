@@ -13,6 +13,7 @@ export default async function FahrzeugDetailPage({ params }: { params: Promise<{
     { data: auftrag, error: auftragError },
     { data: hebebuehnen },
     { data: historie },
+    { data: cfgRow },
   ] = await Promise.all([
     supabase
       .from('auftraege')
@@ -31,6 +32,7 @@ export default async function FahrzeugDetailPage({ params }: { params: Promise<{
       .eq('auftrag_id', id)
       .order('erstellt_am', { ascending: false })
       .limit(20),
+    supabase.from('werkstatt_einstellungen').select('wert').eq('schluessel', 'google_bewertung_url').maybeSingle(),
   ])
 
   if (auftragError) console.error('Auftrag query error:', JSON.stringify(auftragError))
@@ -48,6 +50,7 @@ export default async function FahrzeugDetailPage({ params }: { params: Promise<{
         auftrag={resolvedAuftrag as any}
         hebebuehnen={(hebebuehnen ?? []) as any[]}
         historie={(historie ?? []) as any[]}
+        googleBewertungUrl={(cfgRow as any)?.wert ?? ''}
       />
     </AppLayout>
   )

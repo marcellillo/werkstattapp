@@ -60,6 +60,7 @@ export default async function EinstellungenPage({
           firma_paypal: cfg.firma_paypal ?? '',
           firma_sumup: cfg.firma_sumup ?? '',
           firma_stripe: cfg.firma_stripe ?? '',
+          google_bewertung_url: cfg.google_bewertung_url ?? '',
         }}
       />
     </AppLayout>

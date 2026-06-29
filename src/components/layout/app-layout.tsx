@@ -32,7 +32,7 @@ export function AppLayout({ children, title }: AppLayoutProps) {
           <Sidebar />
         </div>
 
-        <div className="flex flex-col flex-1 min-w-0 overflow-x-hidden">
+        <div className="flex flex-col flex-1 min-w-0">
           <div className="sticky top-0 z-20">
             <Topbar title={title} onMenuClick={() => setSidebarOpen(!sidebarOpen)} />
           </div>

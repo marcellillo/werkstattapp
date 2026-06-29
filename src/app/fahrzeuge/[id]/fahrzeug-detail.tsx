@@ -18,6 +18,7 @@ interface Props {
   auftrag: Auftrag
   hebebuehnen: Hebebuehne[]
   historie: any[]
+  googleBewertungUrl?: string
 }
 
 const STATUS_ORDER: FahrzeugStatus[] = [
@@ -45,7 +46,7 @@ interface KiTeilVorschlag {
   optional: boolean
 }
 
-export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie }: Props) {
+export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie, googleBewertungUrl = '' }: Props) {
   const [auftrag, setAuftrag] = useState(initialAuftrag)
   const [teile, setTeile] = useState<Ersatzteil[]>((initialAuftrag.ersatzteile as Ersatzteil[]) ?? [])
   const [saving, setSaving] = useState(false)
@@ -92,6 +93,7 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie 
   const [uebergabeSchaeden, setUebergabeSchaeden] = useState('')
   const [uebergabeZustand, setUebergabeZustand] = useState('gut')
   const [uebergabeSaving, setUebergabeSaving] = useState(false)
+  const [showBewertungModal, setShowBewertungModal] = useState(false)
   const supabase = createClient()
   const router = useRouter()
 
@@ -310,13 +312,15 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie 
       fetch('/api/push/send', { method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: '✅ Auftrag fertig', body: `${name} (${kz}) ist fertig zur Abholung`, url: `/fahrzeuge/${auftrag.id}`, tag: 'fertig' })
       }).catch(() => {})
-      // Übergabeprotokoll vorausfüllen mit Annahme-Daten als Ausgangswert
       const a = auftrag as any
       setUebergabeKm(String(a.annahme_km ?? ''))
       setUebergabeTank(a.annahme_tank ?? 50)
       setUebergabeSchaeden('')
       setUebergabeZustand('gut')
       setShowUebergabe(true)
+    }
+    if (status === 'ausgeliefert') {
+      setShowBewertungModal(true)
     }
   }
 
@@ -700,6 +704,73 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie 
           </div>
         </div>
       )}
+
+      {/* Bewertungs-WhatsApp-Modal */}
+      {showBewertungModal && (() => {
+        const bewertungLink = googleBewertungUrl || `${process.env.NEXT_PUBLIC_APP_URL ?? 'https://werkstatt-app-umber.vercel.app'}/bewertung/${auftrag.id}`
+        const kundeVorname = (auftrag.kunde as any)?.vorname ?? ''
+        const kundeTelefon = ((auftrag.kunde as any)?.telefon ?? (auftrag.kunde as any)?.mobil ?? '').replace(/\D/g, '')
+        const waText = encodeURIComponent(
+          `Hallo ${kundeVorname},\n\nvielen Dank für Ihren Besuch! Wir würden uns sehr über eine Google-Bewertung freuen – das dauert nur 30 Sekunden:\n\n${bewertungLink}\n\nHerzlichen Dank! 🙏`
+        )
+        return (
+          <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+            <div className="bg-white rounded-t-2xl w-full max-w-lg shadow-xl p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="font-bold text-gray-900 text-base">⭐ Google-Bewertung anfragen</h3>
+                <button onClick={() => setShowBewertungModal(false)} className="text-gray-400 hover:text-gray-600">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <p className="text-sm text-gray-600">
+                {auftrag.kunde
+                  ? `${kundeVorname} ${(auftrag.kunde as any).nachname ?? ''} hat das Fahrzeug abgeholt. Jetzt um eine Google-Bewertung bitten?`
+                  : 'Fahrzeug wurde abgeholt. Jetzt um eine Google-Bewertung bitten?'
+                }
+              </p>
+              {googleBewertungUrl ? (
+                <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-xl px-4 py-3">
+                  <span className="text-lg">🔍</span>
+                  <p className="text-xs text-green-700 font-medium break-all">{googleBewertungUrl}</p>
+                </div>
+              ) : (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+                  <p className="text-xs text-amber-700">Kein Google-Link hinterlegt – bitte in den Einstellungen ergänzen. Es wird ein interner Bewertungslink gesendet.</p>
+                </div>
+              )}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowBewertungModal(false)}
+                  className="flex-1 py-3 rounded-xl border border-gray-200 text-gray-700 text-sm font-semibold hover:bg-gray-50"
+                >
+                  Überspringen
+                </button>
+                {kundeTelefon ? (
+                  <a
+                    href={`https://wa.me/${kundeTelefon}?text=${waText}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => setShowBewertungModal(false)}
+                    className="flex-1 py-3 rounded-xl bg-green-600 text-white text-sm font-bold text-center hover:bg-green-700 transition-colors"
+                  >
+                    📱 Per WhatsApp senden
+                  </a>
+                ) : (
+                  <button
+                    onClick={() => {
+                      navigator.clipboard?.writeText(bewertungLink)
+                      setShowBewertungModal(false)
+                    }}
+                    className="flex-1 py-3 rounded-xl bg-orange-600 text-white text-sm font-bold hover:bg-orange-700 transition-colors"
+                  >
+                    🔗 Link kopieren
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Stornieren-Bestätigung */}
       {storniereBestaetigung && (

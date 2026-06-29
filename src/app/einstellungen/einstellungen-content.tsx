@@ -40,6 +40,7 @@ interface Config {
   firma_paypal: string
   firma_sumup: string
   firma_stripe: string
+  google_bewertung_url: string
 }
 
 export function EinstellungenContent({ initialConfig, profile, userEmail, urlError, urlSuccess }: {
@@ -381,6 +382,21 @@ export function EinstellungenContent({ initialConfig, profile, userEmail, urlErr
                 )}
               </div>
             ))}
+          </div>
+
+          {/* Google Bewertungslink */}
+          <div className="pt-4 border-t border-gray-100">
+            <label className="text-xs font-semibold text-gray-700 mb-1 block">Google Bewertungslink</label>
+            <input
+              type="url"
+              value={config.google_bewertung_url}
+              onChange={e => setConfig(c => ({ ...c, google_bewertung_url: e.target.value }))}
+              placeholder="https://g.page/r/XXXXX/review"
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
+            />
+            <p className="text-xs text-gray-400 mt-1">
+              In Google Maps: Ihr Unternehmen → Bewertungen → „Mehr Bewertungen erhalten" → Link kopieren
+            </p>
           </div>
 
           <button

@@ -33,6 +33,8 @@ interface Props {
   mitarbeiter: any[]
   monatsumsatz: number
   offeneRechnungenSumme: number
+  bewertungen: any[]
+  bewertungDurchschnitt: number | null
 }
 
 const STATUS_ORDER: FahrzeugStatus[] = ['angenommen','diagnose','reparatur','warten_teile','fertig','ausgeliefert']
@@ -50,7 +52,7 @@ function isDialog(b: BuehneExt) {
 export function DashboardContent({
   hebebuehnen: initBuehnen, auftraege: initAuftraege,
   offeneAuftraege, wartendeTeile, fertigeHeute, ueberfaellig, naechsteTermine, eigenFahrzeuge, tuevBuehnenTermine, mitarbeiter,
-  monatsumsatz, offeneRechnungenSumme
+  monatsumsatz, offeneRechnungenSumme, bewertungen, bewertungDurchschnitt
 }: Props) {
   const [buehnen, setBuehnen] = useState<BuehneExt[]>(initBuehnen)
   const [auftraege, setAuftraege] = useState<Auftrag[]>(initAuftraege)
@@ -282,6 +284,45 @@ const auftragMap = new Map<string, Auftrag>()
           )}
         </div>
       </div>
+
+      {/* Kundenbewertungen */}
+      {bewertungen.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
+            <span className="text-base">⭐</span>
+            <span className="font-semibold text-sm text-gray-800">Kundenbewertungen</span>
+            {bewertungDurchschnitt !== null && (
+              <span className="ml-auto flex items-center gap-1 text-sm font-bold text-amber-500">
+                {bewertungDurchschnitt.toFixed(1)}
+                <span className="text-gray-400 font-normal text-xs">/ 5 ({bewertungen.length})</span>
+              </span>
+            )}
+          </div>
+          <div className="divide-y divide-gray-50">
+            {bewertungen.slice(0, 5).map((b: any, i: number) => (
+              <div key={i} className="px-4 py-3 flex items-start gap-3">
+                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center text-sm font-bold text-orange-600">
+                  {b.kunde ? `${(b.kunde.vorname ?? '?')[0]}${(b.kunde.nachname ?? '')[0] ?? ''}` : '?'}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium text-gray-700">
+                      {b.kunde ? `${b.kunde.vorname ?? ''} ${b.kunde.nachname ?? ''}`.trim() : 'Anonym'}
+                    </span>
+                    {b.fahrzeug && (
+                      <span className="text-xs text-gray-400">{b.fahrzeug.kennzeichen}</span>
+                    )}
+                    <span className="ml-auto text-xs text-amber-500">{'★'.repeat(b.bewertung_sterne)}{'☆'.repeat(5 - b.bewertung_sterne)}</span>
+                  </div>
+                  {b.bewertung_kommentar && (
+                    <p className="text-xs text-gray-500 mt-0.5 truncate">{b.bewertung_kommentar}</p>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Bühnen-Detail Drawer */}
       {detailBuehne && (

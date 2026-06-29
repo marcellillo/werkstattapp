@@ -21,6 +21,7 @@ export default async function DashboardPage() {
     { data: mitarbeiterRaw },
     { data: monatRechnungen },
     { data: offeneRechnungenRaw },
+    { data: bewertungenRaw },
   ] = await Promise.all([
     supabase.from('hebebuehnen').select('*').order('position').order('nummer'),
     supabase
@@ -34,6 +35,10 @@ export default async function DashboardPage() {
     supabase.from('profiles').select('id, full_name, role').order('full_name'),
     supabase.from('kunden_rechnungen').select('betrag_brutto').gte('erstellt_am', monatStartStr),
     supabase.from('rechnungen').select('gesamt').eq('bezahlt', false),
+    supabase.from('auftraege').select('bewertung_sterne, bewertung_kommentar, bewertung_datum, fahrzeug:fahrzeuge(marke, modell, kennzeichen), kunde:kunden(vorname, nachname)')
+      .not('bewertung_sterne', 'is', null)
+      .order('bewertung_datum', { ascending: false })
+      .limit(10),
   ])
 
   const hebebuehnen = (hebebuehnenRaw ?? []) as any[]
@@ -73,6 +78,10 @@ export default async function DashboardPage() {
 
   const monatsumsatz = (monatRechnungen ?? []).reduce((s: number, r: any) => s + (r.betrag_brutto ?? 0), 0)
   const offeneRechnungenSumme = (offeneRechnungenRaw ?? []).reduce((s: number, r: any) => s + (r.gesamt ?? 0), 0)
+  const bewertungen = (bewertungenRaw ?? []) as any[]
+  const bewertungDurchschnitt = bewertungen.length
+    ? Math.round((bewertungen.reduce((s, b) => s + b.bewertung_sterne, 0) / bewertungen.length) * 10) / 10
+    : null
 
   return (
     <AppLayout title="Hebebühnen">
@@ -89,6 +98,8 @@ export default async function DashboardPage() {
         mitarbeiter={(mitarbeiterRaw ?? []) as any[]}
         monatsumsatz={monatsumsatz}
         offeneRechnungenSumme={offeneRechnungenSumme}
+        bewertungen={bewertungen}
+        bewertungDurchschnitt={bewertungDurchschnitt}
       />
     </AppLayout>
   )

@@ -68,8 +68,8 @@ export function RechnungFlow({ auftrag, firma }: Props) {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-4 py-4 sticky top-0 z-10">
-        <div className="max-w-lg mx-auto flex items-center justify-between">
+      <div className="bg-white border-b border-gray-200 px-4 sticky top-0 z-10 topbar-safe">
+        <div className="max-w-lg mx-auto flex items-center justify-between py-3">
           <div>
             <h1 className="text-lg font-bold text-gray-900 flex items-center gap-2">
               <Receipt className="w-5 h-5 text-green-600" /> Rechnung erstellen

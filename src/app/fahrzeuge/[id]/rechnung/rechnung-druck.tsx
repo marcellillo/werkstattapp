@@ -277,8 +277,8 @@ export function RechnungDruck({ auftrag, firma }: { auftrag: any; firma: Record<
         /* Fußzeile */
         .footer { margin-top: 14px; border-top: 1px solid #e2e8f0; padding-top: 8px; font-size: 8.5px; color: #94a3b8; text-align: center; line-height: 1.6; }
 
-        .print-btn { position: fixed; top: 16px; right: 16px; background: #ea580c; color: white; border: none; border-radius: 6px; padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer; z-index: 999; }
-        .back-btn { position: fixed; top: 16px; left: 16px; background: white; color: #334155; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer; z-index: 999; }
+        .print-btn { position: fixed; top: max(16px, env(safe-area-inset-top, 16px)); right: 16px; background: #ea580c; color: white; border: none; border-radius: 6px; padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer; z-index: 999; }
+        .back-btn { position: fixed; top: max(16px, env(safe-area-inset-top, 16px)); left: 16px; background: white; color: #334155; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer; z-index: 999; }
       `}</style>
 
       <button className="no-print back-btn" onClick={() => history.back()}>← Zurück</button>
@@ -293,9 +293,9 @@ export function RechnungDruck({ auftrag, firma }: { auftrag: any; firma: Record<
           const url = tel ? `https://wa.me/${tel}?text=${msg}` : `https://wa.me/?text=${msg}`
           window.open(url, '_blank')
         }}
-        style={{position:'fixed',top:'16px',right:'150px',background:'#16a34a',color:'white',border:'none',borderRadius:'6px',padding:'8px 16px',fontSize:'13px',fontWeight:600,cursor:'pointer',zIndex:999}}
+        style={{position:'fixed',top:'max(16px, env(safe-area-inset-top, 16px))',right:'150px',background:'#16a34a',color:'white',border:'none',borderRadius:'6px',padding:'8px 16px',fontSize:'13px',fontWeight:600,cursor:'pointer',zIndex:999}}
       >📱 WhatsApp</button>
-      <button className="no-print" onClick={() => setEmailModalOffen(true)} style={{position:'fixed',top:'16px',right:'16px',background:'#2563eb',color:'white',border:'none',borderRadius:'6px',padding:'8px 16px',fontSize:'13px',fontWeight:600,cursor:'pointer',zIndex:999}}>✉ Per E-Mail</button>
+      <button className="no-print" onClick={() => setEmailModalOffen(true)} style={{position:'fixed',top:'max(16px, env(safe-area-inset-top, 16px))',right:'16px',background:'#2563eb',color:'white',border:'none',borderRadius:'6px',padding:'8px 16px',fontSize:'13px',fontWeight:600,cursor:'pointer',zIndex:999}}>✉ Per E-Mail</button>
       {emailModalOffen && <EmailModal auftrag={auftrag} firma={firma} onClose={() => setEmailModalOffen(false)} />}
 
       <div className="page">
