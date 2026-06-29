@@ -44,9 +44,12 @@ export function usePush() {
         new Promise<never>((_, reject) => setTimeout(() => reject(new Error('SW timeout')), 8000)),
       ])
 
+      const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY?.trim()
+      if (!vapidKey) throw new Error('VAPID key missing')
+
       const sub = await (ready as ServiceWorkerRegistration).pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!),
+        applicationServerKey: urlBase64ToUint8Array(vapidKey),
       })
 
       await fetch('/api/push/subscribe', {

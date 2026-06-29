@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { notFound } from 'next/navigation'
 import { Car, CheckCircle, Clock, Wrench, Package, Truck, ShieldCheck, Ban } from 'lucide-react'
 
@@ -14,9 +14,13 @@ const STATUS_INFO: Record<string, { label: string; icon: typeof Clock; color: st
 
 const STATUS_ORDER = ['angenommen', 'diagnose', 'reparatur', 'warten_teile', 'fertig', 'ausgeliefert']
 
+const supabase = createServiceClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
+
 export default async function StatusPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const supabase = await createClient()
 
   const { data: auftrag } = await supabase
     .from('auftraege')
