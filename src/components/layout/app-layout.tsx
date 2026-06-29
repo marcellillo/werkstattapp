@@ -17,7 +17,7 @@ export function AppLayout({ children, title }: AppLayoutProps) {
 
   return (
     <RollenProvider>
-      <div className="flex bg-slate-50 min-h-screen">
+      <div className="flex bg-slate-50 min-h-screen overflow-x-hidden">
         {sidebarOpen && (
           <div
             className="fixed inset-0 bg-black/40 z-40 lg:hidden backdrop-blur-sm"

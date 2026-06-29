@@ -46,6 +46,34 @@ export async function POST(req: NextRequest) {
     nachricht ? `Nachricht: ${nachricht}` : null,
   ].filter(Boolean).join('\n')
 
+  // Kunde suchen oder neu anlegen (Duplikat-Prüfung per Telefon oder E-Mail)
+  let kundeId: string | null = null
+  try {
+    let existing = null
+    if (telefon) {
+      const { data } = await supabase.from('kunden').select('id').eq('telefon', telefon).maybeSingle()
+      existing = data
+    }
+    if (!existing && email) {
+      const { data } = await supabase.from('kunden').select('id').eq('email', email).maybeSingle()
+      existing = data
+    }
+    if (existing) {
+      kundeId = existing.id
+    } else {
+      const { data: neuerKunde } = await supabase.from('kunden').insert({
+        vorname,
+        nachname,
+        telefon: telefon || null,
+        email: email || null,
+        quelle: 'online-buchung',
+      }).select('id').single()
+      if (neuerKunde) kundeId = neuerKunde.id
+    }
+  } catch (e) {
+    console.error('Kunde upsert error:', e)
+  }
+
   const { error } = await supabase.from('termine').insert({
     titel,
     beschreibung,
@@ -55,6 +83,7 @@ export async function POST(req: NextRequest) {
     typ: 'online',
     quelle: 'website',
     status: 'offen',
+    kunden_id: kundeId,
     notizen: `Online-Buchung von der Website`,
   })
 
