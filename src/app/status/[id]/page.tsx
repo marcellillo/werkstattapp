@@ -22,13 +22,22 @@ const supabase = createServiceClient(
 export default async function StatusPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
 
-  const { data: auftrag } = await supabase
-    .from('auftraege')
-    .select('*, fahrzeug:fahrzeuge(marke, modell, kennzeichen, baujahr), kunde:kunden(vorname, nachname)')
-    .eq('id', id)
-    .single()
+  const [{ data: auftrag }, { data: cfgRows }] = await Promise.all([
+    supabase
+      .from('auftraege')
+      .select('*, fahrzeug:fahrzeuge(marke, modell, kennzeichen, baujahr), kunde:kunden(vorname, nachname)')
+      .eq('id', id)
+      .single(),
+    supabase
+      .from('werkstatt_einstellungen')
+      .select('schluessel, wert')
+      .in('schluessel', ['firma_name', 'firma_strasse', 'firma_plz', 'firma_ort', 'firma_telefon', 'firma_email']),
+  ])
 
   if (!auftrag) notFound()
+
+  const cfg: Record<string, string> = {}
+  for (const r of cfgRows ?? []) if (r.wert) cfg[r.schluessel] = r.wert
 
   const fz = auftrag.fahrzeug as any
   const kunde = auftrag.kunde as any
@@ -143,9 +152,15 @@ export default async function StatusPage({ params }: { params: Promise<{ id: str
           <div className="bg-white rounded-2xl border border-gray-200 p-5">
             <h2 className="font-semibold text-gray-900 text-sm mb-3">Kontakt</h2>
             <div className="space-y-2 text-sm text-gray-700">
-              <p>📍 Emmastraße 23, 38350 Helmstedt</p>
-              <p>📞 <a href="tel:053515991314" className="text-orange-600 hover:underline">05351 / 59913-14</a></p>
-              <p>✉️ <a href="mailto:info@heliosautomobile.de" className="text-orange-600 hover:underline">info@heliosautomobile.de</a></p>
+              {(cfg.firma_strasse || cfg.firma_ort) && (
+                <p>📍 {[cfg.firma_strasse, [cfg.firma_plz, cfg.firma_ort].filter(Boolean).join(' ')].filter(Boolean).join(', ')}</p>
+              )}
+              {cfg.firma_telefon && (
+                <p>📞 <a href={`tel:${cfg.firma_telefon.replace(/\s/g,'')}`} className="text-orange-600 hover:underline">{cfg.firma_telefon}</a></p>
+              )}
+              {cfg.firma_email && (
+                <p>✉️ <a href={`mailto:${cfg.firma_email}`} className="text-orange-600 hover:underline">{cfg.firma_email}</a></p>
+              )}
             </div>
           </div>
 

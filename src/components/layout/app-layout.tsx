@@ -17,7 +17,7 @@ export function AppLayout({ children, title }: AppLayoutProps) {
 
   return (
     <RollenProvider>
-      <div className="flex bg-slate-50 min-h-screen overflow-x-hidden">
+      <div className="flex bg-slate-50 min-h-screen">
         {sidebarOpen && (
           <div
             className="fixed inset-0 bg-black/40 z-40 lg:hidden backdrop-blur-sm"
@@ -32,7 +32,7 @@ export function AppLayout({ children, title }: AppLayoutProps) {
           <Sidebar />
         </div>
 
-        <div className="flex flex-col flex-1 min-w-0">
+        <div className="flex flex-col flex-1 min-w-0 overflow-x-hidden">
           <div className="sticky top-0 z-20">
             <Topbar title={title} onMenuClick={() => setSidebarOpen(!sidebarOpen)} />
           </div>
