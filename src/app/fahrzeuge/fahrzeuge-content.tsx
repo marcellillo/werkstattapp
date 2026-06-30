@@ -2,8 +2,9 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 
-import { Car, Search, Plus, ChevronRight, Package, Tag, Gauge, Palette, Fuel, ArrowUpDown, Wrench, Euro, ShieldCheck } from 'lucide-react'
+import { Car, Search, Plus, ChevronRight, Package, Tag, Gauge, Palette, Fuel, ArrowUpDown, Wrench, Euro, ShieldCheck, CheckCircle2 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { cn, formatDate } from '@/lib/utils'
@@ -39,9 +40,23 @@ export function FahrzeugeContent({
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<FahrzeugStatus | 'alle'>('alle')
   const [sortByPrio, setSortByPrio] = useState(true)
+  const [verkaufenId, setVerkaufenId] = useState<string | null>(null)
+  const [verkaufenLoading, setVerkaufenLoading] = useState(false)
 
   const fremdAuftraege = auftraege.filter(a => (a.fahrzeug as any)?.fahrzeug_typ !== 'eigen')
   const eigenAuftraege = auftraege.filter(a => (a.fahrzeug as any)?.fahrzeug_typ === 'eigen')
+  const eigenImBestand = eigenAuftraege.filter(a => a.status !== 'ausgeliefert' && a.status !== 'storniert')
+  const eigenVerkauft = eigenAuftraege.filter(a => a.status === 'ausgeliefert')
+
+  async function handleVerkauft() {
+    if (!verkaufenId) return
+    setVerkaufenLoading(true)
+    const sb = createClient()
+    await sb.from('auftraege').update({ status: 'ausgeliefert' }).eq('id', verkaufenId)
+    setVerkaufenLoading(false)
+    setVerkaufenId(null)
+    router.refresh()
+  }
 
   const filteredFremdRaw = fremdAuftraege.filter(a => {
     const matchStatus = statusFilter === 'alle' || a.status === statusFilter
@@ -60,7 +75,7 @@ export function FahrzeugeContent({
     ? [...filteredFremdRaw].sort((a, b) => berechnePrioritaet(b).score - berechnePrioritaet(a).score)
     : filteredFremdRaw
 
-  const filteredEigen = eigenAuftraege.filter(a => {
+  const filteredEigen = eigenImBestand.filter(a => {
     const q = search.toLowerCase()
     const fz = a.fahrzeug as any
     return !q ||
@@ -78,7 +93,7 @@ export function FahrzeugeContent({
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Fahrzeuge</h1>
           <p className="text-sm text-gray-800 mt-0.5">
-            {fremdAuftraege.length} Kunden · {eigenAuftraege.length} Lager · {tuevFahrzeuge.length} TÜV · {serviceFahrzeuge.length} Service
+            {fremdAuftraege.length} Kunden · {eigenImBestand.length} Lager{eigenVerkauft.length > 0 ? ` · ${eigenVerkauft.length} verkauft` : ''} · {tuevFahrzeuge.length} TÜV · {serviceFahrzeuge.length} Service
           </p>
         </div>
         <Link href="/fahrzeuge/neu">
@@ -405,15 +420,14 @@ export function FahrzeugeContent({
               const einnahmen: number = (auftrag as any).einnahmen ?? 0
 
               return (
-                <Link key={auftrag.id} href={`/fahrzeuge/${auftrag.id}`}>
-                  <div className="bg-white border border-gray-200 rounded-xl overflow-hidden hover:border-purple-300 hover:shadow-md transition-all cursor-pointer group">
+                <div key={auftrag.id} className="bg-white border border-gray-200 rounded-xl overflow-hidden hover:border-purple-300 hover:shadow-md transition-all group flex flex-col">
+                  <Link href={`/fahrzeuge/${auftrag.id}`} className="flex-1">
                     {hauptbild && (
                       <div className="h-36 w-full overflow-hidden bg-gray-100">
                         <img src={hauptbild} alt={`${fz?.marke} ${fz?.modell}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                       </div>
                     )}
                     <div className="p-4">
-
                       {/* Header */}
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex items-center gap-2">
@@ -431,40 +445,17 @@ export function FahrzeugeContent({
                             )}
                           </div>
                         </div>
-                        <span className={cn(
-                          'text-xs font-semibold px-2 py-0.5 rounded-full border',
-                          FAHRZEUG_STATUS_COLOR[auftrag.status]
-                        )}>
+                        <span className={cn('text-xs font-semibold px-2 py-0.5 rounded-full border', FAHRZEUG_STATUS_COLOR[auftrag.status])}>
                           {FAHRZEUG_STATUS_LABEL[auftrag.status]}
                         </span>
                       </div>
 
                       {/* Fahrzeugdaten */}
                       <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs text-gray-600 mb-3">
-                        {fz?.baujahr && (
-                          <div className="flex items-center gap-1">
-                            <Tag className="w-3 h-3" />
-                            <span>{fz.baujahr}</span>
-                          </div>
-                        )}
-                        {fz?.kilometerstand && (
-                          <div className="flex items-center gap-1">
-                            <Gauge className="w-3 h-3" />
-                            <span>{fz.kilometerstand.toLocaleString('de-DE')} km</span>
-                          </div>
-                        )}
-                        {fz?.farbe && (
-                          <div className="flex items-center gap-1">
-                            <Palette className="w-3 h-3" />
-                            <span>{fz.farbe}</span>
-                          </div>
-                        )}
-                        {fz?.motortyp && (
-                          <div className="flex items-center gap-1">
-                            <Fuel className="w-3 h-3" />
-                            <span>{fz.motortyp}{fz.leistung_kw ? ` · ${fz.leistung_kw} kW` : ''}</span>
-                          </div>
-                        )}
+                        {fz?.baujahr && <div className="flex items-center gap-1"><Tag className="w-3 h-3" /><span>{fz.baujahr}</span></div>}
+                        {fz?.kilometerstand && <div className="flex items-center gap-1"><Gauge className="w-3 h-3" /><span>{fz.kilometerstand.toLocaleString('de-DE')} km</span></div>}
+                        {fz?.farbe && <div className="flex items-center gap-1"><Palette className="w-3 h-3" /><span>{fz.farbe}</span></div>}
+                        {fz?.motortyp && <div className="flex items-center gap-1"><Fuel className="w-3 h-3" /><span>{fz.motortyp}{fz.leistung_kw ? ` · ${fz.leistung_kw} kW` : ''}</span></div>}
                       </div>
 
                       {/* Arbeiten */}
@@ -488,9 +479,7 @@ export function FahrzeugeContent({
                             <div className="flex items-center gap-1 text-gray-500">
                               <Package className="w-3 h-3" />
                               <span>{teile.length} {teile.length === 1 ? 'Teil' : 'Teile'}</span>
-                              {teileKosten > 0 && (
-                                <span className="text-gray-400">· {teileKosten.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €</span>
-                              )}
+                              {teileKosten > 0 && <span className="text-gray-400">· {teileKosten.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €</span>}
                             </div>
                           )}
                         </div>
@@ -498,9 +487,7 @@ export function FahrzeugeContent({
 
                       {/* Kennzeichen + Verkaufspreis */}
                       <div className="flex items-center justify-between pt-3 border-t border-gray-100">
-                        <span className="text-xs font-mono text-gray-500">
-                          {fz?.kennzeichen || 'Kein KZ'}
-                        </span>
+                        <span className="text-xs font-mono text-gray-500">{fz?.kennzeichen || 'Kein KZ'}</span>
                         {verkaufspreis && (
                           <div className="text-right">
                             <p className="text-[10px] text-gray-400 leading-none mb-0.5">Verkaufspreis</p>
@@ -508,10 +495,20 @@ export function FahrzeugeContent({
                           </div>
                         )}
                       </div>
+                    </div>
+                  </Link>
 
-                    </div>{/* /p-4 */}
+                  {/* Verkauft-Button */}
+                  <div className="px-4 pb-4">
+                    <button
+                      onClick={() => setVerkaufenId(auftrag.id)}
+                      className="w-full flex items-center justify-center gap-2 py-2 rounded-lg border border-purple-200 text-purple-700 text-sm font-medium hover:bg-purple-50 transition-colors"
+                    >
+                      <CheckCircle2 className="w-4 h-4" />
+                      Als verkauft markieren
+                    </button>
                   </div>
-                </Link>
+                </div>
               )
             })}
           </div>
@@ -526,6 +523,31 @@ export function FahrzeugeContent({
       {/* Service-Wecker Tab */}
       {tab === 'service' && (
         <ServiceWeckerContent fahrzeuge={serviceFahrzeuge} />
+      )}
+
+      {/* Verkauft-Bestätigungsmodal */}
+      {verkaufenId && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50">
+          <div className="bg-white rounded-t-2xl w-full max-w-lg p-6 space-y-4" style={{ paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0">
+                <CheckCircle2 className="w-5 h-5 text-purple-600" />
+              </div>
+              <div>
+                <h2 className="font-semibold text-gray-900">Fahrzeug als verkauft markieren?</h2>
+                <p className="text-sm text-gray-500 mt-0.5">Das Fahrzeug wird aus dem Lagerbestand entfernt und im Verlauf archiviert.</p>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <Button variant="outline" className="flex-1" onClick={() => setVerkaufenId(null)} disabled={verkaufenLoading}>
+                Abbrechen
+              </Button>
+              <Button className="flex-1 bg-purple-600 hover:bg-purple-700 text-white" onClick={handleVerkauft} disabled={verkaufenLoading}>
+                {verkaufenLoading ? 'Speichern…' : '✓ Verkauft'}
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

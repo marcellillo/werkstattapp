@@ -97,14 +97,25 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
   const supabase = createClient()
   const router = useRouter()
 
-  const CHECKLISTE_FERTIG = [
+  const isEigenfahrzeug = (auftrag.fahrzeug as any)?.fahrzeug_typ === 'eigen'
+
+  const CHECKLISTE_FERTIG = isEigenfahrzeug ? [
+    { id: 'arbeiten', label: 'Alle Aufbereitungsarbeiten erledigt' },
+    { id: 'teile', label: 'Alle Ersatzteile verbaut' },
+    { id: 'sauber', label: 'Fahrzeug wurde gereinigt / poliert' },
+    { id: 'fotos', label: 'Fotos für Inserat erstellt' },
+  ] : [
     { id: 'arbeiten', label: 'Alle Arbeiten wurden erledigt' },
     { id: 'teile', label: 'Alle Ersatzteile sind verbaut' },
     { id: 'sauber', label: 'Fahrzeug wurde gereinigt' },
     { id: 'rechnung', label: 'Rechnung wurde erstellt' },
     { id: 'schluessel', label: 'Fahrzeugschlüssel sind bereit' },
   ]
-  const CHECKLISTE_AUSGELIEFERT = [
+  const CHECKLISTE_AUSGELIEFERT = isEigenfahrzeug ? [
+    { id: 'verkauft', label: 'Fahrzeug wurde verkauft' },
+    { id: 'bezahlt', label: 'Zahlung vollständig erhalten' },
+    { id: 'papiere', label: 'Fahrzeugpapiere übergeben' },
+  ] : [
     { id: 'uebergabe', label: 'Fahrzeug wurde an Kunden übergeben' },
     { id: 'bezahlt', label: 'Rechnung wurde bezahlt' },
     { id: 'schluessel', label: 'Schlüssel wurden übergeben' },
@@ -319,7 +330,7 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
       setUebergabeZustand('gut')
       setShowUebergabe(true)
     }
-    if (status === 'ausgeliefert') {
+    if (status === 'ausgeliefert' && !isEigenfahrzeug) {
       setShowBewertungModal(true)
     }
   }
@@ -518,7 +529,9 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
                   </div>
                   <div>
                     <h3 className="font-bold text-gray-900 text-lg">
-                      {checklisteZiel === 'fertig' ? 'Fahrzeug fertigstellen' : 'Fahrzeug ausliefern'}
+                      {checklisteZiel === 'fertig'
+                        ? (isEigenfahrzeug ? 'Aufbereitung abschließen' : 'Fahrzeug fertigstellen')
+                        : (isEigenfahrzeug ? 'Fahrzeug als verkauft markieren' : 'Fahrzeug ausliefern')}
                     </h3>
                     <p className="text-sm text-gray-500">Bitte alles abhaken bevor du fortfährst</p>
                   </div>
@@ -576,7 +589,9 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
                   )}
                 >
                   {alleAbgehakt
-                    ? checklisteZiel === 'fertig' ? '✓ Fertigstellen' : '✓ Ausliefern'
+                    ? checklisteZiel === 'fertig'
+                      ? (isEigenfahrzeug ? '✓ Aufbereitung abschließen' : '✓ Fertigstellen')
+                      : (isEigenfahrzeug ? '✓ Als verkauft markieren' : '✓ Ausliefern')
                     : `Noch ${items.filter(i => !checklisteAbgehakt[i.id]).length} offen`}
                 </button>
               </div>
