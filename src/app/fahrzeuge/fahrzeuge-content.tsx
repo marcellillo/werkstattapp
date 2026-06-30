@@ -43,6 +43,8 @@ export function FahrzeugeContent({
   const [verkaufenId, setVerkaufenId] = useState<string | null>(null)
   const [verkaufenLoading, setVerkaufenLoading] = useState(false)
   const [verkaufenPreis, setVerkaufenPreis] = useState('')
+  const [verkaufenAuslieferung, setVerkaufenAuslieferung] = useState('')
+  const [eigenSubTab, setEigenSubTab] = useState<'bestand' | 'verkauft'>('bestand')
 
   const fremdAuftraege = auftraege.filter(a => (a.fahrzeug as any)?.fahrzeug_typ !== 'eigen')
   const eigenAuftraege = auftraege.filter(a => (a.fahrzeug as any)?.fahrzeug_typ === 'eigen')
@@ -53,13 +55,18 @@ export function FahrzeugeContent({
     if (!verkaufenId) return
     setVerkaufenLoading(true)
     const sb = createClient()
-    const updates: Record<string, any> = { status: 'ausgeliefert' }
+    const updates: Record<string, any> = {
+      status: 'ausgeliefert',
+      verkauft_am: new Date().toISOString().split('T')[0],
+    }
     const preis = parseFloat(verkaufenPreis.replace(',', '.'))
     if (!isNaN(preis) && preis > 0) updates.einnahmen = preis
+    if (verkaufenAuslieferung) updates.auslieferung_geplant = verkaufenAuslieferung
     await sb.from('auftraege').update(updates).eq('id', verkaufenId)
     setVerkaufenLoading(false)
     setVerkaufenId(null)
     setVerkaufenPreis('')
+    setVerkaufenAuslieferung('')
     router.refresh()
   }
 
@@ -397,9 +404,100 @@ export function FahrzeugeContent({
         </>)
       )}
 
-      {/* Eigenfahrzeuge — Karten */}
+      {/* Eigenfahrzeuge */}
       {tab === 'eigen' && (
-        filteredEigen.length === 0 ? (
+        <>
+          {/* Sub-Tabs Bestand / Verkauft */}
+          <div className="flex gap-2">
+            <button
+              onClick={() => setEigenSubTab('bestand')}
+              className={cn('flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium border transition-all',
+                eigenSubTab === 'bestand' ? 'bg-purple-600 text-white border-purple-600' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300')}
+            >
+              Im Bestand
+              <span className={cn('text-xs px-1.5 py-0.5 rounded-full', eigenSubTab === 'bestand' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600')}>
+                {eigenImBestand.length}
+              </span>
+            </button>
+            <button
+              onClick={() => setEigenSubTab('verkauft')}
+              className={cn('flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium border transition-all',
+                eigenSubTab === 'verkauft' ? 'bg-green-600 text-white border-green-600' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300')}
+            >
+              Verkauft
+              <span className={cn('text-xs px-1.5 py-0.5 rounded-full', eigenSubTab === 'verkauft' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600')}>
+                {eigenVerkauft.length}
+              </span>
+            </button>
+          </div>
+
+          {/* Verkauft-Liste */}
+          {eigenSubTab === 'verkauft' && (
+            eigenVerkauft.length === 0 ? (
+              <Card><CardContent className="py-12 text-center">
+                <CheckCircle2 className="w-10 h-10 mx-auto mb-3 text-gray-200" />
+                <p className="text-gray-500 text-sm">Noch keine Fahrzeuge verkauft</p>
+              </CardContent></Card>
+            ) : (
+              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-100 bg-gray-50">
+                        <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Fahrzeug</th>
+                        <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Verkauft am</th>
+                        <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Verkaufspreis</th>
+                        <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Auslieferung</th>
+                        <th className="px-4 py-3"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {eigenVerkauft.map(a => {
+                        const fz = a.fahrzeug as any
+                        const vk = (a as any).verkauft_am
+                        const al = (a as any).auslieferung_geplant
+                        const preis = (a as any).einnahmen
+                        const heute = new Date().toISOString().split('T')[0]
+                        const ausstehend = al && al >= heute
+                        return (
+                          <tr key={a.id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50 transition-colors">
+                            <td className="px-4 py-3">
+                              <p className="font-medium text-gray-900">{fz?.marke} {fz?.modell}</p>
+                              <p className="text-xs text-gray-400 font-mono">{fz?.kennzeichen || '—'}</p>
+                            </td>
+                            <td className="px-4 py-3 text-gray-700">
+                              {vk ? new Date(vk).toLocaleDateString('de-DE') : <span className="text-gray-300">—</span>}
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              {preis > 0
+                                ? <span className="font-semibold text-green-700">{preis.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €</span>
+                                : <span className="text-gray-300">—</span>}
+                            </td>
+                            <td className="px-4 py-3">
+                              {al ? (
+                                <span className={cn('text-sm', ausstehend ? 'text-orange-600 font-medium' : 'text-gray-500')}>
+                                  {new Date(al).toLocaleDateString('de-DE')}
+                                  {ausstehend && ' ⏳'}
+                                </span>
+                              ) : <span className="text-gray-300">—</span>}
+                            </td>
+                            <td className="px-4 py-3">
+                              <Link href={`/fahrzeuge/${a.id}`}>
+                                <ChevronRight className="w-4 h-4 text-gray-300" />
+                              </Link>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )
+          )}
+
+          {/* Bestand-Karten */}
+          {eigenSubTab === 'bestand' && (filteredEigen.length === 0 ? (
           <Card>
             <CardContent className="py-16 text-center">
               <Car className="w-12 h-12 mx-auto mb-3 text-purple-200" />
@@ -517,7 +615,8 @@ export function FahrzeugeContent({
               )
             })}
           </div>
-        )
+        ))}
+        </>
       )}
 
       {/* TÜV-Wecker Tab */}
@@ -543,22 +642,33 @@ export function FahrzeugeContent({
                 <p className="text-sm text-gray-500 mt-0.5">Das Fahrzeug wird aus dem Lagerbestand entfernt und im Verlauf archiviert.</p>
               </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Verkaufspreis (optional)</label>
-              <div className="relative">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Verkaufspreis (optional)</label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    placeholder="0,00"
+                    value={verkaufenPreis}
+                    onChange={e => setVerkaufenPreis(e.target.value)}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2.5 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">€</span>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Auslieferung geplant</label>
                 <input
-                  type="number"
-                  inputMode="decimal"
-                  placeholder="0,00"
-                  value={verkaufenPreis}
-                  onChange={e => setVerkaufenPreis(e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2.5 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
+                  type="date"
+                  value={verkaufenAuslieferung}
+                  onChange={e => setVerkaufenAuslieferung(e.target.value)}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
                 />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">€</span>
               </div>
             </div>
             <div className="flex gap-3">
-              <Button variant="outline" className="flex-1" onClick={() => { setVerkaufenId(null); setVerkaufenPreis('') }} disabled={verkaufenLoading}>
+              <Button variant="outline" className="flex-1" onClick={() => { setVerkaufenId(null); setVerkaufenPreis(''); setVerkaufenAuslieferung('') }} disabled={verkaufenLoading}>
                 Abbrechen
               </Button>
               <Button className="flex-1 bg-purple-600 hover:bg-purple-700 text-white" onClick={handleVerkauft} disabled={verkaufenLoading}>

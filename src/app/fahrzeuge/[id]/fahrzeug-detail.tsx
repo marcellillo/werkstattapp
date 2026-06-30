@@ -317,6 +317,7 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
     const updates: Record<string, any> = { status }
     if (status === 'fertig') updates.fertiggestellt_am = new Date().toISOString().split('T')[0]
     if (status === 'ausgeliefert' && isEigenfahrzeug) {
+      updates.verkauft_am = new Date().toISOString().split('T')[0]
       const preis = parseFloat(verkaufspreis.replace(',', '.'))
       if (!isNaN(preis) && preis > 0) updates.einnahmen = preis
       setVerkaufspreis('')
