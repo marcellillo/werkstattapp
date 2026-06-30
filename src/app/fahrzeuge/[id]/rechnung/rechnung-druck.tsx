@@ -283,7 +283,7 @@ export function RechnungDruck({ auftrag, firma }: { auftrag: any; firma: Record<
         .btn-print { background: #ea580c; color: white; }
         .btn-wa { background: #16a34a; color: white; }
         .btn-email { background: #2563eb; color: white; }
-        .page { padding-top: calc(max(10px, env(safe-area-inset-top)) + 60px); }
+        .page { padding-top: calc(max(10px, env(safe-area-inset-top)) + 60px); padding-bottom: max(20px, env(safe-area-inset-bottom)); }
       `}</style>
 
       <div className="no-print action-bar">

@@ -86,7 +86,7 @@ export function BottomNav() {
             </button>
           </div>
 
-          <div className="p-3 space-y-4">
+          <div className="p-3 space-y-4" style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
             {moreGroups.map(group => {
               const visibleItems = loading ? [] : group.items.filter(i => kannZugreifen(i.key))
               if (visibleItems.length === 0) return null

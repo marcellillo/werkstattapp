@@ -251,7 +251,7 @@ export function AnnahmeProtokoll({ auftrag, firma }: Props) {
 
       <div className="no-print bg-gray-50 min-h-screen pb-24">
         {/* Header */}
-        <div className="bg-white border-b px-4 flex items-center gap-3 topbar-safe">
+        <div className="sticky top-0 z-20 bg-white border-b px-4 flex items-center gap-3 topbar-safe">
           <Link href={`/fahrzeuge/${auftrag.id}`}>
             <Button variant="ghost" size="sm"><ArrowLeft className="w-4 h-4 mr-1" />Zurück</Button>
           </Link>
@@ -545,8 +545,8 @@ export function AnnahmeProtokoll({ auftrag, firma }: Props) {
 
       {/* Foto-Beschreibungs-Modal */}
       {pendingFotos.length > 0 && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
-          <div className="bg-white rounded-t-2xl w-full max-w-lg shadow-xl p-5 space-y-4">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50">
+          <div className="bg-white rounded-t-2xl w-full max-w-lg shadow-xl p-5 space-y-4" style={{ paddingBottom: 'max(20px, env(safe-area-inset-bottom))' }}>
             <div className="flex items-center justify-between">
               <h2 className="font-semibold text-gray-900 text-base">
                 {pendingFotos.length === 1 ? 'Foto hinzufügen' : `${pendingFotos.length} Fotos hinzufügen`}

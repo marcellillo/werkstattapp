@@ -42,18 +42,18 @@ export function VerlaufContent({ auftraege }: { auftraege: any[] }) {
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         <Card><CardContent className="p-4">
           <p className="text-xs text-gray-500 mb-1">Aufträge gesamt</p>
-          <p className="text-2xl font-bold text-gray-900">{auftraege.length}</p>
+          <p className="text-xl sm:text-2xl font-bold text-gray-900">{auftraege.length}</p>
         </CardContent></Card>
         <Card><CardContent className="p-4">
           <p className="text-xs text-gray-500 mb-1">Teile verbaut</p>
-          <p className="text-2xl font-bold text-gray-900">{totalTeile}</p>
+          <p className="text-xl sm:text-2xl font-bold text-gray-900">{totalTeile}</p>
         </CardContent></Card>
         <Card><CardContent className="p-4">
           <p className="text-xs text-gray-500 mb-1">Teile-Einkauf</p>
-          <p className="text-2xl font-bold text-gray-900">
+          <p className="text-xl sm:text-2xl font-bold text-gray-900">
             {new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(totalUmsatz)}
           </p>
         </CardContent></Card>

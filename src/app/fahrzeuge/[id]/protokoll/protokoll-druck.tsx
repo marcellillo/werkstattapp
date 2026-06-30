@@ -39,7 +39,7 @@ export function ProtokolllDruck({ auftrag, rechnungen }: { auftrag: any; rechnun
           .no-print { display: none !important; }
           body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         }
-        .page { font-family: Arial, sans-serif; font-size: 11px; color: #111; max-width: 794px; margin: 0 auto; padding: 20px; padding-top: calc(max(10px, env(safe-area-inset-top)) + 58px); }
+        .page { font-family: Arial, sans-serif; font-size: 11px; color: #111; max-width: 794px; margin: 0 auto; padding: 20px; padding-top: calc(max(10px, env(safe-area-inset-top)) + 58px); padding-bottom: max(20px, env(safe-area-inset-bottom)); }
         .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 18px; border-bottom: 2px solid #ea580c; padding-bottom: 12px; }
         .logo-block h1 { font-size: 20px; font-weight: 700; color: #ea580c; margin: 0 0 2px; }
         .logo-block p { font-size: 10px; color: #666; margin: 0; }

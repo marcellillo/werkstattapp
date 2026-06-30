@@ -128,8 +128,8 @@ const auftragMap = new Map<string, Auftrag>()
             <Card className="card-hover cursor-pointer"><CardContent className="p-5">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-slate-500">{label}</p>
-                  <p className="text-3xl font-bold text-slate-900 mt-1 stat-number">{display}</p>
+                  <p className="text-xs sm:text-sm text-slate-500 leading-tight">{label}</p>
+                  <p className="text-2xl sm:text-3xl font-bold text-slate-900 mt-1 stat-number">{display}</p>
                 </div>
                 <div className={`w-12 h-12 ${bg} rounded-xl flex items-center justify-center`}>
                   <Icon className={`w-6 h-6 ${color}`} />
