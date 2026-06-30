@@ -80,6 +80,7 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
   const [zugewiesenAn, setZugewiesenAn] = useState<string>(initialAuftrag.zugewiesen_an ?? '')
   const [checklisteZiel, setChecklisteZiel] = useState<FahrzeugStatus | null>(null)
   const [checklisteAbgehakt, setChecklisteAbgehakt] = useState<Record<string, boolean>>({})
+  const [verkaufspreis, setVerkaufspreis] = useState('')
   const [showKundeModal, setShowKundeModal] = useState(false)
   const [kundeSearch, setKundeSearch] = useState('')
   const [kundenListe, setKundenListe] = useState<any[]>([])
@@ -315,6 +316,11 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
     setAuftrag(a => ({ ...a, status }))
     const updates: Record<string, any> = { status }
     if (status === 'fertig') updates.fertiggestellt_am = new Date().toISOString().split('T')[0]
+    if (status === 'ausgeliefert' && isEigenfahrzeug) {
+      const preis = parseFloat(verkaufspreis.replace(',', '.'))
+      if (!isNaN(preis) && preis > 0) updates.einnahmen = preis
+      setVerkaufspreis('')
+    }
     await supabase.from('auftraege').update(updates).eq('id', auftrag.id)
     fetch('/api/benachrichtigungen/generieren', { method: 'POST' }).catch(() => {})
     if (status === 'fertig') {
@@ -571,9 +577,26 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
                 ))}
               </div>
 
+              {isEigenfahrzeug && checklisteZiel === 'ausgeliefert' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Verkaufspreis (optional)</label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      placeholder="0,00"
+                      value={verkaufspreis}
+                      onChange={e => setVerkaufspreis(e.target.value)}
+                      className="w-full border border-gray-200 rounded-xl px-4 py-3 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">€</span>
+                  </div>
+                </div>
+              )}
+
               <div className="flex gap-3 pt-1">
                 <button
-                  onClick={() => setChecklisteZiel(null)}
+                  onClick={() => { setChecklisteZiel(null); setVerkaufspreis('') }}
                   className="flex-1 px-4 py-3 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:border-gray-300 transition-colors"
                 >
                   Abbrechen

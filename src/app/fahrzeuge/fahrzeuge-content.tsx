@@ -42,6 +42,7 @@ export function FahrzeugeContent({
   const [sortByPrio, setSortByPrio] = useState(true)
   const [verkaufenId, setVerkaufenId] = useState<string | null>(null)
   const [verkaufenLoading, setVerkaufenLoading] = useState(false)
+  const [verkaufenPreis, setVerkaufenPreis] = useState('')
 
   const fremdAuftraege = auftraege.filter(a => (a.fahrzeug as any)?.fahrzeug_typ !== 'eigen')
   const eigenAuftraege = auftraege.filter(a => (a.fahrzeug as any)?.fahrzeug_typ === 'eigen')
@@ -52,9 +53,13 @@ export function FahrzeugeContent({
     if (!verkaufenId) return
     setVerkaufenLoading(true)
     const sb = createClient()
-    await sb.from('auftraege').update({ status: 'ausgeliefert' }).eq('id', verkaufenId)
+    const updates: Record<string, any> = { status: 'ausgeliefert' }
+    const preis = parseFloat(verkaufenPreis.replace(',', '.'))
+    if (!isNaN(preis) && preis > 0) updates.einnahmen = preis
+    await sb.from('auftraege').update(updates).eq('id', verkaufenId)
     setVerkaufenLoading(false)
     setVerkaufenId(null)
+    setVerkaufenPreis('')
     router.refresh()
   }
 
@@ -538,8 +543,22 @@ export function FahrzeugeContent({
                 <p className="text-sm text-gray-500 mt-0.5">Das Fahrzeug wird aus dem Lagerbestand entfernt und im Verlauf archiviert.</p>
               </div>
             </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Verkaufspreis (optional)</label>
+              <div className="relative">
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  placeholder="0,00"
+                  value={verkaufenPreis}
+                  onChange={e => setVerkaufenPreis(e.target.value)}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2.5 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">€</span>
+              </div>
+            </div>
             <div className="flex gap-3">
-              <Button variant="outline" className="flex-1" onClick={() => setVerkaufenId(null)} disabled={verkaufenLoading}>
+              <Button variant="outline" className="flex-1" onClick={() => { setVerkaufenId(null); setVerkaufenPreis('') }} disabled={verkaufenLoading}>
                 Abbrechen
               </Button>
               <Button className="flex-1 bg-purple-600 hover:bg-purple-700 text-white" onClick={handleVerkauft} disabled={verkaufenLoading}>
