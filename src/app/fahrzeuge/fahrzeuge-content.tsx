@@ -438,62 +438,85 @@ export function FahrzeugeContent({
                 <CheckCircle2 className="w-10 h-10 mx-auto mb-3 text-gray-200" />
                 <p className="text-gray-500 text-sm">Noch keine Fahrzeuge verkauft</p>
               </CardContent></Card>
-            ) : (
-              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-gray-100 bg-gray-50">
-                        <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Fahrzeug</th>
-                        <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Verkauft am</th>
-                        <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Verkaufspreis</th>
-                        <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Auslieferung</th>
-                        <th className="px-4 py-3"></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {eigenVerkauft.map(a => {
-                        const fz = a.fahrzeug as any
-                        const vk = (a as any).verkauft_am
-                        const al = (a as any).auslieferung_geplant
-                        const preis = (a as any).einnahmen
-                        const heute = new Date().toISOString().split('T')[0]
-                        const ausstehend = al && al >= heute
-                        return (
-                          <tr key={a.id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50 transition-colors">
-                            <td className="px-4 py-3">
-                              <p className="font-medium text-gray-900">{fz?.marke} {fz?.modell}</p>
-                              <p className="text-xs text-gray-400 font-mono">{fz?.kennzeichen || '—'}</p>
-                            </td>
-                            <td className="px-4 py-3 text-gray-700">
-                              {vk ? new Date(vk).toLocaleDateString('de-DE') : <span className="text-gray-300">—</span>}
-                            </td>
-                            <td className="px-4 py-3 text-right">
-                              {preis > 0
-                                ? <span className="font-semibold text-green-700">{preis.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €</span>
-                                : <span className="text-gray-300">—</span>}
-                            </td>
-                            <td className="px-4 py-3">
-                              {al ? (
-                                <span className={cn('text-sm', ausstehend ? 'text-orange-600 font-medium' : 'text-gray-500')}>
-                                  {new Date(al).toLocaleDateString('de-DE')}
-                                  {ausstehend && ' ⏳'}
-                                </span>
-                              ) : <span className="text-gray-300">—</span>}
-                            </td>
-                            <td className="px-4 py-3">
-                              <Link href={`/fahrzeuge/${a.id}`}>
-                                <ChevronRight className="w-4 h-4 text-gray-300" />
-                              </Link>
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )
+            ) : (() => {
+                const heute = new Date().toISOString().split('T')[0]
+                // Sortieren: neueste zuerst, kein Datum ans Ende
+                const sorted = [...eigenVerkauft].sort((a, b) => {
+                  const da = (a as any).verkauft_am ?? ''
+                  const db = (b as any).verkauft_am ?? ''
+                  return db.localeCompare(da)
+                })
+                // Nach Monat gruppieren
+                const groups: { label: string; key: string; items: typeof sorted; summe: number }[] = []
+                for (const a of sorted) {
+                  const vk = (a as any).verkauft_am as string | null
+                  const key = vk ? vk.slice(0, 7) : 'unbekannt'
+                  const label = vk
+                    ? new Date(vk + '-01').toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })
+                    : 'Kein Datum'
+                  let g = groups.find(g => g.key === key)
+                  if (!g) { g = { label, key, items: [], summe: 0 }; groups.push(g) }
+                  g.items.push(a)
+                  g.summe += (a as any).einnahmen ?? 0
+                }
+                return (
+                  <div className="space-y-4">
+                    {groups.map(group => (
+                      <div key={group.key} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                        {/* Monats-Header */}
+                        <div className="flex items-center justify-between px-4 py-2.5 bg-gray-50 border-b border-gray-100">
+                          <span className="text-sm font-semibold text-gray-700">{group.label}</span>
+                          <div className="flex items-center gap-3 text-xs text-gray-500">
+                            <span>{group.items.length} {group.items.length === 1 ? 'Fahrzeug' : 'Fahrzeuge'}</span>
+                            {group.summe > 0 && (
+                              <span className="font-semibold text-green-700">
+                                {group.summe.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <tbody>
+                              {group.items.map(a => {
+                                const fz = a.fahrzeug as any
+                                const vk = (a as any).verkauft_am as string | null
+                                const al = (a as any).auslieferung_geplant as string | null
+                                const preis = (a as any).einnahmen as number | null
+                                const ausstehend = al && al >= heute
+                                return (
+                                  <tr key={a.id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50 transition-colors">
+                                    <td className="px-4 py-3">
+                                      <p className="font-medium text-gray-900">{fz?.marke} {fz?.modell}</p>
+                                      <p className="text-xs text-gray-400 font-mono">{fz?.kennzeichen || '—'}</p>
+                                    </td>
+                                    <td className="px-4 py-3 text-gray-600 text-sm whitespace-nowrap">
+                                      {vk ? new Date(vk).toLocaleDateString('de-DE') : <span className="text-gray-300">—</span>}
+                                    </td>
+                                    <td className="px-4 py-3 text-right whitespace-nowrap">
+                                      {preis && preis > 0
+                                        ? <span className="font-semibold text-green-700">{preis.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €</span>
+                                        : <span className="text-gray-300">—</span>}
+                                    </td>
+                                    <td className="px-4 py-3 whitespace-nowrap">
+                                      {al
+                                        ? <span className={cn('text-sm', ausstehend ? 'text-orange-600 font-medium' : 'text-gray-500')}>{new Date(al).toLocaleDateString('de-DE')}{ausstehend && ' ⏳'}</span>
+                                        : <span className="text-gray-300">—</span>}
+                                    </td>
+                                    <td className="px-4 py-3">
+                                      <Link href={`/fahrzeuge/${a.id}`}><ChevronRight className="w-4 h-4 text-gray-300" /></Link>
+                                    </td>
+                                  </tr>
+                                )
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )
+              })()
           )}
 
           {/* Bestand-Karten */}
