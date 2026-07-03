@@ -461,11 +461,23 @@ export function FahrzeugeContent({
       {/* Eigenfahrzeuge */}
       {tab === 'eigen' && (
         <>
-          {/* Sub-Tabs Bestand / Verkauft / Übergeben */}
-          <div className="flex gap-2 overflow-x-auto pb-1">
+          {/* Sub-Tabs: Mobile Select / Desktop Buttons */}
+          {/* Mobile: Select */}
+          <select
+            value={eigenSubTab}
+            onChange={e => setEigenSubTab(e.target.value as 'bestand' | 'verkauft' | 'uebergeben')}
+            className="md:hidden w-full px-3 py-2 border border-gray-200 rounded-xl text-sm font-medium bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-400"
+          >
+            <option value="bestand">Im Bestand ({eigenImBestand.length})</option>
+            <option value="verkauft">Verkauft ({eigenBereitsVerkauft.length})</option>
+            <option value="uebergeben">Übergeben ({eigenVerkauft.length})</option>
+          </select>
+
+          {/* Desktop: Buttons */}
+          <div className="hidden md:flex gap-2">
             <button
               onClick={() => setEigenSubTab('bestand')}
-              className={cn('flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium border transition-all whitespace-nowrap',
+              className={cn('flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium border transition-all',
                 eigenSubTab === 'bestand' ? 'bg-purple-600 text-white border-purple-600' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300')}
             >
               Im Bestand
@@ -475,7 +487,7 @@ export function FahrzeugeContent({
             </button>
             <button
               onClick={() => setEigenSubTab('verkauft')}
-              className={cn('flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium border transition-all whitespace-nowrap',
+              className={cn('flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium border transition-all',
                 eigenSubTab === 'verkauft' ? 'bg-green-600 text-white border-green-600' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300')}
             >
               Verkauft
@@ -485,7 +497,7 @@ export function FahrzeugeContent({
             </button>
             <button
               onClick={() => setEigenSubTab('uebergeben')}
-              className={cn('flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium border transition-all whitespace-nowrap',
+              className={cn('flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium border transition-all',
                 eigenSubTab === 'uebergeben' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300')}
             >
               Übergeben
