@@ -344,14 +344,21 @@ export function VerkauftContent({ verkauft, standardSteuerart = 'differenz', isA
                     const gewinn = s.marge - s.mwst
                     return (
                       <div key={r.auftragId} className="bg-gray-50 rounded-lg p-4 space-y-3 border border-gray-200">
-                        {/* Fahrzeug-Info */}
-                        <div>
-                          <Link href={`/fahrzeuge/${r.auftragId}`} className="block font-semibold text-gray-900 hover:text-purple-600">{r.name}</Link>
-                          <div className="flex items-center gap-2 text-xs text-gray-500 mt-1">
-                            {r.bnr && <span className="font-mono text-purple-600">{r.bnr}</span>}
-                            <span>{fmtDatum(r.verkauftAm)}</span>
-                            {r.status === 'verkauft' && <span className="text-orange-500 font-medium">⏳ n. übergeben</span>}
+                        {/* Fahrzeug-Info + Status-Badge */}
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <Link href={`/fahrzeuge/${r.auftragId}`} className="block font-semibold text-gray-900 hover:text-purple-600 truncate">{r.name}</Link>
+                            <div className="flex items-center gap-2 text-xs text-gray-500 mt-1 flex-wrap">
+                              {r.bnr && <span className="font-mono text-purple-600">{r.bnr}</span>}
+                              <span className="whitespace-nowrap">{fmtDatum(r.verkauftAm)}</span>
+                            </div>
                           </div>
+                          {r.status === 'verkauft' && (
+                            <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-orange-100 text-orange-700 whitespace-nowrap flex-shrink-0">⏳ n. übergeben</span>
+                          )}
+                          {r.status === 'ausgeliefert' && (
+                            <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 whitespace-nowrap flex-shrink-0">✓ Übergeben</span>
+                          )}
                         </div>
 
                         {/* Preise & Steuern */}
@@ -362,7 +369,8 @@ export function VerkauftContent({ verkauft, standardSteuerart = 'differenz', isA
                               type="number" inputMode="decimal" defaultValue={r.ek ?? ''}
                               onBlur={e => { if ((e.target.value ? parseFloat(e.target.value) : null) !== r.ek) saveEk(r, e.target.value) }}
                               placeholder="—"
-                              className="w-full text-right border border-gray-300 rounded px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-purple-400"
+                              disabled={r.status === 'ausgeliefert'}
+                              className={cn('w-full text-right border rounded px-2 py-1.5 focus:outline-none focus:ring-2', r.status === 'ausgeliefert' ? 'bg-gray-100 border-gray-200 text-gray-500 cursor-not-allowed' : 'border-gray-300 focus:ring-purple-400')}
                             />
                           </div>
                           <div>
@@ -371,7 +379,8 @@ export function VerkauftContent({ verkauft, standardSteuerart = 'differenz', isA
                               type="number" inputMode="decimal" defaultValue={r.vk ?? ''}
                               onBlur={e => { if ((e.target.value ? parseFloat(e.target.value) : null) !== r.vk) saveVk(r, e.target.value) }}
                               placeholder="—"
-                              className="w-full text-right border border-gray-300 rounded px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-purple-400"
+                              disabled={r.status === 'ausgeliefert'}
+                              className={cn('w-full text-right border rounded px-2 py-1.5 focus:outline-none focus:ring-2', r.status === 'ausgeliefert' ? 'bg-gray-100 border-gray-200 text-gray-500 cursor-not-allowed' : 'border-gray-300 focus:ring-purple-400')}
                             />
                           </div>
                         </div>
@@ -383,7 +392,8 @@ export function VerkauftContent({ verkauft, standardSteuerart = 'differenz', isA
                             <select
                               value={r.steuerart}
                               onChange={e => saveSteuerart(r, e.target.value as Steuerart)}
-                              className={cn('w-full text-xs font-medium border rounded px-2 py-1.5 cursor-pointer focus:outline-none', STEUERART_COLOR[r.steuerart])}
+                              disabled={r.status === 'ausgeliefert'}
+                              className={cn('w-full text-xs font-medium border rounded px-2 py-1.5 focus:outline-none', r.status === 'ausgeliefert' ? 'bg-gray-100 border-gray-200 text-gray-500 cursor-not-allowed' : cn('cursor-pointer', STEUERART_COLOR[r.steuerart]))}
                             >
                               <option value="differenz">§25a</option>
                               <option value="regel">19%</option>

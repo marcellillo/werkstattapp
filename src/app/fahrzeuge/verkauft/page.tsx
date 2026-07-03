@@ -19,7 +19,7 @@ export default async function VerkauftPage() {
         verkaufspreis, einkaufspreis
       )
     `)
-    .eq('status', 'verkauft')
+    .in('status', ['verkauft', 'ausgeliefert'])
     .order('verkauft_am', { ascending: false, nullsFirst: false })
 
   const verkauft = ((raw ?? []) as any[]).filter(
