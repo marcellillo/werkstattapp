@@ -172,18 +172,18 @@ export function VerkauftContent({ verkauft, standardSteuerart = 'differenz', isA
   return (
     <div className="space-y-5">
       {/* Header */}
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <Link href="/fahrzeuge?tab=eigen" className="p-2 rounded-xl hover:bg-gray-100 transition-colors">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-3 w-full sm:w-auto">
+          <Link href="/fahrzeuge?tab=eigen" className="p-2 rounded-xl hover:bg-gray-100 transition-colors flex-shrink-0">
             <ArrowLeft className="w-5 h-5 text-gray-600" />
           </Link>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Steuerblatt Fahrzeuge</h1>
-            <p className="text-sm text-gray-500 mt-0.5">{rows.length} verkauft · EK/VK eintragen, Marge & Steuern werden berechnet</p>
+          <div className="min-w-0">
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Steuerblatt Fahrzeuge</h1>
+            <p className="text-xs sm:text-sm text-gray-500 mt-0.5 truncate">{rows.length} verkauft · EK/VK eintragen</p>
           </div>
         </div>
         {rows.length > 0 && (
-          <button onClick={exportCSV} className="flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors flex-shrink-0">
+          <button onClick={exportCSV} className="flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 text-xs sm:text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors flex-shrink-0">
             <Download className="w-4 h-4" /> CSV
           </button>
         )}
@@ -191,29 +191,29 @@ export function VerkauftContent({ verkauft, standardSteuerart = 'differenz', isA
 
       {/* Summen-Karten */}
       {rows.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div className="bg-white border border-gray-200 rounded-xl p-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3">
+          <div className="bg-white border border-gray-200 rounded-lg md:rounded-xl p-3 md:p-4">
             <p className="text-xs text-gray-500 mb-1">Verkaufserlös</p>
-            <p className="text-xl font-bold text-gray-900">{fmtEuro(gesamt.vk)}</p>
+            <p className="text-lg md:text-xl font-bold text-gray-900 truncate">{fmtEuro(gesamt.vk)}</p>
           </div>
-          <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <div className="bg-white border border-gray-200 rounded-lg md:rounded-xl p-3 md:p-4">
             <p className="text-xs text-gray-500 mb-1">Einkauf</p>
-            <p className="text-xl font-bold text-gray-500">{fmtEuro(gesamt.ek)}</p>
+            <p className="text-lg md:text-xl font-bold text-gray-500 truncate">{fmtEuro(gesamt.ek)}</p>
           </div>
-          <div className="bg-white border border-gray-200 rounded-xl p-4">
-            <p className="text-xs text-gray-500 mb-1">MwSt (abzuführen)</p>
-            <p className="text-xl font-bold text-amber-600">{fmtEuro(gesamt.mwst)}</p>
+          <div className="bg-white border border-gray-200 rounded-lg md:rounded-xl p-3 md:p-4">
+            <p className="text-xs text-gray-500 mb-1">MwSt</p>
+            <p className="text-lg md:text-xl font-bold text-amber-600 truncate">{fmtEuro(gesamt.mwst)}</p>
           </div>
-          <div className="bg-white border border-gray-200 rounded-xl p-4">
-            <p className="text-xs text-gray-500 mb-1 flex items-center gap-1"><TrendingUp className="w-3 h-3" /> Gewinn (n. St.)</p>
-            <p className={cn('text-xl font-bold', gesamt.gewinn >= 0 ? 'text-green-600' : 'text-red-600')}>{fmtEuro(gesamt.gewinn)}</p>
+          <div className="bg-white border border-gray-200 rounded-lg md:rounded-xl p-3 md:p-4">
+            <p className="text-xs text-gray-500 mb-1 flex items-center gap-1"><TrendingUp className="w-3 h-3" /> Gewinn</p>
+            <p className={cn('text-lg md:text-xl font-bold truncate', gesamt.gewinn >= 0 ? 'text-green-600' : 'text-red-600')}>{fmtEuro(gesamt.gewinn)}</p>
           </div>
         </div>
       )}
 
       {unklassifiziert > 0 && (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 text-sm text-amber-800">
-          Bei <strong>{unklassifiziert}</strong> {unklassifiziert === 1 ? 'Fahrzeug' : 'Fahrzeugen'} fehlt der Einkaufspreis — bitte eintragen, damit Marge & MwSt (§25a) stimmen.
+        <div className="bg-amber-50 border border-amber-200 rounded-lg md:rounded-xl px-3 md:px-4 py-2 md:py-2.5 text-xs md:text-sm text-amber-800">
+          Bei <strong>{unklassifiziert}</strong> {unklassifiziert === 1 ? 'Fahrzeug' : 'Fahrzeugen'} fehlt der Einkaufspreis — bitte eintragen.
         </div>
       )}
 
@@ -247,92 +247,190 @@ export function VerkauftContent({ verkauft, standardSteuerart = 'differenz', isA
             </button>
 
             {offen && (
-              <div className="border-t border-gray-100 overflow-x-auto">
-                <table className="w-full text-sm min-w-[720px]">
-                  <thead>
-                    <tr className="bg-gray-50 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                      <th className="px-4 py-2.5">Fahrzeug</th>
-                      <th className="px-3 py-2.5 whitespace-nowrap">Verkauft</th>
-                      <th className="px-3 py-2.5 text-right">Einkauf €</th>
-                      <th className="px-3 py-2.5 text-right">Verkauf €</th>
-                      <th className="px-3 py-2.5 text-right">Marge</th>
-                      <th className="px-3 py-2.5 text-center">Steuerart</th>
-                      <th className="px-3 py-2.5 text-right">MwSt</th>
-                      <th className="px-3 py-2.5 text-right">Gewinn</th>
-                      {!isArchiv && <th className="px-3 py-2.5 text-center">Aktion</th>}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50">
-                    {list.map(r => {
-                      const s = berechneFahrzeugSteuer({ verkaufspreis: r.vk, einkaufspreis: r.ek, steuerart: r.steuerart })
-                      const gewinn = s.marge - s.mwst
-                      return (
-                        <tr key={r.auftragId} className="hover:bg-gray-50/60">
-                          <td className="px-4 py-2.5">
-                            <Link href={`/fahrzeuge/${r.auftragId}`} className="font-medium text-gray-900 hover:text-purple-700">{r.name}</Link>
-                            <div className="flex items-center gap-2 text-xs text-gray-400">
-                              {r.bnr && <span className="font-mono text-purple-500">{r.bnr}</span>}
-                              {r.status === 'verkauft' && <span className="text-orange-500">⏳ n. übergeben</span>}
-                            </div>
-                          </td>
-                          <td className="px-3 py-2.5 text-gray-500 whitespace-nowrap">{fmtDatum(r.verkauftAm)}</td>
-                          <td className="px-3 py-2.5">
+              <div className="border-t border-gray-100">
+                {/* Desktop: Tabelle */}
+                <div className="hidden md:block overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-gray-50 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                        <th className="px-4 py-2.5">Fahrzeug</th>
+                        <th className="px-3 py-2.5 whitespace-nowrap">Verkauft</th>
+                        <th className="px-3 py-2.5 text-right">Einkauf €</th>
+                        <th className="px-3 py-2.5 text-right">Verkauf €</th>
+                        <th className="px-3 py-2.5 text-right">Marge</th>
+                        <th className="px-3 py-2.5 text-center">Steuerart</th>
+                        <th className="px-3 py-2.5 text-right">MwSt</th>
+                        <th className="px-3 py-2.5 text-right">Gewinn</th>
+                        {!isArchiv && <th className="px-3 py-2.5 text-center">Aktion</th>}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {list.map(r => {
+                        const s = berechneFahrzeugSteuer({ verkaufspreis: r.vk, einkaufspreis: r.ek, steuerart: r.steuerart })
+                        const gewinn = s.marge - s.mwst
+                        return (
+                          <tr key={r.auftragId} className="hover:bg-gray-50/60">
+                            <td className="px-4 py-2.5">
+                              <Link href={`/fahrzeuge/${r.auftragId}`} className="font-medium text-gray-900 hover:text-purple-700">{r.name}</Link>
+                              <div className="flex items-center gap-2 text-xs text-gray-400">
+                                {r.bnr && <span className="font-mono text-purple-500">{r.bnr}</span>}
+                                {r.status === 'verkauft' && <span className="text-orange-500">⏳ n. übergeben</span>}
+                              </div>
+                            </td>
+                            <td className="px-3 py-2.5 text-gray-500 whitespace-nowrap">{fmtDatum(r.verkauftAm)}</td>
+                            <td className="px-3 py-2.5">
+                              <input
+                                type="number" inputMode="decimal" defaultValue={r.ek ?? ''}
+                                onBlur={e => { if ((e.target.value ? parseFloat(e.target.value) : null) !== r.ek) saveEk(r, e.target.value) }}
+                                placeholder="—"
+                                className="w-24 text-right border border-gray-200 rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-purple-400 text-sm"
+                              />
+                            </td>
+                            <td className="px-3 py-2.5">
+                              <input
+                                type="number" inputMode="decimal" defaultValue={r.vk ?? ''}
+                                onBlur={e => { if ((e.target.value ? parseFloat(e.target.value) : null) !== r.vk) saveVk(r, e.target.value) }}
+                                placeholder="—"
+                                className="w-24 text-right border border-gray-200 rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-purple-400 text-sm"
+                              />
+                            </td>
+                            <td className="px-3 py-2.5 text-right font-medium text-gray-700 whitespace-nowrap">{fmtEuro(s.marge)}</td>
+                            <td className="px-3 py-2.5 text-center">
+                              <select
+                                value={r.steuerart}
+                                onChange={e => saveSteuerart(r, e.target.value as Steuerart)}
+                                className={cn('text-xs font-medium border rounded-md px-1.5 py-1 cursor-pointer focus:outline-none', STEUERART_COLOR[r.steuerart])}
+                              >
+                                <option value="differenz">§25a</option>
+                                <option value="regel">19%</option>
+                                <option value="ausfuhr">Ausfuhr</option>
+                              </select>
+                            </td>
+                            <td className="px-3 py-2.5 text-right text-amber-600 whitespace-nowrap">{fmtEuro(s.mwst)}</td>
+                            <td className={cn('px-3 py-2.5 text-right font-semibold whitespace-nowrap', gewinn >= 0 ? 'text-green-600' : 'text-red-600')}>{fmtEuro(gewinn)}</td>
+                            {!isArchiv && r.status === 'verkauft' && (
+                              <td className="px-3 py-2.5 text-center">
+                                <button
+                                  onClick={() => setUebergebenId(r.auftragId)}
+                                  className="px-2.5 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-medium rounded-md transition-colors whitespace-nowrap"
+                                  disabled={uebergebenLoading}
+                                >
+                                  Übergeben
+                                </button>
+                              </td>
+                            )}
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                    <tfoot>
+                      <tr className="bg-gray-50 font-semibold text-gray-800 border-t border-gray-200">
+                        <td className="px-4 py-2.5" colSpan={2}>Summe {jahr === 0 ? '' : jahr}</td>
+                        <td className="px-3 py-2.5 text-right">{fmtEuro(jSum.ek)}</td>
+                        <td className="px-3 py-2.5 text-right">{fmtEuro(jSum.vk)}</td>
+                        <td className="px-3 py-2.5 text-right">{fmtEuro(jSum.marge)}</td>
+                        <td></td>
+                        <td className="px-3 py-2.5 text-right text-amber-600">{fmtEuro(jSum.mwst)}</td>
+                        <td className={cn('px-3 py-2.5 text-right', jSum.gewinn >= 0 ? 'text-green-700' : 'text-red-600')}>{fmtEuro(jSum.gewinn)}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+
+                {/* Mobile: Card-Liste */}
+                <div className="md:hidden space-y-3 p-4">
+                  {list.map(r => {
+                    const s = berechneFahrzeugSteuer({ verkaufspreis: r.vk, einkaufspreis: r.ek, steuerart: r.steuerart })
+                    const gewinn = s.marge - s.mwst
+                    return (
+                      <div key={r.auftragId} className="bg-gray-50 rounded-lg p-4 space-y-3 border border-gray-200">
+                        {/* Fahrzeug-Info */}
+                        <div>
+                          <Link href={`/fahrzeuge/${r.auftragId}`} className="block font-semibold text-gray-900 hover:text-purple-600">{r.name}</Link>
+                          <div className="flex items-center gap-2 text-xs text-gray-500 mt-1">
+                            {r.bnr && <span className="font-mono text-purple-600">{r.bnr}</span>}
+                            <span>{fmtDatum(r.verkauftAm)}</span>
+                            {r.status === 'verkauft' && <span className="text-orange-500 font-medium">⏳ n. übergeben</span>}
+                          </div>
+                        </div>
+
+                        {/* Preise & Steuern */}
+                        <div className="grid grid-cols-2 gap-3 text-sm">
+                          <div>
+                            <p className="text-gray-600 text-xs mb-1">Einkauf</p>
                             <input
                               type="number" inputMode="decimal" defaultValue={r.ek ?? ''}
                               onBlur={e => { if ((e.target.value ? parseFloat(e.target.value) : null) !== r.ek) saveEk(r, e.target.value) }}
                               placeholder="—"
-                              className="w-24 text-right border border-gray-200 rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-purple-400"
+                              className="w-full text-right border border-gray-300 rounded px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-purple-400"
                             />
-                          </td>
-                          <td className="px-3 py-2.5">
+                          </div>
+                          <div>
+                            <p className="text-gray-600 text-xs mb-1">Verkauf</p>
                             <input
                               type="number" inputMode="decimal" defaultValue={r.vk ?? ''}
                               onBlur={e => { if ((e.target.value ? parseFloat(e.target.value) : null) !== r.vk) saveVk(r, e.target.value) }}
                               placeholder="—"
-                              className="w-24 text-right border border-gray-200 rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-purple-400"
+                              className="w-full text-right border border-gray-300 rounded px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-purple-400"
                             />
-                          </td>
-                          <td className="px-3 py-2.5 text-right font-medium text-gray-700 whitespace-nowrap">{fmtEuro(s.marge)}</td>
-                          <td className="px-3 py-2.5 text-center">
+                          </div>
+                        </div>
+
+                        {/* Steuerart & Berechnung */}
+                        <div className="grid grid-cols-2 gap-3 text-sm">
+                          <div>
+                            <p className="text-gray-600 text-xs mb-1">Steuerart</p>
                             <select
                               value={r.steuerart}
                               onChange={e => saveSteuerart(r, e.target.value as Steuerart)}
-                              className={cn('text-xs font-medium border rounded-md px-1.5 py-1 cursor-pointer focus:outline-none', STEUERART_COLOR[r.steuerart])}
+                              className={cn('w-full text-xs font-medium border rounded px-2 py-1.5 cursor-pointer focus:outline-none', STEUERART_COLOR[r.steuerart])}
                             >
                               <option value="differenz">§25a</option>
                               <option value="regel">19%</option>
                               <option value="ausfuhr">Ausfuhr</option>
                             </select>
-                          </td>
-                          <td className="px-3 py-2.5 text-right text-amber-600 whitespace-nowrap">{fmtEuro(s.mwst)}</td>
-                          <td className={cn('px-3 py-2.5 text-right font-semibold whitespace-nowrap', gewinn >= 0 ? 'text-green-600' : 'text-red-600')}>{fmtEuro(gewinn)}</td>
-                          {!isArchiv && r.status === 'verkauft' && (
-                            <td className="px-3 py-2.5 text-center">
-                              <button
-                                onClick={() => setUebergebenId(r.auftragId)}
-                                className="px-2.5 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-medium rounded-md transition-colors"
-                                disabled={uebergebenLoading}
-                              >
-                                Übergeben
-                              </button>
-                            </td>
-                          )}
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                  <tfoot>
-                    <tr className="bg-gray-50 font-semibold text-gray-800 border-t border-gray-200">
-                      <td className="px-4 py-2.5" colSpan={2}>Summe {jahr === 0 ? '' : jahr}</td>
-                      <td className="px-3 py-2.5 text-right">{fmtEuro(jSum.ek)}</td>
-                      <td className="px-3 py-2.5 text-right">{fmtEuro(jSum.vk)}</td>
-                      <td className="px-3 py-2.5 text-right">{fmtEuro(jSum.marge)}</td>
-                      <td></td>
-                      <td className="px-3 py-2.5 text-right text-amber-600">{fmtEuro(jSum.mwst)}</td>
-                      <td className={cn('px-3 py-2.5 text-right', jSum.gewinn >= 0 ? 'text-green-700' : 'text-red-600')}>{fmtEuro(jSum.gewinn)}</td>
-                    </tr>
-                  </tfoot>
-                </table>
+                          </div>
+                          <div>
+                            <p className="text-gray-600 text-xs mb-1">Marge</p>
+                            <div className="px-2 py-1.5 font-medium text-gray-900">{fmtEuro(s.marge)}</div>
+                          </div>
+                        </div>
+
+                        {/* Steuern */}
+                        <div className="flex justify-between text-sm pt-2 border-t border-gray-300">
+                          <span className="text-gray-600">MwSt</span>
+                          <span className="text-amber-600 font-medium">{fmtEuro(s.mwst)}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-600">Gewinn</span>
+                          <span className={cn('font-semibold', gewinn >= 0 ? 'text-green-600' : 'text-red-600')}>{fmtEuro(gewinn)}</span>
+                        </div>
+
+                        {/* Übergeben-Button */}
+                        {!isArchiv && r.status === 'verkauft' && (
+                          <button
+                            onClick={() => setUebergebenId(r.auftragId)}
+                            className="w-full mt-3 px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50"
+                            disabled={uebergebenLoading}
+                          >
+                            {uebergebenLoading && uebergebenId === r.auftragId ? 'Lädt...' : 'Übergeben'}
+                          </button>
+                        )}
+                      </div>
+                    )
+                  })}
+                  {/* Summen-Card */}
+                  <div className="bg-white border border-gray-300 rounded-lg p-4 space-y-2 mt-4">
+                    <h3 className="font-semibold text-gray-900">Summe {jahr === 0 ? '' : jahr}</h3>
+                    <div className="text-sm space-y-1">
+                      <div className="flex justify-between"><span className="text-gray-600">EK:</span> <span className="font-medium">{fmtEuro(jSum.ek)}</span></div>
+                      <div className="flex justify-between"><span className="text-gray-600">VK:</span> <span className="font-medium">{fmtEuro(jSum.vk)}</span></div>
+                      <div className="flex justify-between"><span className="text-gray-600">Marge:</span> <span className="font-medium">{fmtEuro(jSum.marge)}</span></div>
+                      <div className="flex justify-between pt-1 border-t border-gray-200"><span className="text-gray-600">MwSt:</span> <span className="font-medium text-amber-600">{fmtEuro(jSum.mwst)}</span></div>
+                      <div className={cn('flex justify-between', jSum.gewinn >= 0 ? 'text-green-700' : 'text-red-600')}><span>Gewinn:</span> <span className="font-semibold">{fmtEuro(jSum.gewinn)}</span></div>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
           </div>
