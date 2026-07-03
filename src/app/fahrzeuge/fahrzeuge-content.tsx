@@ -230,6 +230,56 @@ export function FahrzeugeContent({
         </button>
       </div>
 
+      {/* Eigenfahrzeug Sub-Tabs: direkt nach Haupt-Tabs */}
+      {tab === 'eigen' && (
+        <>
+          {/* Mobile: Select */}
+          <select
+            value={eigenSubTab}
+            onChange={e => setEigenSubTab(e.target.value as 'bestand' | 'verkauft' | 'uebergeben')}
+            className="md:hidden w-full px-3 py-2 border border-gray-200 rounded-xl text-sm font-medium bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-400 mt-3"
+          >
+            <option value="bestand">Im Bestand ({eigenImBestand.length})</option>
+            <option value="verkauft">Verkauft ({eigenBereitsVerkauft.length})</option>
+            <option value="uebergeben">Übergeben ({eigenVerkauft.length})</option>
+          </select>
+
+          {/* Desktop: Buttons */}
+          <div className="hidden md:flex gap-2 mt-3">
+            <button
+              onClick={() => setEigenSubTab('bestand')}
+              className={cn('flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium border transition-all',
+                eigenSubTab === 'bestand' ? 'bg-purple-600 text-white border-purple-600' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300')}
+            >
+              Im Bestand
+              <span className={cn('text-xs px-1.5 py-0.5 rounded-full', eigenSubTab === 'bestand' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600')}>
+                {eigenImBestand.length}
+              </span>
+            </button>
+            <button
+              onClick={() => setEigenSubTab('verkauft')}
+              className={cn('flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium border transition-all',
+                eigenSubTab === 'verkauft' ? 'bg-green-600 text-white border-green-600' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300')}
+            >
+              Verkauft
+              <span className={cn('text-xs px-1.5 py-0.5 rounded-full', eigenSubTab === 'verkauft' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600')}>
+                {eigenBereitsVerkauft.length}
+              </span>
+            </button>
+            <button
+              onClick={() => setEigenSubTab('uebergeben')}
+              className={cn('flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium border transition-all',
+                eigenSubTab === 'uebergeben' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300')}
+            >
+              Übergeben
+              <span className={cn('text-xs px-1.5 py-0.5 rounded-full', eigenSubTab === 'uebergeben' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600')}>
+                {eigenVerkauft.length}
+              </span>
+            </button>
+          </div>
+        </>
+      )}
+
       {/* Search — nur für Auftrags-Tabs */}
       {(tab === 'fremd' || tab === 'eigen') && <div className="flex flex-col gap-3">
         <div className="relative">
@@ -458,55 +508,9 @@ export function FahrzeugeContent({
         </>)
       )}
 
-      {/* Eigenfahrzeuge */}
+      {/* Eigenfahrzeuge Content */}
       {tab === 'eigen' && (
         <>
-          {/* Sub-Tabs: Mobile Select / Desktop Buttons */}
-          {/* Mobile: Select */}
-          <select
-            value={eigenSubTab}
-            onChange={e => setEigenSubTab(e.target.value as 'bestand' | 'verkauft' | 'uebergeben')}
-            className="md:hidden w-full px-3 py-2 border border-gray-200 rounded-xl text-sm font-medium bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-400"
-          >
-            <option value="bestand">Im Bestand ({eigenImBestand.length})</option>
-            <option value="verkauft">Verkauft ({eigenBereitsVerkauft.length})</option>
-            <option value="uebergeben">Übergeben ({eigenVerkauft.length})</option>
-          </select>
-
-          {/* Desktop: Buttons */}
-          <div className="hidden md:flex gap-2">
-            <button
-              onClick={() => setEigenSubTab('bestand')}
-              className={cn('flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium border transition-all',
-                eigenSubTab === 'bestand' ? 'bg-purple-600 text-white border-purple-600' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300')}
-            >
-              Im Bestand
-              <span className={cn('text-xs px-1.5 py-0.5 rounded-full', eigenSubTab === 'bestand' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600')}>
-                {eigenImBestand.length}
-              </span>
-            </button>
-            <button
-              onClick={() => setEigenSubTab('verkauft')}
-              className={cn('flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium border transition-all',
-                eigenSubTab === 'verkauft' ? 'bg-green-600 text-white border-green-600' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300')}
-            >
-              Verkauft
-              <span className={cn('text-xs px-1.5 py-0.5 rounded-full', eigenSubTab === 'verkauft' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600')}>
-                {eigenBereitsVerkauft.length}
-              </span>
-            </button>
-            <button
-              onClick={() => setEigenSubTab('uebergeben')}
-              className={cn('flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium border transition-all',
-                eigenSubTab === 'uebergeben' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300')}
-            >
-              Übergeben
-              <span className={cn('text-xs px-1.5 py-0.5 rounded-full', eigenSubTab === 'uebergeben' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600')}>
-                {eigenVerkauft.length}
-              </span>
-            </button>
-          </div>
-
           {/* Verkauft-Liste (Status = verkauft) */}
           {eigenSubTab === 'verkauft' && eigenBereitsVerkauft.length > 0 && (
             <div className="flex justify-end">
