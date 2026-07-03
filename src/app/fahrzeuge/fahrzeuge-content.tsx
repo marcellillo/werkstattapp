@@ -233,16 +233,19 @@ export function FahrzeugeContent({
       {/* Eigenfahrzeug Sub-Tabs: direkt nach Haupt-Tabs */}
       {tab === 'eigen' && (
         <>
-          {/* Mobile: Select */}
-          <select
-            value={eigenSubTab}
-            onChange={e => setEigenSubTab(e.target.value as 'bestand' | 'verkauft' | 'uebergeben')}
-            className="md:hidden w-full px-3 py-2 border border-gray-200 rounded-xl text-sm font-medium bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-400 mt-3"
-          >
-            <option value="bestand">Im Bestand ({eigenImBestand.length})</option>
-            <option value="verkauft">Verkauft ({eigenBereitsVerkauft.length})</option>
-            <option value="uebergeben">Übergeben ({eigenVerkauft.length})</option>
-          </select>
+          {/* Mobile: Select (VERY VISIBLE) */}
+          <div className="block lg:hidden mt-4 px-0">
+            <label className="block text-xs font-semibold text-gray-600 mb-2">Ansicht wählen:</label>
+            <select
+              value={eigenSubTab}
+              onChange={e => setEigenSubTab(e.target.value as 'bestand' | 'verkauft' | 'uebergeben')}
+              className="w-full px-4 py-3 border-2 border-purple-400 rounded-lg text-base font-semibold bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500"
+            >
+              <option value="bestand">📦 Im Bestand ({eigenImBestand.length})</option>
+              <option value="verkauft">💰 Verkauft ({eigenBereitsVerkauft.length})</option>
+              <option value="uebergeben">✅ Übergeben ({eigenVerkauft.length})</option>
+            </select>
+          </div>
 
           {/* Desktop: Buttons */}
           <div className="hidden md:flex gap-2 mt-3">
