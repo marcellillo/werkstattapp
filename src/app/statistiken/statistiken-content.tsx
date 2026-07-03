@@ -49,31 +49,53 @@ function getLast6Months() {
 export function StatistikenContent({ auftraege, teile, rechnungen, hebebuehnen }: Props) {
   const months = getLast6Months()
 
-  // ── KPIs ────────────────────────────────────────────────────────────────────
-  const fertige = auftraege.filter(a => ['fertig', 'ausgeliefert'].includes(a.status))
-  const offene  = auftraege.filter(a => !['fertig', 'ausgeliefert'].includes(a.status))
-  const gesamtEinnahmen = auftraege.reduce((s, a) => s + (a.einnahmen ?? 0), 0)
+  // Werkstattleistungen vs. Fahrzeugverkäufe (Eigenfahrzeuge) trennen
+  const werkstatt = auftraege.filter(a => a.fahrzeug?.fahrzeug_typ !== 'eigen')
+  const eigenAlle = auftraege.filter(a => a.fahrzeug?.fahrzeug_typ === 'eigen')
+  const eigenVerkauft = eigenAlle.filter(a => ['verkauft', 'ausgeliefert'].includes(a.status))
+  const eigenImBestand = eigenAlle.filter(a => !['verkauft', 'ausgeliefert', 'storniert'].includes(a.status))
+
+  // ── KPIs (Werkstatt) ─────────────────────────────────────────────────────────
+  const fertige = werkstatt.filter(a => ['fertig', 'ausgeliefert'].includes(a.status))
+  const offene  = werkstatt.filter(a => !['fertig', 'ausgeliefert'].includes(a.status))
+  const gesamtEinnahmen = werkstatt.reduce((s, a) => s + (a.einnahmen ?? 0), 0)
   const gesamtEinkauf   = rechnungen.reduce((s, r) => s + (r.gesamt ?? 0), 0)
   const offeneTeile = teile.filter(t => ['nicht_bestellt', 'bestellt', 'unterwegs'].includes(t.status)).length
-  const tuevBestanden = auftraege.filter(a => a.tuev_ergebnis === 'bestanden').length
-  const tuevGesamt    = auftraege.filter(a => a.tuev_ergebnis).length
+  const tuevBestanden = werkstatt.filter(a => a.tuev_ergebnis === 'bestanden').length
+  const tuevGesamt    = werkstatt.filter(a => a.tuev_ergebnis).length
+
+  // ── KPIs (Fahrzeugverkäufe / Gebrauchtwagen) ──────────────────────────────────
+  const anzahlVerkauft = eigenVerkauft.length
+  const verkaufsErloes = eigenVerkauft.reduce((s, a) => s + (a.einnahmen ?? 0), 0)
+  const standtage = eigenVerkauft
+    .filter(a => a.verkauft_am && a.erstellt_am)
+    .map(a => Math.max(0, Math.round((new Date(a.verkauft_am).getTime() - new Date(a.erstellt_am).getTime()) / 86_400_000)))
+  const avgStandtage = standtage.length ? Math.round(standtage.reduce((s, d) => s + d, 0) / standtage.length) : null
+  const jetzt = Date.now()
+  const ladenhueter = eigenImBestand.filter(a => a.erstellt_am && (jetzt - new Date(a.erstellt_am).getTime()) / 86_400_000 > 90)
 
   // ── Aufträge pro Monat ──────────────────────────────────────────────────────
   const auftragProMonat = months.map(m => {
-    const abgeschlossen = auftraege.filter(a => {
+    const abgeschlossen = werkstatt.filter(a => {
       const d = a.fertiggestellt_am ?? a.erstellt_am
       return d && d.startsWith(m.key)
     }).length
-    const neu = auftraege.filter(a => a.erstellt_am?.startsWith(m.key)).length
+    const neu = werkstatt.filter(a => a.erstellt_am?.startsWith(m.key)).length
     return { monat: m.label, Abgeschlossen: abgeschlossen, Neu: neu }
   })
 
-  // ── Einnahmen pro Monat ──────────────────────────────────────────────────────
+  // ── Einnahmen pro Monat (nur Werkstatt) ───────────────────────────────────────
   const einnahmenProMonat = months.map(m => {
-    const summe = auftraege
+    const summe = werkstatt
       .filter(a => (a.fertiggestellt_am ?? a.erstellt_am)?.startsWith(m.key))
       .reduce((s, a) => s + (a.einnahmen ?? 0), 0)
     return { monat: m.label, Einnahmen: Math.round(summe) }
+  })
+
+  // ── Fahrzeugverkäufe pro Monat (nach Verkaufsdatum) ───────────────────────────
+  const verkaeufeProMonat = months.map(m => {
+    const rs = eigenVerkauft.filter(a => (a.verkauft_am ?? '')?.startsWith(m.key))
+    return { monat: m.label, Verkäufe: rs.length, Erlös: Math.round(rs.reduce((s, a) => s + (a.einnahmen ?? 0), 0)) }
   })
 
   // ── Einkauf pro Monat ────────────────────────────────────────────────────────
@@ -86,7 +108,7 @@ export function StatistikenContent({ auftraege, teile, rechnungen, hebebuehnen }
 
   // ── Auftragsstatus ──────────────────────────────────────────────────────────
   const statusCounts: Record<string, number> = {}
-  for (const a of auftraege) statusCounts[a.status] = (statusCounts[a.status] ?? 0) + 1
+  for (const a of werkstatt) statusCounts[a.status] = (statusCounts[a.status] ?? 0) + 1
   const statusPie = Object.entries(statusCounts).map(([s, v]) => ({
     name: FAHRZEUG_STATUS_LABEL[s as FahrzeugStatus] ?? s,
     value: v,
@@ -160,11 +182,11 @@ export function StatistikenContent({ auftraege, teile, rechnungen, hebebuehnen }
       {/* KPI-Karten */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
         {[
-          { label: 'Aufträge gesamt',    value: auftraege.length,               icon: Car,          color: 'text-blue-600',   bg: 'bg-blue-50' },
+          { label: 'Werkstatt-Aufträge', value: werkstatt.length,               icon: Car,          color: 'text-blue-600',   bg: 'bg-blue-50' },
           { label: 'Abgeschlossen',      value: fertige.length,                 icon: CheckCircle,  color: 'text-green-600',  bg: 'bg-green-50' },
           { label: 'Offen / in Arbeit',  value: offene.length,                  icon: Wrench,       color: 'text-orange-600', bg: 'bg-orange-50' },
           { label: 'Wartende Teile',     value: offeneTeile,                    icon: Package,      color: 'text-yellow-600', bg: 'bg-yellow-50' },
-          { label: 'Einnahmen gesamt',   value: `${gesamtEinnahmen.toFixed(0)} €`, icon: TrendingUp, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+          { label: 'Werkstatt-Einnahmen', value: `${gesamtEinnahmen.toFixed(0)} €`, icon: TrendingUp, color: 'text-emerald-600', bg: 'bg-emerald-50' },
           { label: 'Einkauf gesamt',     value: `${gesamtEinkauf.toFixed(0)} €`,  icon: Receipt,    color: 'text-red-600',    bg: 'bg-red-50' },
           { label: 'TÜV bestanden',      value: tuevGesamt > 0 ? `${tuevBestanden}/${tuevGesamt}` : '—', icon: ShieldCheck, color: 'text-teal-600', bg: 'bg-teal-50' },
           { label: 'Rechnungen',         value: rechnungen.length,              icon: Receipt,      color: 'text-purple-600', bg: 'bg-purple-50' },
@@ -184,6 +206,43 @@ export function StatistikenContent({ auftraege, teile, rechnungen, hebebuehnen }
           </Card>
         ))}
       </div>
+
+      {/* Fahrzeugverkäufe (Gebrauchtwagen) */}
+      {eigenAlle.length > 0 && (
+        <div>
+          <h2 className="text-sm font-semibold text-gray-700 flex items-center gap-2 mb-3">
+            <Warehouse className="w-4 h-4 text-purple-500" /> Fahrzeugverkäufe & Lagerbestand
+          </h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+            {[
+              { label: 'Verkauft gesamt',   value: anzahlVerkauft,                          icon: Truck,     color: 'text-purple-600', bg: 'bg-purple-50' },
+              { label: 'Verkaufserlös',     value: `${verkaufsErloes.toFixed(0)} €`,        icon: Euro,      color: 'text-green-600',  bg: 'bg-green-50' },
+              { label: 'Im Bestand',        value: eigenImBestand.length,                   icon: Warehouse, color: 'text-blue-600',   bg: 'bg-blue-50' },
+              { label: 'Ø Standzeit',       value: avgStandtage != null ? `${avgStandtage} Tage` : '—', icon: Clock, color: 'text-slate-600', bg: 'bg-slate-100' },
+              { label: 'Ladenhüter >90 T.', value: ladenhueter.length,                      icon: AlertCircle, color: ladenhueter.length > 0 ? 'text-red-600' : 'text-gray-400', bg: ladenhueter.length > 0 ? 'bg-red-50' : 'bg-gray-50' },
+            ].map(({ label, value, icon: Icon, color, bg }) => (
+              <Card key={label}>
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-gray-500 uppercase tracking-wide">{label}</p>
+                      <p className="text-2xl font-bold text-gray-900 mt-1">{value}</p>
+                    </div>
+                    <div className={`w-10 h-10 ${bg} rounded-xl flex items-center justify-center flex-shrink-0`}>
+                      <Icon className={`w-5 h-5 ${color}`} />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+          {ladenhueter.length > 0 && (
+            <p className="text-xs text-red-500 mt-2 flex items-center gap-1">
+              <AlertCircle className="w-3.5 h-3.5" /> {ladenhueter.length} {ladenhueter.length === 1 ? 'Fahrzeug steht' : 'Fahrzeuge stehen'} seit über 90 Tagen im Bestand.
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Aufträge + Einnahmen pro Monat */}
       <div className="grid lg:grid-cols-2 gap-6">

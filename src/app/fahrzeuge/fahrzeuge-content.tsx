@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
-import { Car, Search, Plus, ChevronRight, Package, Tag, Gauge, Palette, Fuel, ArrowUpDown, Wrench, Euro, ShieldCheck, CheckCircle2 } from 'lucide-react'
+import { Car, Search, Plus, ChevronRight, Package, Tag, Gauge, Palette, Fuel, ArrowUpDown, Wrench, Euro, ShieldCheck, CheckCircle2, ExternalLink, Trash2, AlertTriangle } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { cn, formatDate } from '@/lib/utils'
@@ -30,10 +30,12 @@ export function FahrzeugeContent({
   auftraege,
   tuevFahrzeuge,
   serviceFahrzeuge,
+  standardSteuerart = 'differenz',
 }: {
   auftraege: Auftrag[]
   tuevFahrzeuge: any[]
   serviceFahrzeuge: any[]
+  standardSteuerart?: 'differenz' | 'regel' | 'ausfuhr'
 }) {
   const router = useRouter()
   const [tab, setTab] = useState<'fremd' | 'eigen' | 'tuev' | 'service'>('fremd')
@@ -43,30 +45,82 @@ export function FahrzeugeContent({
   const [verkaufenId, setVerkaufenId] = useState<string | null>(null)
   const [verkaufenLoading, setVerkaufenLoading] = useState(false)
   const [verkaufenPreis, setVerkaufenPreis] = useState('')
+  // Steuerart wird beim Verkauf still auf den Standard (§25a) gesetzt bzw. eine bestehende Einstufung erhalten — Feinjustierung im Steuerblatt
+  const [verkaufenSteuerart, setVerkaufenSteuerart] = useState<'differenz' | 'regel' | 'ausfuhr'>('differenz')
   const [verkaufenAuslieferung, setVerkaufenAuslieferung] = useState('')
+  const [verkaufenKaeufer, setVerkaufenKaeufer] = useState('')
+  const [uebergabeId, setUebergabeId] = useState<string | null>(null)
+  const [uebergabeLoading, setUebergabeLoading] = useState(false)
+  const [uebergabeDatum, setUebergabeDatum] = useState('')
+  const [loeschen, setLoeschen] = useState<{ fahrzeugId: string; name: string; kennzeichen?: string } | null>(null)
+  const [loeschenLoading, setLoeschenLoading] = useState(false)
   const [eigenSubTab, setEigenSubTab] = useState<'bestand' | 'verkauft'>('bestand')
 
   const fremdAuftraege = auftraege.filter(a => (a.fahrzeug as any)?.fahrzeug_typ !== 'eigen')
   const eigenAuftraege = auftraege.filter(a => (a.fahrzeug as any)?.fahrzeug_typ === 'eigen')
   const eigenImBestand = eigenAuftraege.filter(a => a.status !== 'ausgeliefert' && a.status !== 'storniert')
   const eigenVerkauft = eigenAuftraege.filter(a => a.status === 'ausgeliefert')
+  const eigenBereitsVerkauft = eigenAuftraege.filter(a => a.status === 'verkauft')
+
+  function openVerkaufen(auftrag: any) {
+    const fz = auftrag.fahrzeug as any
+    setVerkaufenId(auftrag.id)
+    setVerkaufenPreis(fz?.verkaufspreis != null ? String(fz.verkaufspreis) : (auftrag.einnahmen ? String(auftrag.einnahmen) : ''))
+    setVerkaufenSteuerart(auftrag.steuerart ?? standardSteuerart) // bestehende Einstufung erhalten, sonst Standard aus Einstellungen
+    setVerkaufenAuslieferung(auftrag.auslieferung_geplant ?? '')
+    setVerkaufenKaeufer(auftrag.kaeufer_name ?? '')
+  }
+
+  function resetVerkaufen() {
+    setVerkaufenId(null)
+    setVerkaufenPreis('')
+    setVerkaufenSteuerart(standardSteuerart)
+    setVerkaufenAuslieferung('')
+    setVerkaufenKaeufer('')
+  }
 
   async function handleVerkauft() {
     if (!verkaufenId) return
     setVerkaufenLoading(true)
     const sb = createClient()
     const updates: Record<string, any> = {
-      status: 'ausgeliefert',
+      status: 'verkauft',
       verkauft_am: new Date().toISOString().split('T')[0],
+      steuerart: verkaufenSteuerart, // Standard §25a bzw. bestehende Einstufung
     }
     const preis = parseFloat(verkaufenPreis.replace(',', '.'))
     if (!isNaN(preis) && preis > 0) updates.einnahmen = preis
     if (verkaufenAuslieferung) updates.auslieferung_geplant = verkaufenAuslieferung
+    if (verkaufenKaeufer.trim()) updates.kaeufer_name = verkaufenKaeufer.trim()
     await sb.from('auftraege').update(updates).eq('id', verkaufenId)
+
     setVerkaufenLoading(false)
-    setVerkaufenId(null)
-    setVerkaufenPreis('')
-    setVerkaufenAuslieferung('')
+    resetVerkaufen()
+    router.refresh()
+  }
+
+  async function handleUebergabe() {
+    if (!uebergabeId) return
+    setUebergabeLoading(true)
+    const sb = createClient()
+    const updates: Record<string, any> = { status: 'ausgeliefert' }
+    if (uebergabeDatum) updates.auslieferung_geplant = uebergabeDatum
+    else updates.auslieferung_geplant = new Date().toISOString().split('T')[0]
+    await sb.from('auftraege').update(updates).eq('id', uebergabeId)
+    setUebergabeLoading(false)
+    setUebergabeId(null)
+    setUebergabeDatum('')
+    router.refresh()
+  }
+
+  async function handleLoeschen() {
+    if (!loeschen) return
+    setLoeschenLoading(true)
+    const sb = createClient()
+    // fahrzeug löschen → auftraege/ersatzteile/fotos werden per ON DELETE CASCADE mitgelöscht
+    await sb.from('fahrzeuge').delete().eq('id', loeschen.fahrzeugId)
+    setLoeschenLoading(false)
+    setLoeschen(null)
     router.refresh()
   }
 
@@ -424,7 +478,7 @@ export function FahrzeugeContent({
               className={cn('flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium border transition-all',
                 eigenSubTab === 'verkauft' ? 'bg-green-600 text-white border-green-600' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300')}
             >
-              Verkauft
+              Übergeben
               <span className={cn('text-xs px-1.5 py-0.5 rounded-full', eigenSubTab === 'verkauft' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600')}>
                 {eigenVerkauft.length}
               </span>
@@ -432,6 +486,14 @@ export function FahrzeugeContent({
           </div>
 
           {/* Verkauft-Liste */}
+          {eigenSubTab === 'verkauft' && eigenVerkauft.length > 0 && (
+            <div className="flex justify-end">
+              <Link href="/fahrzeuge/verkauft" className="flex items-center gap-1.5 text-sm text-purple-600 font-medium hover:text-purple-800 transition-colors">
+                <ExternalLink className="w-3.5 h-3.5" />
+                Vollständige Übersicht
+              </Link>
+            </div>
+          )}
           {eigenSubTab === 'verkauft' && (
             eigenVerkauft.length === 0 ? (
               <Card><CardContent className="py-12 text-center">
@@ -484,11 +546,13 @@ export function FahrzeugeContent({
                                 const al = (a as any).auslieferung_geplant as string | null
                                 const preis = (a as any).einnahmen as number | null
                                 const ausstehend = al && al >= heute
+                                const kaeufer = (a as any).kaeufer_name ?? (a as any).bemerkungen?.match(/Käufer:\s*(.+)/)?.[1]?.trim() ?? null
                                 return (
                                   <tr key={a.id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50 transition-colors">
                                     <td className="px-4 py-3">
                                       <p className="font-medium text-gray-900">{fz?.marke} {fz?.modell}</p>
                                       <p className="text-xs text-gray-400 font-mono">{fz?.kennzeichen || '—'}</p>
+                                      {kaeufer && <p className="text-xs text-gray-500 mt-0.5">→ {kaeufer}</p>}
                                     </td>
                                     <td className="px-4 py-3 text-gray-600 text-sm whitespace-nowrap">
                                       {vk ? new Date(vk).toLocaleDateString('de-DE') : <span className="text-gray-300">—</span>}
@@ -537,8 +601,10 @@ export function FahrzeugeContent({
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredEigen.map(auftrag => {
               const fz = auftrag.fahrzeug as any
-              const preisMatch = fz?.notizen?.match(/Verkaufspreis:\s*([\d.,]+)\s*€/)
-              const verkaufspreis = preisMatch ? preisMatch[1] : null
+              // Bevorzugt echte Spalte, Fallback auf Alt-Text in notizen
+              const verkaufspreis = fz?.verkaufspreis != null
+                ? Number(fz.verkaufspreis).toLocaleString('de-DE', { minimumFractionDigits: 0 })
+                : (fz?.notizen?.match(/Verkaufspreis:\s*([\d.,]+)\s*€/)?.[1] ?? null)
               const bilderUrls: string[] = (() => { try { return fz?.bilder_urls ? JSON.parse(fz.bilder_urls) : [] } catch { return [] } })()
               const hauptbild = bilderUrls[0] ?? null
               const teile = (auftrag.ersatzteile ?? []) as any[]
@@ -624,14 +690,31 @@ export function FahrzeugeContent({
                     </div>
                   </Link>
 
-                  {/* Verkauft-Button */}
-                  <div className="px-4 pb-4">
+                  {/* Aktionen */}
+                  <div className="px-4 pb-4 flex items-center gap-2">
+                    {auftrag.status === 'verkauft' ? (
+                      <button
+                        onClick={() => setUebergabeId(auftrag.id)}
+                        className="flex-1 flex items-center justify-center gap-2 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 transition-colors"
+                      >
+                        <CheckCircle2 className="w-4 h-4" />
+                        Übergabe durchführen
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => openVerkaufen(auftrag)}
+                        className="flex-1 flex items-center justify-center gap-2 py-2 rounded-lg border border-purple-200 text-purple-700 text-sm font-medium hover:bg-purple-50 transition-colors"
+                      >
+                        <CheckCircle2 className="w-4 h-4" />
+                        Als verkauft markieren
+                      </button>
+                    )}
                     <button
-                      onClick={() => setVerkaufenId(auftrag.id)}
-                      className="w-full flex items-center justify-center gap-2 py-2 rounded-lg border border-purple-200 text-purple-700 text-sm font-medium hover:bg-purple-50 transition-colors"
+                      onClick={() => setLoeschen({ fahrzeugId: fz?.id, name: `${fz?.marke ?? ''} ${fz?.modell ?? ''}`.trim() || 'Fahrzeug', kennzeichen: fz?.kennzeichen })}
+                      title="Aus Bestand löschen"
+                      className="flex-shrink-0 p-2 rounded-lg border border-gray-200 text-gray-400 hover:text-red-600 hover:border-red-200 hover:bg-red-50 transition-colors"
                     >
-                      <CheckCircle2 className="w-4 h-4" />
-                      Als verkauft markieren
+                      <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
@@ -652,6 +735,41 @@ export function FahrzeugeContent({
         <ServiceWeckerContent fahrzeuge={serviceFahrzeuge} />
       )}
 
+      {/* Übergabe-Modal */}
+      {uebergabeId && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50">
+          <div className="bg-white rounded-t-2xl w-full max-w-lg p-6 space-y-4" style={{ paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center flex-shrink-0">
+                <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+              </div>
+              <div>
+                <h2 className="font-semibold text-gray-900">Übergabe durchführen?</h2>
+                <p className="text-sm text-gray-500 mt-0.5">Das Fahrzeug wird als ausgeliefert markiert und aus dem Lagerbestand entfernt.</p>
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Übergabedatum</label>
+              <input
+                type="date"
+                value={uebergabeDatum}
+                onChange={e => setUebergabeDatum(e.target.value)}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+              />
+              <p className="text-xs text-gray-400 mt-1">Leer lassen = heute</p>
+            </div>
+            <div className="flex gap-3">
+              <Button variant="outline" className="flex-1" onClick={() => { setUebergabeId(null); setUebergabeDatum('') }} disabled={uebergabeLoading}>
+                Abbrechen
+              </Button>
+              <Button className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white" onClick={handleUebergabe} disabled={uebergabeLoading}>
+                {uebergabeLoading ? 'Speichern…' : '✓ Ausgeliefert'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Verkauft-Bestätigungsmodal */}
       {verkaufenId && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50">
@@ -661,18 +779,26 @@ export function FahrzeugeContent({
                 <CheckCircle2 className="w-5 h-5 text-purple-600" />
               </div>
               <div>
-                <h2 className="font-semibold text-gray-900">Fahrzeug als verkauft markieren?</h2>
-                <p className="text-sm text-gray-500 mt-0.5">Das Fahrzeug wird aus dem Lagerbestand entfernt und im Verlauf archiviert.</p>
+                <h2 className="font-semibold text-gray-900">Fahrzeug als verkauft markieren</h2>
+                <p className="text-sm text-gray-500 mt-0.5">Vertrag unterschrieben — das Fahrzeug bleibt sichtbar bis zur Übergabe.</p>
               </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Käufer Name (optional)</label>
+              <input
+                type="text"
+                placeholder="Max Mustermann"
+                value={verkaufenKaeufer}
+                onChange={e => setVerkaufenKaeufer(e.target.value)}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
+              />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Verkaufspreis (optional)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Verkaufspreis</label>
                 <div className="relative">
                   <input
-                    type="number"
-                    inputMode="decimal"
-                    placeholder="0,00"
+                    type="number" inputMode="decimal" placeholder="0,00"
                     value={verkaufenPreis}
                     onChange={e => setVerkaufenPreis(e.target.value)}
                     className="w-full border border-gray-200 rounded-lg px-3 py-2.5 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
@@ -690,12 +816,46 @@ export function FahrzeugeContent({
                 />
               </div>
             </div>
+            <p className="text-xs text-gray-400">
+              Einkaufspreis & Steuerart (Standard §25a) trägst du danach gebündelt im <span className="font-medium text-purple-600">Steuerblatt</span> ein.
+            </p>
             <div className="flex gap-3">
-              <Button variant="outline" className="flex-1" onClick={() => { setVerkaufenId(null); setVerkaufenPreis(''); setVerkaufenAuslieferung('') }} disabled={verkaufenLoading}>
+              <Button variant="outline" className="flex-1" onClick={resetVerkaufen} disabled={verkaufenLoading}>
                 Abbrechen
               </Button>
               <Button className="flex-1 bg-purple-600 hover:bg-purple-700 text-white" onClick={handleVerkauft} disabled={verkaufenLoading}>
                 {verkaufenLoading ? 'Speichern…' : '✓ Verkauft'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Löschen-Bestätigungsmodal */}
+      {loeschen && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50">
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full max-w-lg p-6 space-y-4" style={{ paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
+                <AlertTriangle className="w-5 h-5 text-red-600" />
+              </div>
+              <div>
+                <h2 className="font-semibold text-gray-900">Fahrzeug aus dem Bestand löschen?</h2>
+                <p className="text-sm text-gray-500 mt-0.5">
+                  <span className="font-medium text-gray-700">{loeschen.name}</span>
+                  {loeschen.kennzeichen ? ` · ${loeschen.kennzeichen}` : ''}
+                </p>
+              </div>
+            </div>
+            <div className="bg-red-50 border border-red-100 rounded-lg px-3 py-2.5 text-sm text-red-700">
+              Das Fahrzeug wird endgültig gelöscht (inkl. Auftrag, Ersatzteile & Fotos). Dies kann nicht rückgängig gemacht werden. Über Mobile.de kann es jederzeit erneut importiert werden.
+            </div>
+            <div className="flex gap-3">
+              <Button variant="outline" className="flex-1" onClick={() => setLoeschen(null)} disabled={loeschenLoading}>
+                Abbrechen
+              </Button>
+              <Button className="flex-1 bg-red-600 hover:bg-red-700 text-white" onClick={handleLoeschen} disabled={loeschenLoading}>
+                {loeschenLoading ? 'Löschen…' : 'Endgültig löschen'}
               </Button>
             </div>
           </div>

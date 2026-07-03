@@ -16,7 +16,7 @@ export default async function BuchhaltungPage() {
   ] = await Promise.all([
     supabase
       .from('auftraege')
-      .select('id, auftrag_nr, einnahmen, erstellt_am, status, fahrzeug:fahrzeuge(kennzeichen, marke, modell)')
+      .select('id, auftrag_nr, einnahmen, erstellt_am, verkauft_am, status, steuerart, fahrzeug:fahrzeuge(kennzeichen, marke, modell, mobile_de_id, fahrzeug_typ, einkaufspreis)')
       .not('einnahmen', 'is', null)
       .gt('einnahmen', 0)
       .order('erstellt_am', { ascending: false }),

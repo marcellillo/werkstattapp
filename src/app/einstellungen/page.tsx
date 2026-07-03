@@ -56,6 +56,7 @@ export default async function EinstellungenPage({
           firma_bank: cfg.firma_bank ?? '',
           firma_stundensatz: cfg.firma_stundensatz ?? '',
           firma_kleinunternehmer: cfg.firma_kleinunternehmer ?? 'nein',
+          fahrzeug_steuerart_standard: cfg.fahrzeug_steuerart_standard ?? 'differenz',
           firma_logo: cfg.firma_logo ?? '',
           firma_paypal: cfg.firma_paypal ?? '',
           firma_sumup: cfg.firma_sumup ?? '',

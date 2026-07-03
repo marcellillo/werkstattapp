@@ -36,6 +36,7 @@ interface Config {
   firma_bank: string
   firma_stundensatz: string
   firma_kleinunternehmer: string
+  fahrzeug_steuerart_standard: string
   firma_logo: string
   firma_paypal: string
   firma_sumup: string
@@ -234,6 +235,20 @@ export function EinstellungenContent({ initialConfig, profile, userEmail, urlErr
               />
               <span className="text-sm text-gray-700">Kleinunternehmer (§19 UStG) — keine MwSt auf Rechnungen</span>
             </label>
+          </div>
+
+          <div className="pt-1">
+            <label className="text-xs text-gray-800 mb-1 block">Standard-Steuerart bei Fahrzeugverkäufen</label>
+            <select
+              value={config.fahrzeug_steuerart_standard}
+              onChange={e => setConfig(c => ({ ...c, fahrzeug_steuerart_standard: e.target.value }))}
+              className="w-full sm:w-80 px-3 py-2.5 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-400"
+            >
+              <option value="differenz">Differenzbesteuerung §25a (Standard bei Gebrauchtwagen)</option>
+              <option value="regel">Regelbesteuerung 19%</option>
+              <option value="ausfuhr">Ausfuhr (steuerfrei)</option>
+            </select>
+            <p className="text-xs text-gray-400 mt-1">Wird bei jedem Verkauf voreingestellt — pro Fahrzeug im Steuerblatt änderbar.</p>
           </div>
 
           <button

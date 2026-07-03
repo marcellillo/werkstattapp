@@ -44,6 +44,10 @@ export default async function FahrzeugDetailPage({ params }: { params: Promise<{
     hebebuehne: (hebebuehnen ?? []).find(h => h.id === (auftrag as any).hebebuehne_id) ?? null,
   }
 
+  const { data: steuerCfg } = await supabase
+    .from('werkstatt_einstellungen').select('wert').eq('schluessel', 'fahrzeug_steuerart_standard').maybeSingle()
+  const standardSteuerart = ((steuerCfg as any)?.wert as 'differenz' | 'regel' | 'ausfuhr') ?? 'differenz'
+
   return (
     <AppLayout title={`${(auftrag as any).fahrzeug?.marke} ${(auftrag as any).fahrzeug?.modell}`}>
       <FahrzeugDetail
@@ -51,6 +55,7 @@ export default async function FahrzeugDetailPage({ params }: { params: Promise<{
         hebebuehnen={(hebebuehnen ?? []) as any[]}
         historie={(historie ?? []) as any[]}
         googleBewertungUrl={(cfgRow as any)?.wert ?? ''}
+        standardSteuerart={standardSteuerart}
       />
     </AppLayout>
   )

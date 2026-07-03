@@ -12,6 +12,7 @@ export default async function DashboardPage() {
   monatStart.setDate(1)
   monatStart.setHours(0, 0, 0, 0)
   const monatStartStr = monatStart.toISOString()
+  const monatStartDate = monatStartStr.split('T')[0]
 
   const [
     { data: hebebuehnenRaw },
@@ -19,7 +20,7 @@ export default async function DashboardPage() {
     { data: termineRaw },
     { count: eigenCount },
     { data: mitarbeiterRaw },
-    { data: monatRechnungen },
+    { data: monatWerkstattRaw },
     { data: offeneRechnungenRaw },
     { data: bewertungenRaw },
   ] = await Promise.all([
@@ -33,7 +34,7 @@ export default async function DashboardPage() {
     supabase.from('termine').select('*, kunde:kunden(vorname,nachname), fahrzeug:fahrzeuge(kennzeichen,marke,modell)').gte('datum', new Date().toISOString().split('T')[0]).not('status', 'eq', 'abgesagt').order('datum').order('uhrzeit').limit(20),
     supabase.from('fahrzeuge').select('*', { count: 'exact', head: true }).eq('fahrzeug_typ', 'eigen'),
     supabase.from('profiles').select('id, full_name, role').order('full_name'),
-    supabase.from('kunden_rechnungen').select('betrag_brutto').gte('erstellt_am', monatStartStr),
+    supabase.from('auftraege').select('einnahmen, fertiggestellt_am, fahrzeug:fahrzeuge(fahrzeug_typ)').not('einnahmen', 'is', null).gte('fertiggestellt_am', monatStartDate),
     supabase.from('rechnungen').select('gesamt').eq('bezahlt', false),
     supabase.from('auftraege').select('bewertung_sterne, bewertung_kommentar, bewertung_datum, fahrzeug:fahrzeuge(marke, modell, kennzeichen), kunde:kunden(vorname, nachname)')
       .not('bewertung_sterne', 'is', null)
@@ -76,7 +77,10 @@ export default async function DashboardPage() {
     !['fertig', 'ausgeliefert'].includes(a.status)
   ).length
 
-  const monatsumsatz = (monatRechnungen ?? []).reduce((s: number, r: any) => s + (r.betrag_brutto ?? 0), 0)
+  // Werkstatt-Umsatz diesen Monat: abgeschlossene Aufträge (ohne Eigenfahrzeug-Verkäufe)
+  const monatsumsatz = (monatWerkstattRaw ?? [])
+    .filter((a: any) => a.fahrzeug?.fahrzeug_typ !== 'eigen')
+    .reduce((s: number, a: any) => s + (a.einnahmen ?? 0), 0)
   const offeneRechnungenSumme = (offeneRechnungenRaw ?? []).reduce((s: number, r: any) => s + (r.gesamt ?? 0), 0)
   const bewertungen = (bewertungenRaw ?? []) as any[]
   const bewertungDurchschnitt = bewertungen.length

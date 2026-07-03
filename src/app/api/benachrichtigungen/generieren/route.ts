@@ -151,6 +151,42 @@ export async function POST() {
     }
   }
 
+  // ── 4. Übergabe fällig (verkaufte Eigenfahrzeuge) ────────────────────────
+  const { data: uebergaben } = await supabase
+    .from('auftraege')
+    .select('id, auslieferung_geplant, fahrzeug:fahrzeuge(marke, modell, kennzeichen)')
+    .eq('status', 'verkauft')
+    .not('auslieferung_geplant', 'is', null)
+
+  for (const u of uebergaben ?? []) {
+    const fz = (u as any).fahrzeug
+    const name = fz ? `${fz.marke} ${fz.modell}${fz.kennzeichen ? ` (${fz.kennzeichen})` : ''}` : 'Auftrag'
+    const ziel = (u as any).auslieferung_geplant as string
+    const tageBis = Math.floor((new Date(ziel + 'T00:00:00').getTime() - new Date(heuteStr + 'T00:00:00').getTime()) / 86_400_000)
+    if (tageBis < 0) {
+      addNeu({
+        typ: 'termin_ueberschritten',
+        auftrag_id: u.id,
+        titel: `Übergabe überfällig – ${name}`,
+        nachricht: `Geplante Übergabe war am ${new Date(ziel).toLocaleDateString('de-DE')} — ${Math.abs(tageBis)} Tag${Math.abs(tageBis) !== 1 ? 'e' : ''} überfällig.`,
+      })
+    } else if (tageBis === 0) {
+      addNeu({
+        typ: 'info',
+        auftrag_id: u.id,
+        titel: `Übergabe heute – ${name}`,
+        nachricht: `Das verkaufte Fahrzeug soll heute übergeben werden.`,
+      })
+    } else if (tageBis <= 2) {
+      addNeu({
+        typ: 'info',
+        auftrag_id: u.id,
+        titel: `Übergabe in ${tageBis} Tag${tageBis > 1 ? 'en' : ''} – ${name}`,
+        nachricht: `Geplante Übergabe am ${new Date(ziel).toLocaleDateString('de-DE')}.`,
+      })
+    }
+  }
+
   // ── Einfügen ─────────────────────────────────────────────────────────────
   if (neu.length > 0) {
     await supabase.from('benachrichtigungen').insert(neu)

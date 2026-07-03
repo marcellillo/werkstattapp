@@ -13,16 +13,21 @@ import {
   TEIL_STATUS_LABEL, TEIL_STATUS_COLOR,
 } from '@/types/database'
 import { createClient } from '@/lib/supabase/client'
+import { createRechnungOnAusgeliefert } from '@/lib/auto-rechnung-ersteller'
 
 interface Props {
   auftrag: Auftrag
   hebebuehnen: Hebebuehne[]
   historie: any[]
   googleBewertungUrl?: string
+  standardSteuerart?: 'differenz' | 'regel' | 'ausfuhr'
 }
 
-const STATUS_ORDER: FahrzeugStatus[] = [
+const STATUS_ORDER_FREMD: FahrzeugStatus[] = [
   'angenommen', 'diagnose', 'reparatur', 'warten_teile', 'fertig', 'ausgeliefert'
+]
+const STATUS_ORDER_EIGEN: FahrzeugStatus[] = [
+  'angenommen', 'fertig', 'verkauft', 'ausgeliefert'
 ]
 
 const TEIL_STATUS_ORDER: TeilStatus[] = [
@@ -46,7 +51,7 @@ interface KiTeilVorschlag {
   optional: boolean
 }
 
-export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie, googleBewertungUrl = '' }: Props) {
+export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie, googleBewertungUrl = '', standardSteuerart = 'differenz' }: Props) {
   const [auftrag, setAuftrag] = useState(initialAuftrag)
   const [teile, setTeile] = useState<Ersatzteil[]>((initialAuftrag.ersatzteile as Ersatzteil[]) ?? [])
   const [saving, setSaving] = useState(false)
@@ -81,6 +86,8 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
   const [checklisteZiel, setChecklisteZiel] = useState<FahrzeugStatus | null>(null)
   const [checklisteAbgehakt, setChecklisteAbgehakt] = useState<Record<string, boolean>>({})
   const [verkaufspreis, setVerkaufspreis] = useState('')
+  // Steuerart wird still auf Standard (aus Einstellungen) gesetzt bzw. bestehende Einstufung erhalten — Feinjustierung im Steuerblatt
+  const [detailSteuerart] = useState<'differenz' | 'regel' | 'ausfuhr'>((auftrag as any).steuerart ?? standardSteuerart)
   const [showKundeModal, setShowKundeModal] = useState(false)
   const [kundeSearch, setKundeSearch] = useState('')
   const [kundenListe, setKundenListe] = useState<any[]>([])
@@ -112,9 +119,15 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
     { id: 'rechnung', label: 'Rechnung wurde erstellt' },
     { id: 'schluessel', label: 'Fahrzeugschlüssel sind bereit' },
   ]
+  // Für Eigenfahrzeuge: Schritt 1 = Kaufvertrag unterschrieben
+  const CHECKLISTE_VERKAUFT = [
+    { id: 'vertrag', label: 'Kaufvertrag unterschrieben' },
+    { id: 'anzahlung', label: 'Anzahlung / Zahlung bestätigt' },
+    { id: 'termin', label: 'Übergabetermin vereinbart' },
+  ]
   const CHECKLISTE_AUSGELIEFERT = isEigenfahrzeug ? [
-    { id: 'verkauft', label: 'Fahrzeug wurde verkauft' },
-    { id: 'bezahlt', label: 'Zahlung vollständig erhalten' },
+    { id: 'zahlung', label: 'Zahlung vollständig erhalten' },
+    { id: 'schluessel', label: 'Schlüssel wurden übergeben' },
     { id: 'papiere', label: 'Fahrzeugpapiere übergeben' },
   ] : [
     { id: 'uebergabe', label: 'Fahrzeug wurde an Kunden übergeben' },
@@ -296,8 +309,10 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
       setBuehneWarnung(status)
       return
     }
-    // Checkliste vor Fertig / Ausgeliefert
-    if (status === 'fertig' || status === 'ausgeliefert') {
+    // Checkliste vor Fertig / Verkauft (Eigen) / Ausgeliefert
+    const brauchtCheckliste = status === 'fertig' || status === 'ausgeliefert' ||
+      (status === 'verkauft' && isEigenfahrzeug)
+    if (brauchtCheckliste) {
       setChecklisteZiel(status)
       setChecklisteAbgehakt({})
       return
@@ -316,12 +331,14 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
     setAuftrag(a => ({ ...a, status }))
     const updates: Record<string, any> = { status }
     if (status === 'fertig') updates.fertiggestellt_am = new Date().toISOString().split('T')[0]
-    if (status === 'ausgeliefert' && isEigenfahrzeug) {
+    if (status === 'verkauft' && isEigenfahrzeug) {
       updates.verkauft_am = new Date().toISOString().split('T')[0]
+      updates.steuerart = detailSteuerart // Standard §25a bzw. bestehende Einstufung
       const preis = parseFloat(verkaufspreis.replace(',', '.'))
       if (!isNaN(preis) && preis > 0) updates.einnahmen = preis
       setVerkaufspreis('')
     }
+    // Keine auto-Rechnung in fahrzeug-detail — das passiert in /fahrzeuge/verkauft
     await supabase.from('auftraege').update(updates).eq('id', auftrag.id)
     fetch('/api/benachrichtigungen/generieren', { method: 'POST' }).catch(() => {})
     if (status === 'fertig') {
@@ -524,7 +541,11 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
 
       {/* Checkliste vor Fertig / Ausgeliefert */}
       {checklisteZiel && (() => {
-        const items = checklisteZiel === 'fertig' ? CHECKLISTE_FERTIG : CHECKLISTE_AUSGELIEFERT
+        const items = checklisteZiel === 'fertig'
+          ? CHECKLISTE_FERTIG
+          : checklisteZiel === 'verkauft'
+            ? CHECKLISTE_VERKAUFT
+            : CHECKLISTE_AUSGELIEFERT
         const alleAbgehakt = items.every(i => checklisteAbgehakt[i.id])
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
@@ -538,7 +559,9 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
                     <h3 className="font-bold text-gray-900 text-lg">
                       {checklisteZiel === 'fertig'
                         ? (isEigenfahrzeug ? 'Aufbereitung abschließen' : 'Fahrzeug fertigstellen')
-                        : (isEigenfahrzeug ? 'Fahrzeug als verkauft markieren' : 'Fahrzeug ausliefern')}
+                        : checklisteZiel === 'verkauft'
+                          ? 'Kaufvertrag bestätigen'
+                          : (isEigenfahrzeug ? 'Übergabe durchführen' : 'Fahrzeug ausliefern')}
                     </h3>
                     <p className="text-sm text-gray-500">Bitte alles abhaken bevor du fortfährst</p>
                   </div>
@@ -578,20 +601,19 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
                 ))}
               </div>
 
-              {isEigenfahrzeug && checklisteZiel === 'ausgeliefert' && (
+              {isEigenfahrzeug && checklisteZiel === 'verkauft' && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Verkaufspreis (optional)</label>
                   <div className="relative">
                     <input
-                      type="number"
-                      inputMode="decimal"
-                      placeholder="0,00"
+                      type="number" inputMode="decimal" placeholder="0,00"
                       value={verkaufspreis}
                       onChange={e => setVerkaufspreis(e.target.value)}
                       className="w-full border border-gray-200 rounded-xl px-4 py-3 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
                     />
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">€</span>
                   </div>
+                  <p className="text-xs text-gray-400 mt-1.5">Einkaufspreis & Steuerart (Standard §25a) danach gebündelt im Steuerblatt.</p>
                 </div>
               )}
 
@@ -615,7 +637,9 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
                   {alleAbgehakt
                     ? checklisteZiel === 'fertig'
                       ? (isEigenfahrzeug ? '✓ Aufbereitung abschließen' : '✓ Fertigstellen')
-                      : (isEigenfahrzeug ? '✓ Als verkauft markieren' : '✓ Ausliefern')
+                      : checklisteZiel === 'verkauft'
+                        ? '✓ Als verkauft markieren'
+                        : (isEigenfahrzeug ? '✓ Übergabe abschließen' : '✓ Ausliefern')
                     : `Noch ${items.filter(i => !checklisteAbgehakt[i.id]).length} offen`}
                 </button>
               </div>
@@ -1477,7 +1501,7 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
               <p className="text-xs text-gray-500 mt-0.5">Status anklicken zum Ändern</p>
             </CardHeader>
             <CardContent className="space-y-2">
-              {STATUS_ORDER.map(s => (
+              {(isEigenfahrzeug ? STATUS_ORDER_EIGEN : STATUS_ORDER_FREMD).map(s => (
                 <button
                   key={s}
                   onClick={() => handleStatusChange(s)}

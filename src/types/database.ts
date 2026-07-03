@@ -15,6 +15,7 @@ export type FahrzeugStatus =
   | 'reparatur'
   | 'warten_teile'
   | 'fertig'
+  | 'verkauft'
   | 'ausgeliefert'
   | 'storniert'
 
@@ -85,6 +86,9 @@ export interface Fahrzeug {
   naechste_hauptuntersuchung?: string
   notizen?: string
   mobile_de_id?: string
+  bilder_urls?: string
+  verkaufspreis?: number
+  einkaufspreis?: number
   erstellt_am: string
   aktualisiert_am: string
   kunde?: Kunde
@@ -125,6 +129,10 @@ export interface Auftrag {
   geplante_fertigstellung?: string
   fertiggestellt_am?: string
   einnahmen?: number
+  verkauft_am?: string
+  auslieferung_geplant?: string
+  kaeufer_name?: string
+  steuerart?: 'differenz' | 'regel' | 'ausfuhr'
   tuev_kandidat?: boolean
   tuev_termin?: string
   tuev_ergebnis?: TuevErgebnis
@@ -197,6 +205,7 @@ export const FAHRZEUG_STATUS_LABEL: Record<FahrzeugStatus, string> = {
   reparatur: 'Reparatur läuft',
   warten_teile: 'Warten auf Teile',
   fertig: 'Fertig',
+  verkauft: 'Verkauft',
   ausgeliefert: 'Ausgeliefert',
   storniert: 'Storniert',
 }
@@ -207,6 +216,7 @@ export const FAHRZEUG_STATUS_COLOR: Record<FahrzeugStatus, string> = {
   reparatur: 'bg-orange-100 text-orange-700 border-orange-300',
   warten_teile: 'bg-yellow-100 text-yellow-700 border-yellow-300',
   fertig: 'bg-green-100 text-green-700 border-green-300',
+  verkauft: 'bg-emerald-100 text-emerald-700 border-emerald-300',
   ausgeliefert: 'bg-purple-100 text-purple-700 border-purple-300',
   storniert: 'bg-red-100 text-red-700 border-red-300',
 }

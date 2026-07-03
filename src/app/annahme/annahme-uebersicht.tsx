@@ -3,21 +3,7 @@ import Link from 'next/link'
 import { ClipboardCheck, CheckCircle, Clock, Plus, ChevronRight } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
-
-const STATUS_COLOR: Record<string, string> = {
-  angenommen:   'bg-blue-100 text-blue-700',
-  diagnose:     'bg-purple-100 text-purple-700',
-  reparatur:    'bg-orange-100 text-orange-700',
-  warten_teile: 'bg-yellow-100 text-yellow-700',
-  fertig:       'bg-green-100 text-green-700',
-}
-const STATUS_LABEL: Record<string, string> = {
-  angenommen:   'Angenommen',
-  diagnose:     'Diagnose',
-  reparatur:    'In Arbeit',
-  warten_teile: 'Warten auf Teile',
-  fertig:       'Fertig',
-}
+import { FAHRZEUG_STATUS_LABEL, FAHRZEUG_STATUS_COLOR, type FahrzeugStatus } from '@/types/database'
 
 export function AnnahmeUebersicht({ auftraege }: { auftraege: any[] }) {
   const ohneProtokoll = auftraege.filter(a => !a.annahme_datum)
@@ -39,8 +25,8 @@ export function AnnahmeUebersicht({ auftraege }: { auftraege: any[] }) {
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
               <span className="font-medium text-sm text-gray-900">{a.auftrag_nr}</span>
-              <span className={cn('text-xs px-1.5 py-0.5 rounded-full font-medium', STATUS_COLOR[a.status] ?? 'bg-gray-100 text-gray-600')}>
-                {STATUS_LABEL[a.status] ?? a.status}
+              <span className={cn('text-xs px-1.5 py-0.5 rounded-full font-medium border', FAHRZEUG_STATUS_COLOR[a.status as FahrzeugStatus] ?? 'bg-gray-100 text-gray-600 border-gray-200')}>
+                {FAHRZEUG_STATUS_LABEL[a.status as FahrzeugStatus] ?? a.status}
               </span>
             </div>
             <div className="text-xs text-gray-500 truncate">

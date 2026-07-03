@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Car, User, Plus, Download, Upload, ShieldAlert, Bell, BellOff, ScanLine, Loader2, Wrench } from 'lucide-react'
+import { ArrowLeft, Car, User, Plus, Download, Upload, ShieldAlert, Bell, BellOff, ScanLine, Loader2, Wrench, X, ClipboardCheck, Gauge, Euro, ChevronDown } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { createClient } from '@/lib/supabase/client'
@@ -58,6 +58,8 @@ export function NeuFahrzeugForm({ kunden, hebebuehnen }: Props) {
   const [mobileAds, setMobileAds] = useState<MobileAd[]>([])
   const [selectedBNummer, setSelectedBNummer] = useState('')
   const [bestandDatum, setBestandDatum] = useState<string>('')
+  const [importing, setImporting] = useState(false)
+  const [importResult, setImportResult] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
   const scanInputRef = useRef<HTMLInputElement>(null)
   const [scanning, setScanning] = useState(false)
@@ -78,16 +80,31 @@ export function NeuFahrzeugForm({ kunden, hebebuehnen }: Props) {
   const [leistungKw, setLeistungKw] = useState('')
   const [mobileDeId, setMobileDeId] = useState('')
   const [verkaufspreis, setVerkaufspreis] = useState('')
+  const [einkaufspreis, setEinkaufspreis] = useState('')
   const [bilderUrls, setBilderUrls] = useState<string[]>([])
 
   // Customer
   const [kundenId, setKundenId] = useState('')
+  const [kundenSuche, setKundenSuche] = useState('')
+  const [kundenDropdown, setKundenDropdown] = useState(false)
   const [newKunde, setNewKunde] = useState(false)
   const [kVorname, setKVorname] = useState('')
   const [kNachname, setKNachname] = useState('')
   const [kFirma, setKFirma] = useState('')
   const [kTelefon, setKTelefon] = useState('')
   const [kMobil, setKMobil] = useState('')
+
+  // Annahme-Protokoll (optional, direkt bei Anlage)
+  const [annahmeErfassen, setAnnahmeErfassen] = useState(false)
+  const [annahmeKm, setAnnahmeKm] = useState('')
+  const [annahmeTank, setAnnahmeTank] = useState(50)
+  const [annahmeZustand, setAnnahmeZustand] = useState('gut')
+  const [kostenrahmen, setKostenrahmen] = useState('')
+  const [annahmeSchaeden, setAnnahmeSchaeden] = useState('')
+
+  const kundenGefiltert = kundenSuche.trim()
+    ? kunden.filter(k => `${k.vorname ?? ''} ${k.nachname ?? ''} ${k.firma ?? ''}`.toLowerCase().includes(kundenSuche.toLowerCase())).slice(0, 8)
+    : kunden.slice(0, 8)
 
   // TÜV-Wecker
   const [naechsteHu, setNaechsteHu] = useState('')
@@ -145,23 +162,46 @@ export function NeuFahrzeugForm({ kunden, hebebuehnen }: Props) {
     }).catch(() => {})
   }
 
-  function handleBestandUpload(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleBestandUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
-    const reader = new FileReader()
-    reader.onload = ev => {
-      try {
-        const text = ev.target?.result as string
-        const parsed = JSON.parse(text)
-        const withDate = { ...parsed, _importedAt: new Date().toLocaleDateString('de-DE') }
-        localStorage.setItem('mobile_bestand', JSON.stringify(withDate))
-        loadBestand(withDate)
-      } catch {
-        alert('Fehler beim Lesen der Datei. Bitte eine gültige ads.json hochladen.')
-      }
-    }
-    reader.readAsText(file)
     e.target.value = ''
+    let parsed: any
+    try {
+      parsed = JSON.parse(await file.text())
+    } catch {
+      alert('Fehler beim Lesen der Datei. Bitte eine gültige ads.json hochladen.')
+      return
+    }
+    const withDate = { ...parsed, _importedAt: new Date().toLocaleDateString('de-DE') }
+    localStorage.setItem('mobile_bestand', JSON.stringify(withDate))
+    loadBestand(withDate)
+
+    // Direkt in die Datenbank synchronisieren (neue anlegen, bestehende aktualisieren)
+    setImporting(true)
+    setImportResult('')
+    try {
+      const res = await fetch('/api/mobile-import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ads: parsed.ads || [] }),
+      })
+      const d = await res.json()
+      if (!res.ok) {
+        setImportResult(`Fehler: ${d.error ?? 'Import fehlgeschlagen'}`)
+      } else {
+        const teile: string[] = []
+        if (d.importiert) teile.push(`${d.importiert} neu angelegt`)
+        if (d.aktualisiert) teile.push(`${d.aktualisiert} aktualisiert`)
+        if (d.uebersprungen) teile.push(`${d.uebersprungen} übersprungen`)
+        setImportResult(`✓ Bestand synchronisiert: ${teile.join(' · ') || 'keine Änderungen'}`)
+        router.refresh()
+      }
+    } catch {
+      setImportResult('Import fehlgeschlagen (Netzwerkfehler).')
+    } finally {
+      setImporting(false)
+    }
   }
 
   function handleMobileSelect(bNummer: string) {
@@ -252,6 +292,8 @@ export function NeuFahrzeugForm({ kunden, hebebuehnen }: Props) {
         leistung_kw: leistungKw ? parseInt(leistungKw) : null,
         mobile_de_id: mobileDeId || null,
         bilder_urls: bilderUrls.length > 0 ? JSON.stringify(bilderUrls) : null,
+        verkaufspreis: verkaufspreis ? parseFloat(verkaufspreis) : null,
+        einkaufspreis: einkaufspreis ? parseFloat(einkaufspreis) : null,
         notizen: verkaufspreis ? `Verkaufspreis: ${parseFloat(verkaufspreis).toLocaleString('de-DE')} € (Brutto)` : null,
         naechste_hauptuntersuchung: naechsteHu || null,
         tuev_erinnerung: tuevErinnerung ?? false,
@@ -271,6 +313,14 @@ export function NeuFahrzeugForm({ kunden, hebebuehnen }: Props) {
         arbeiten: arbeiten || null,
         geschaetzte_dauer_tage: dauerTage ? parseFloat(dauerTage) : null,
         geplante_fertigstellung: fertigDatum || null,
+        ...(annahmeErfassen && fahrzeugTyp === 'fremd' ? {
+          annahme_km: (annahmeKm || kilometerstand) ? parseInt(annahmeKm || kilometerstand) : null,
+          annahme_tank: annahmeTank,
+          annahme_zustand: annahmeZustand,
+          annahme_schaeden: annahmeSchaeden || null,
+          kostenrahmen_max: kostenrahmen ? parseFloat(kostenrahmen.replace(',', '.')) : null,
+          annahme_datum: new Date().toISOString(),
+        } : {}),
       }).select().single()
 
       if (auftrag) {
@@ -385,6 +435,14 @@ export function NeuFahrzeugForm({ kunden, hebebuehnen }: Props) {
                     className="hidden"
                   />
                 </div>
+                {importing && (
+                  <p className="text-xs text-purple-600 flex items-center gap-1.5 mb-2">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" /> Bestand wird mit der Datenbank synchronisiert…
+                  </p>
+                )}
+                {importResult && !importing && (
+                  <p className={`text-xs mb-2 ${importResult.startsWith('Fehler') ? 'text-red-600' : 'text-green-600'}`}>{importResult}</p>
+                )}
                 {mobileAds.length > 0 && (
                   <>
                     <select
@@ -474,6 +532,11 @@ export function NeuFahrzeugForm({ kunden, hebebuehnen }: Props) {
                     <input type="number" value={verkaufspreis} onChange={e => setVerkaufspreis(e.target.value)} placeholder="15990"
                       className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
                   </div>
+                  <div>
+                    <label className="text-xs text-gray-800 mb-1 block">Einkaufspreis (€)</label>
+                    <input type="number" value={einkaufspreis} onChange={e => setEinkaufspreis(e.target.value)} placeholder="12500"
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
+                  </div>
                 </>
               )}
             </div>
@@ -528,18 +591,52 @@ export function NeuFahrzeugForm({ kunden, hebebuehnen }: Props) {
                 </div>
               </div>
             ) : (
-              <select
-                value={kundenId}
-                onChange={e => setKundenId(e.target.value)}
-                className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-400"
-              >
-                <option value="">— Kein Kunde —</option>
-                {kunden.map(k => (
-                  <option key={k.id} value={k.id}>
-                    {k.vorname} {k.nachname}{k.firma ? ` (${k.firma})` : ''}
-                  </option>
-                ))}
-              </select>
+              <div className="relative">
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                  <input
+                    value={kundenSuche}
+                    onChange={e => { setKundenSuche(e.target.value); setKundenId(''); setKundenDropdown(true) }}
+                    onFocus={() => setKundenDropdown(true)}
+                    placeholder="Kunde suchen (Name oder Firma)…"
+                    className="w-full pl-9 pr-9 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-400"
+                  />
+                  {(kundenId || kundenSuche) && (
+                    <button
+                      type="button"
+                      onClick={() => { setKundenId(''); setKundenSuche(''); setKundenDropdown(false) }}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-gray-100 text-gray-400"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+                {kundenDropdown && !kundenId && (
+                  <>
+                    <div className="fixed inset-0 z-10" onClick={() => setKundenDropdown(false)} />
+                    <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                      {kundenGefiltert.length === 0 ? (
+                        <p className="px-3 py-3 text-sm text-gray-400">Kein Kunde gefunden — oben „Neuen anlegen"</p>
+                      ) : kundenGefiltert.map(k => (
+                        <button
+                          type="button"
+                          key={k.id}
+                          onClick={() => {
+                            setKundenId(k.id)
+                            setKundenSuche(`${k.vorname ?? ''} ${k.nachname ?? ''}`.trim() + (k.firma ? ` (${k.firma})` : ''))
+                            setKundenDropdown(false)
+                          }}
+                          className="w-full text-left px-3 py-2.5 text-sm hover:bg-orange-50 border-b border-gray-50 last:border-0 transition-colors"
+                        >
+                          <span className="text-gray-900">{k.vorname} {k.nachname}</span>
+                          {k.firma && <span className="text-gray-400"> · {k.firma}</span>}
+                          {k.telefon && <span className="block text-xs text-gray-400 font-mono">{k.telefon}</span>}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
             )}
           </CardContent>
         </Card>}
@@ -678,6 +775,67 @@ export function NeuFahrzeugForm({ kunden, hebebuehnen }: Props) {
                 </div>
               )}
             </CardContent>
+          </Card>
+        )}
+
+        {/* Annahme-Protokoll (optional) — nur Fremdfahrzeuge */}
+        {fahrzeugTyp === 'fremd' && (
+          <Card>
+            <CardHeader className="pb-3">
+              <button type="button" onClick={() => setAnnahmeErfassen(v => !v)} className="w-full flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <ClipboardCheck className="w-5 h-5 text-green-500" />
+                  Annahme-Protokoll
+                  <span className="text-xs font-normal text-gray-400">optional</span>
+                </CardTitle>
+                <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${!annahmeErfassen ? '-rotate-90' : ''}`} />
+              </button>
+              {!annahmeErfassen && (
+                <p className="text-xs text-gray-400 mt-1 text-left">
+                  Gleich hier erfassen spart den zweiten Schritt. Schäden-Diagramm, Fotos & Unterschrift folgen später im Protokoll.
+                </p>
+              )}
+            </CardHeader>
+            {annahmeErfassen && (
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-gray-800 mb-1 flex items-center gap-1"><Gauge className="w-3 h-3" /> km-Stand bei Annahme</label>
+                    <input type="number" value={annahmeKm} onChange={e => setAnnahmeKm(e.target.value)} placeholder={kilometerstand || '50000'}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-800 mb-1 flex items-center gap-1"><Euro className="w-3 h-3" /> Kostenrahmen (max.)</label>
+                    <input type="number" value={kostenrahmen} onChange={e => setKostenrahmen(e.target.value)} placeholder="500"
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-800 mb-1 block">Tankfüllung: <strong>{annahmeTank}%</strong></label>
+                  <input type="range" min={0} max={100} step={5} value={annahmeTank} onChange={e => setAnnahmeTank(parseInt(e.target.value))}
+                    className="w-full accent-orange-500" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-800 mb-1.5 block">Fahrzeugzustand</label>
+                  <div className="flex gap-2">
+                    {[['sehr_gut', 'Sehr gut'], ['gut', 'Gut'], ['maessig', 'Mäßig'], ['schlecht', 'Schlecht']].map(([val, label]) => (
+                      <button key={val} type="button" onClick={() => setAnnahmeZustand(val)}
+                        className={`flex-1 py-2 rounded-lg text-xs font-medium border transition-colors ${
+                          annahmeZustand === val ? 'bg-orange-600 text-white border-orange-600' : 'bg-white text-gray-600 border-gray-200 hover:border-orange-300'
+                        }`}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-800 mb-1 block">Vorschäden / Bemerkungen</label>
+                  <textarea value={annahmeSchaeden} onChange={e => setAnnahmeSchaeden(e.target.value)} rows={2}
+                    placeholder="z.B. Kratzer Stoßstange hinten links, Delle Fahrertür…"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-orange-400" />
+                </div>
+              </CardContent>
+            )}
           </Card>
         )}
 

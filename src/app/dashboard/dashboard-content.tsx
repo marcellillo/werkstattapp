@@ -115,7 +115,7 @@ const auftragMap = new Map<string, Auftrag>()
     { label: 'Heute fertig', value: fertigeHeute, display: String(fertigeHeute), icon: CheckCircle, color: 'text-green-600', bg: 'bg-green-50', href: '/fahrzeuge' },
     { label: 'Überfällig', value: ueberfaellig, display: String(ueberfaellig), icon: AlertTriangle, color: 'text-red-600', bg: 'bg-red-50', href: '/fahrzeuge' },
     { label: 'Lagerbestand', value: eigenFahrzeuge, display: String(eigenFahrzeuge), icon: Tag, color: 'text-purple-600', bg: 'bg-purple-50', href: '/fahrzeuge' },
-    { label: 'Umsatz diesen Monat', value: monatsumsatz, display: fmtEuro(monatsumsatz), icon: TrendingUp, color: 'text-emerald-600', bg: 'bg-emerald-50', href: '/buchhaltung' },
+    { label: 'Werkstatt-Umsatz (Monat)', value: monatsumsatz, display: fmtEuro(monatsumsatz), icon: TrendingUp, color: 'text-emerald-600', bg: 'bg-emerald-50', href: '/buchhaltung' },
     { label: 'Offene Eingangsrechnungen', value: offeneRechnungenSumme, display: fmtEuro(offeneRechnungenSumme), icon: Euro, color: 'text-orange-600', bg: 'bg-orange-50', href: '/rechnungen' },
   ]
 

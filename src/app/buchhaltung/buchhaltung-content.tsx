@@ -9,14 +9,17 @@ import Link from 'next/link'
 import { Card, CardContent } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
+import { berechneFahrzeugSteuer, STEUERART_KURZ, STEUERART_COLOR, type Steuerart } from '@/lib/fahrzeug-steuer'
 
 type Auftrag = {
   id: string
   auftrag_nr: string
   einnahmen: number
   erstellt_am: string
+  verkauft_am: string | null
   status: string
-  fahrzeug: { kennzeichen: string; marke: string; modell: string } | null
+  steuerart: 'differenz' | 'regel' | 'ausfuhr' | null
+  fahrzeug: { kennzeichen: string; marke: string; modell: string; mobile_de_id: string | null; fahrzeug_typ: string | null; einkaufspreis: number | null } | null
 }
 
 type Ausgabe = {
@@ -56,7 +59,7 @@ type KundenRechnung = {
   fahrzeug: { kennzeichen: string; marke: string | null; modell: string | null } | null
 }
 
-type Tab = 'uebersicht' | 'rechnungen'
+type Tab = 'uebersicht' | 'fahrzeuge' | 'rechnungen'
 
 export function BuchhaltungContent({ auftraege, ausgaben, kundenRechnungen: initialKundenRechnungen, kleinunternehmer, firmaName }: {
   auftraege: Auftrag[]
@@ -85,14 +88,35 @@ export function BuchhaltungContent({ auftraege, ausgaben, kundenRechnungen: init
       .eq('id', r.id)
   }
 
-  const einnahmenNetto = useMemo(() => auftraege.map(a => ({
+  // Werkstattleistungen vs. Fahrzeugverkäufe (Eigenfahrzeuge) trennen
+  const werkstattAuftraege = useMemo(() => auftraege.filter(a => a.fahrzeug?.fahrzeug_typ !== 'eigen'), [auftraege])
+  const fahrzeugVerkaeufe = useMemo(() => auftraege.filter(a => a.fahrzeug?.fahrzeug_typ === 'eigen'), [auftraege])
+
+  const einnahmenNetto = useMemo(() => werkstattAuftraege.map(a => ({
     ...a,
     netto:  kleinunternehmer ? (a.einnahmen ?? 0) : (a.einnahmen ?? 0) / 1.19,
     brutto: a.einnahmen ?? 0,
     mwst:   kleinunternehmer ? 0 : (a.einnahmen ?? 0) - (a.einnahmen ?? 0) / 1.19,
     monat:      new Date(a.erstellt_am).getMonth(),
     monatJahr:  new Date(a.erstellt_am).getFullYear(),
-  })), [auftraege, kleinunternehmer])
+  })), [werkstattAuftraege, kleinunternehmer])
+
+  // Fahrzeugverkäufe: nach Verkaufsdatum + Steuerart aufbereiten
+  const fahrzeugRows = useMemo(() => fahrzeugVerkaeufe.map(a => {
+    const s = berechneFahrzeugSteuer({ verkaufspreis: a.einnahmen ?? 0, einkaufspreis: a.fahrzeug?.einkaufspreis, steuerart: a.steuerart })
+    const datum = a.verkauft_am ?? a.erstellt_am
+    return {
+      ...a,
+      ek: a.fahrzeug?.einkaufspreis ?? 0,
+      vk: a.einnahmen ?? 0,
+      marge: s.marge,
+      mwst: s.mwst,
+      gewinn: s.marge - s.mwst,
+      steuerartVal: (a.steuerart ?? 'differenz') as Steuerart,
+      monat:     new Date(datum).getMonth(),
+      monatJahr: new Date(datum).getFullYear(),
+    }
+  }), [fahrzeugVerkaeufe])
 
   const ausgabenMitDatum = useMemo(() => ausgaben.map(a => ({
     ...a,
@@ -131,7 +155,7 @@ export function BuchhaltungContent({ auftraege, ausgaben, kundenRechnungen: init
 
   const jahre = useMemo(() => {
     const set = new Set<number>()
-    auftraege.forEach(a => set.add(new Date(a.erstellt_am).getFullYear()))
+    auftraege.forEach(a => set.add(new Date(a.verkauft_am ?? a.erstellt_am).getFullYear()))
     ausgaben.forEach(a => { if (a.datum) set.add(new Date(a.datum).getFullYear()) })
     set.add(new Date().getFullYear())
     return Array.from(set).sort((a, b) => b - a)
@@ -193,7 +217,8 @@ export function BuchhaltungContent({ auftraege, ausgaben, kundenRechnungen: init
       {/* Tabs */}
       <div className="flex gap-2 border-b border-slate-200 pb-0">
         {([
-          { value: 'uebersicht', label: 'Übersicht' },
+          { value: 'uebersicht', label: 'Werkstatt' },
+          { value: 'fahrzeuge', label: 'Fahrzeugverkäufe', badge: fahrzeugRows.length },
           { value: 'rechnungen', label: 'Kundenrechnungen', badge: offeneRechnungen.length },
         ] as const).map(t => (
           <button key={t.value} onClick={() => setTab(t.value)}
@@ -378,6 +403,97 @@ export function BuchhaltungContent({ auftraege, ausgaben, kundenRechnungen: init
           )}
         </div>
       )}
+
+      {tab === 'fahrzeuge' && (() => {
+        const jahrRows = fahrzeugRows.filter(r => r.monatJahr === jahr)
+        const sum = jahrRows.reduce((a, r) => ({
+          vk: a.vk + r.vk, ek: a.ek + r.ek, marge: a.marge + r.marge, mwst: a.mwst + r.mwst, gewinn: a.gewinn + r.gewinn,
+        }), { vk: 0, ek: 0, marge: 0, mwst: 0, gewinn: 0 })
+        const perArt = (['differenz', 'regel', 'ausfuhr'] as Steuerart[]).map(art => {
+          const rs = jahrRows.filter(r => r.steuerartVal === art)
+          return { art, anzahl: rs.length, mwst: rs.reduce((s, r) => s + r.mwst, 0), erloes: rs.reduce((s, r) => s + r.vk, 0) }
+        }).filter(x => x.anzahl > 0)
+        return (
+          <div className="space-y-4">
+            {jahrRows.length === 0 ? (
+              <div className="bg-white border border-slate-200 rounded-xl py-12 text-center">
+                <p className="text-slate-400 font-medium">Keine Fahrzeugverkäufe in {jahr}</p>
+              </div>
+            ) : (<>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="bg-white border border-slate-200 rounded-xl p-4">
+                  <p className="text-xs text-slate-400 mb-1 uppercase tracking-wide font-semibold">Verkaufserlös</p>
+                  <p className="text-xl font-bold text-slate-900 stat-number">{fmtEuro(sum.vk)}</p>
+                  <p className="text-xs text-slate-400 mt-0.5">{jahrRows.length} Fahrzeuge</p>
+                </div>
+                <div className="bg-white border border-slate-200 rounded-xl p-4">
+                  <p className="text-xs text-slate-400 mb-1 uppercase tracking-wide font-semibold">Einkauf</p>
+                  <p className="text-xl font-bold text-slate-500 stat-number">{fmtEuro(sum.ek)}</p>
+                </div>
+                <div className="bg-white border border-slate-200 rounded-xl p-4">
+                  <p className="text-xs text-slate-400 mb-1 uppercase tracking-wide font-semibold">MwSt abzuführen</p>
+                  <p className="text-xl font-bold text-amber-600 stat-number">{fmtEuro(sum.mwst)}</p>
+                </div>
+                <div className="bg-white border border-slate-200 rounded-xl p-4">
+                  <p className="text-xs text-slate-400 mb-1 uppercase tracking-wide font-semibold">Gewinn (n. St.)</p>
+                  <p className={cn('text-xl font-bold stat-number', sum.gewinn >= 0 ? 'text-green-600' : 'text-red-600')}>{fmtEuro(sum.gewinn)}</p>
+                </div>
+              </div>
+
+              {/* MwSt nach Steuerart */}
+              <div className="bg-white border border-slate-200 rounded-xl p-4">
+                <p className="text-sm font-semibold text-slate-700 mb-3">Aufschlüsselung nach Steuerart</p>
+                <div className="space-y-2">
+                  {perArt.map(x => (
+                    <div key={x.art} className="flex items-center justify-between text-sm">
+                      <span className={cn('text-xs font-medium px-2 py-0.5 rounded-full border', STEUERART_COLOR[x.art])}>{STEUERART_KURZ[x.art]}</span>
+                      <span className="text-slate-500">{x.anzahl} {x.anzahl === 1 ? 'Fahrzeug' : 'Fahrzeuge'} · Erlös {fmtEuro(x.erloes)}</span>
+                      <span className="font-semibold text-amber-600">MwSt {fmtEuro(x.mwst)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Einzel-Liste (read-only) */}
+              <div className="bg-white border border-slate-200 rounded-xl overflow-x-auto">
+                <table className="w-full text-sm min-w-[640px]">
+                  <thead>
+                    <tr className="bg-slate-50 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                      <th className="px-4 py-2.5">Fahrzeug</th>
+                      <th className="px-3 py-2.5 whitespace-nowrap">Verkauft</th>
+                      <th className="px-3 py-2.5 text-right">Einkauf</th>
+                      <th className="px-3 py-2.5 text-right">Verkauf</th>
+                      <th className="px-3 py-2.5 text-center">Steuer</th>
+                      <th className="px-3 py-2.5 text-right">MwSt</th>
+                      <th className="px-3 py-2.5 text-right">Gewinn</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {jahrRows.map(r => (
+                      <tr key={r.id} className="hover:bg-slate-50/60">
+                        <td className="px-4 py-2.5">
+                          <Link href={`/fahrzeuge/${r.id}`} className="font-medium text-slate-900 hover:text-orange-600">{r.fahrzeug?.marke} {r.fahrzeug?.modell}</Link>
+                          {r.fahrzeug?.mobile_de_id && <span className="block text-xs font-mono text-purple-500">{r.fahrzeug.mobile_de_id}</span>}
+                        </td>
+                        <td className="px-3 py-2.5 text-slate-500 whitespace-nowrap">{fmt(r.verkauft_am)}</td>
+                        <td className="px-3 py-2.5 text-right text-slate-500">{r.ek > 0 ? fmtEuro(r.ek) : '—'}</td>
+                        <td className="px-3 py-2.5 text-right font-medium text-slate-800">{fmtEuro(r.vk)}</td>
+                        <td className="px-3 py-2.5 text-center"><span className={cn('text-xs font-medium px-1.5 py-0.5 rounded border', STEUERART_COLOR[r.steuerartVal])}>{STEUERART_KURZ[r.steuerartVal]}</span></td>
+                        <td className="px-3 py-2.5 text-right text-amber-600 whitespace-nowrap">{fmtEuro(r.mwst)}</td>
+                        <td className={cn('px-3 py-2.5 text-right font-semibold whitespace-nowrap', r.gewinn >= 0 ? 'text-green-600' : 'text-red-600')}>{fmtEuro(r.gewinn)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <Link href="/fahrzeuge/verkauft" className="inline-flex items-center gap-1.5 text-sm text-orange-600 font-medium hover:text-orange-700">
+                Einkaufspreise & Steuerart im Steuerblatt bearbeiten →
+              </Link>
+            </>)}
+          </div>
+        )
+      })()}
 
       {tab === 'uebersicht' && (<>
 

@@ -16,7 +16,7 @@ export default async function StatistikenPage() {
   ] = await Promise.all([
     supabase
       .from('auftraege')
-      .select('id, status, erstellt_am, fertiggestellt_am, einnahmen, tuev_kandidat, tuev_ergebnis, hebebuehne_id, fahrzeug:fahrzeuge(marke, modell, kennzeichen)')
+      .select('id, status, erstellt_am, fertiggestellt_am, verkauft_am, einnahmen, steuerart, tuev_kandidat, tuev_ergebnis, hebebuehne_id, fahrzeug:fahrzeuge(marke, modell, kennzeichen, fahrzeug_typ, einkaufspreis)')
       .order('erstellt_am'),
     supabase
       .from('ersatzteile')
