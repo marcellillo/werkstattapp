@@ -54,7 +54,7 @@ export function FahrzeugeContent({
   const [uebergabeDatum, setUebergabeDatum] = useState('')
   const [loeschen, setLoeschen] = useState<{ fahrzeugId: string; name: string; kennzeichen?: string } | null>(null)
   const [loeschenLoading, setLoeschenLoading] = useState(false)
-  const [eigenSubTab, setEigenSubTab] = useState<'bestand' | 'verkauft'>('bestand')
+  const [eigenSubTab, setEigenSubTab] = useState<'bestand' | 'verkauft' | 'uebergeben'>('bestand')
 
   const fremdAuftraege = auftraege.filter(a => (a.fahrzeug as any)?.fahrzeug_typ !== 'eigen')
   const eigenAuftraege = auftraege.filter(a => (a.fahrzeug as any)?.fahrzeug_typ === 'eigen')
@@ -461,11 +461,11 @@ export function FahrzeugeContent({
       {/* Eigenfahrzeuge */}
       {tab === 'eigen' && (
         <>
-          {/* Sub-Tabs Bestand / Verkauft */}
-          <div className="flex gap-2">
+          {/* Sub-Tabs Bestand / Verkauft / Übergeben */}
+          <div className="flex gap-2 overflow-x-auto pb-1">
             <button
               onClick={() => setEigenSubTab('bestand')}
-              className={cn('flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium border transition-all',
+              className={cn('flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium border transition-all whitespace-nowrap',
                 eigenSubTab === 'bestand' ? 'bg-purple-600 text-white border-purple-600' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300')}
             >
               Im Bestand
@@ -475,27 +475,37 @@ export function FahrzeugeContent({
             </button>
             <button
               onClick={() => setEigenSubTab('verkauft')}
-              className={cn('flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium border transition-all',
+              className={cn('flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium border transition-all whitespace-nowrap',
                 eigenSubTab === 'verkauft' ? 'bg-green-600 text-white border-green-600' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300')}
             >
-              Übergeben
+              Verkauft
               <span className={cn('text-xs px-1.5 py-0.5 rounded-full', eigenSubTab === 'verkauft' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600')}>
+                {eigenBereitsVerkauft.length}
+              </span>
+            </button>
+            <button
+              onClick={() => setEigenSubTab('uebergeben')}
+              className={cn('flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium border transition-all whitespace-nowrap',
+                eigenSubTab === 'uebergeben' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300')}
+            >
+              Übergeben
+              <span className={cn('text-xs px-1.5 py-0.5 rounded-full', eigenSubTab === 'uebergeben' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600')}>
                 {eigenVerkauft.length}
               </span>
             </button>
           </div>
 
-          {/* Verkauft-Liste */}
-          {eigenSubTab === 'verkauft' && eigenVerkauft.length > 0 && (
+          {/* Verkauft-Liste (Status = verkauft) */}
+          {eigenSubTab === 'verkauft' && eigenBereitsVerkauft.length > 0 && (
             <div className="flex justify-end">
-              <Link href="/fahrzeuge/verkauft" className="flex items-center gap-1.5 text-sm text-purple-600 font-medium hover:text-purple-800 transition-colors">
+              <Link href="/fahrzeuge/verkauft" className="flex items-center gap-1.5 text-sm text-green-600 font-medium hover:text-green-800 transition-colors">
                 <ExternalLink className="w-3.5 h-3.5" />
-                Vollständige Übersicht
+                Steuerblatt & Übergeben
               </Link>
             </div>
           )}
           {eigenSubTab === 'verkauft' && (
-            eigenVerkauft.length === 0 ? (
+            eigenBereitsVerkauft.length === 0 ? (
               <Card><CardContent className="py-12 text-center">
                 <CheckCircle2 className="w-10 h-10 mx-auto mb-3 text-gray-200" />
                 <p className="text-gray-500 text-sm">Noch keine Fahrzeuge verkauft</p>
@@ -503,7 +513,7 @@ export function FahrzeugeContent({
             ) : (() => {
                 const heute = new Date().toISOString().split('T')[0]
                 // Sortieren: neueste zuerst, kein Datum ans Ende
-                const sorted = [...eigenVerkauft].sort((a, b) => {
+                const sorted = [...eigenBereitsVerkauft].sort((a, b) => {
                   const da = (a as any).verkauft_am ?? ''
                   const db = (b as any).verkauft_am ?? ''
                   return db.localeCompare(da)
@@ -581,6 +591,20 @@ export function FahrzeugeContent({
                   </div>
                 )
               })()
+          )}
+
+          {/* Übergeben-Seite (Link zu Archiv) */}
+          {eigenSubTab === 'uebergeben' && (
+            <div className="text-center py-12">
+              <CheckCircle2 className="w-12 h-12 mx-auto mb-4 text-emerald-500" />
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Übergeben-Archiv</h3>
+              <p className="text-gray-600 mb-6">Alle übergebenen Fahrzeuge und detaillierte Verkaufshistorie</p>
+              <Link href="/fahrzeuge/uebergeben">
+                <Button className="bg-emerald-600 hover:bg-emerald-700 text-white">
+                  Zum Archiv ({eigenVerkauft.length})
+                </Button>
+              </Link>
+            </div>
           )}
 
           {/* Bestand-Karten */}
