@@ -1244,7 +1244,7 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
                 Ersatzteile ({teile.length})
               </CardTitle>
               <div className="flex items-center gap-2">
-                {arbeiten.trim() && (
+                {(isEigenfahrzeug || arbeiten.trim()) && (
                   <Button
                     size="sm"
                     variant="ghost"
