@@ -1,5 +1,6 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -38,6 +39,7 @@ export function FahrzeugeContent({
   standardSteuerart?: 'differenz' | 'regel' | 'ausfuhr'
 }) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [tab, setTab] = useState<'fremd' | 'eigen' | 'tuev' | 'service'>('fremd')
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<FahrzeugStatus | 'alle'>('alle')
@@ -55,6 +57,18 @@ export function FahrzeugeContent({
   const [loeschen, setLoeschen] = useState<{ fahrzeugId: string; name: string; kennzeichen?: string } | null>(null)
   const [loeschenLoading, setLoeschenLoading] = useState(false)
   const [eigenSubTab, setEigenSubTab] = useState<'bestand' | 'verkauft' | 'uebergeben'>('bestand')
+
+  // URL-Parameter verarbeiten
+  useEffect(() => {
+    const tabParam = searchParams.get('tab')
+    const eigenSubTabParam = searchParams.get('eigenSubTab')
+    if (tabParam === 'eigen' || tabParam === 'fremd' || tabParam === 'tuev' || tabParam === 'service') {
+      setTab(tabParam)
+    }
+    if (eigenSubTabParam === 'bestand' || eigenSubTabParam === 'verkauft' || eigenSubTabParam === 'uebergeben') {
+      setEigenSubTab(eigenSubTabParam)
+    }
+  }, [searchParams])
 
   const fremdAuftraege = auftraege.filter(a => (a.fahrzeug as any)?.fahrzeug_typ !== 'eigen')
   const eigenAuftraege = auftraege.filter(a => (a.fahrzeug as any)?.fahrzeug_typ === 'eigen')
