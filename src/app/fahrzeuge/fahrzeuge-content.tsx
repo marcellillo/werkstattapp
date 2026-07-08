@@ -274,16 +274,16 @@ export function FahrzeugeContent({
                 {eigenImBestand.length}
               </span>
             </button>
-            <button
-              onClick={() => setEigenSubTab('verkauft')}
-              className={cn('flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium border transition-all',
-                eigenSubTab === 'verkauft' ? 'bg-green-600 text-white border-green-600' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300')}
-            >
-              Verkauft
-              <span className={cn('text-xs px-1.5 py-0.5 rounded-full', eigenSubTab === 'verkauft' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600')}>
-                {eigenBereitsVerkauft.length}
-              </span>
-            </button>
+            <Link href="/fahrzeuge/verkauft">
+              <button
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium border bg-green-600 text-white border-green-600 hover:bg-green-700 transition-all"
+              >
+                💰 Verkauft
+                <span className="text-xs px-1.5 py-0.5 rounded-full bg-white/20 text-white">
+                  {eigenBereitsVerkauft.length}
+                </span>
+              </button>
+            </Link>
             <button
               onClick={() => setEigenSubTab('uebergeben')}
               className={cn('flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium border transition-all',
