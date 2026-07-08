@@ -245,22 +245,24 @@ export function FahrzeugeContent({
         </button>
       </div>
 
-      {/* Quick Access Links — Eigenfahrzeuge Verkauft & Übergeben */}
-      <div className="grid grid-cols-2 sm:flex gap-3 pt-2">
-        <Link href="/fahrzeuge/verkauft" className="flex-1 sm:flex-none">
-          <button className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold bg-green-600 text-white hover:bg-green-700 transition-all shadow-sm">
-            <span>💰</span>
-            <span className="hidden sm:inline">Verkaufte Fahrzeuge</span>
-            <span className="sm:hidden">Verkauft</span>
-            <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">{eigenBereitsVerkauft.length}</span>
+      {/* 🎯 QUICK ACCESS BUTTONS — HIGHLY VISIBLE */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-4 px-3 bg-gray-50 rounded-xl border-2 border-gray-200 mt-4">
+        <Link href="/fahrzeuge/verkauft" className="w-full">
+          <button className="w-full flex flex-col sm:flex-row items-center justify-center gap-3 px-6 py-5 rounded-xl bg-gradient-to-r from-green-500 to-green-600 text-white hover:from-green-600 hover:to-green-700 transition-all shadow-lg hover:shadow-xl font-bold text-lg border-2 border-green-700">
+            <span className="text-4xl">💰</span>
+            <div className="text-center sm:text-left">
+              <div className="font-bold text-lg">Verkaufte Fahrzeuge</div>
+              <div className="text-sm opacity-90">{eigenBereitsVerkauft.length} Fahrzeuge</div>
+            </div>
           </button>
         </Link>
-        <Link href="/fahrzeuge/uebergeben" className="flex-1 sm:flex-none">
-          <button className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 transition-all shadow-sm">
-            <span>✅</span>
-            <span className="hidden sm:inline">Übergeben</span>
-            <span className="sm:hidden">Übergeben</span>
-            <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">{eigenVerkauft.length}</span>
+        <Link href="/fahrzeuge/uebergeben" className="w-full">
+          <button className="w-full flex flex-col sm:flex-row items-center justify-center gap-3 px-6 py-5 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 text-white hover:from-emerald-600 hover:to-emerald-700 transition-all shadow-lg hover:shadow-xl font-bold text-lg border-2 border-emerald-700">
+            <span className="text-4xl">✅</span>
+            <div className="text-center sm:text-left">
+              <div className="font-bold text-lg">Übergeben</div>
+              <div className="text-sm opacity-90">{eigenVerkauft.length} Fahrzeuge</div>
+            </div>
           </button>
         </Link>
       </div>
