@@ -40,7 +40,8 @@ export function FahrzeugeContent({
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const [tab, setTab] = useState<'fremd' | 'eigen' | 'tuev' | 'service'>('fremd')
+  // Default auf 'eigen' statt 'fremd' — Eigenfahrzeuge sind das Hauptfocus
+  const [tab, setTab] = useState<'fremd' | 'eigen' | 'tuev' | 'service'>('eigen')
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<FahrzeugStatus | 'alle'>('alle')
   const [sortByPrio, setSortByPrio] = useState(true)
