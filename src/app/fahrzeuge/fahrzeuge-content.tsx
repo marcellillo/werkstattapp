@@ -245,6 +245,26 @@ export function FahrzeugeContent({
         </button>
       </div>
 
+      {/* Quick Access Links — Eigenfahrzeuge Verkauft & Übergeben */}
+      <div className="grid grid-cols-2 sm:flex gap-3 pt-2">
+        <Link href="/fahrzeuge/verkauft" className="flex-1 sm:flex-none">
+          <button className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold bg-green-600 text-white hover:bg-green-700 transition-all shadow-sm">
+            <span>💰</span>
+            <span className="hidden sm:inline">Verkaufte Fahrzeuge</span>
+            <span className="sm:hidden">Verkauft</span>
+            <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">{eigenBereitsVerkauft.length}</span>
+          </button>
+        </Link>
+        <Link href="/fahrzeuge/uebergeben" className="flex-1 sm:flex-none">
+          <button className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 transition-all shadow-sm">
+            <span>✅</span>
+            <span className="hidden sm:inline">Übergeben</span>
+            <span className="sm:hidden">Übergeben</span>
+            <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">{eigenVerkauft.length}</span>
+          </button>
+        </Link>
+      </div>
+
       {/* Eigenfahrzeug Sub-Tabs: direkt nach Haupt-Tabs */}
       {tab === 'eigen' && (
         <>
