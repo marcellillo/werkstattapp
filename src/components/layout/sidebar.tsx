@@ -21,6 +21,8 @@ const navGroups = [
       { href: '/hebebuehnen', label: 'Hebebühnen',  icon: Layers,          key: 'hebebuehnen' },
       { href: '/annahme',     label: 'Annahme',     icon: ClipboardCheck,  key: 'annahme' },
       { href: '/fahrzeuge',   label: 'Fahrzeuge',   icon: Car,             key: 'fahrzeuge' },
+      { href: '/fahrzeuge/verkauft', label: '💰 Verkaufte Fahrzeuge', icon: Package, key: 'fahrzeuge_verkauft' },
+      { href: '/fahrzeuge/uebergeben', label: '✅ Übergeben', icon: Package, key: 'fahrzeuge_uebergeben' },
       { href: '/termine',     label: 'Termine',     icon: CalendarClock,   key: 'termine' },
     ],
   },
