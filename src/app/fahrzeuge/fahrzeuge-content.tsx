@@ -172,6 +172,11 @@ export function FahrzeugeContent({
 
   return (
     <div className="space-y-5">
+      {/* REBUILD TEST: Rote Test-Box */}
+      <div className="bg-red-100 border-2 border-red-500 p-4 rounded-lg text-center font-bold text-red-700">
+        🔴 TEST: Neue Version ist aktiv! Vercel hat erfolgreich neugebaut!
+      </div>
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
