@@ -124,6 +124,34 @@ export function Sidebar() {
             </div>
           )
         })}
+
+        {/* Direktlinks für Fahrzeuge */}
+        <div className="border-t border-slate-800 pt-3 space-y-0.5">
+          <Link
+            href="/fahrzeuge/verkauft"
+            className={cn(
+              'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all',
+              pathname.startsWith('/fahrzeuge/verkauft')
+                ? 'bg-green-600 text-white'
+                : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100'
+            )}
+          >
+            <Package className="w-[18px] h-[18px]" />
+            <span>💰 Verkaufte Fahrzeuge</span>
+          </Link>
+          <Link
+            href="/fahrzeuge/uebergeben"
+            className={cn(
+              'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all',
+              pathname.startsWith('/fahrzeuge/uebergeben')
+                ? 'bg-emerald-600 text-white'
+                : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100'
+            )}
+          >
+            <Package className="w-[18px] h-[18px]" />
+            <span>✅ Übergeben</span>
+          </Link>
+        </div>
       </nav>
 
       {/* Footer */}
