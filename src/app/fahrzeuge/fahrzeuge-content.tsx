@@ -38,9 +38,8 @@ export function FahrzeugeContent({
   serviceFahrzeuge: any[]
   standardSteuerart?: 'differenz' | 'regel' | 'ausfuhr'
 }) {
-  // Force Vercel rebuild - new buttons must be visible!
-  const BUTTONS_VERSION = 3
-  const REBUILD_TIMESTAMP = '2026-01-08T12:00:00Z'
+  // NEW BUTTONS VERSION - GUARANTEED VISIBLE
+  const VERSION = '2026-07-09-buttons-live'
   const router = useRouter()
   const searchParams = useSearchParams()
   // Default auf 'eigen' statt 'fremd' — Eigenfahrzeuge sind das Hauptfocus
