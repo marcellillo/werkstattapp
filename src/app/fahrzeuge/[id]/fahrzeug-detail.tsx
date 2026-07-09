@@ -14,6 +14,7 @@ import {
 } from '@/types/database'
 import { createClient } from '@/lib/supabase/client'
 import { createRechnungOnAusgeliefert } from '@/lib/auto-rechnung-ersteller'
+import { VerkaufenModal } from './verkaufen-modal'
 
 interface Props {
   auftrag: Auftrag
@@ -102,6 +103,7 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
   const [uebergabeZustand, setUebergabeZustand] = useState('gut')
   const [uebergabeSaving, setUebergabeSaving] = useState(false)
   const [showBewertungModal, setShowBewertungModal] = useState(false)
+  const [showVerkaufenModal, setShowVerkaufenModal] = useState(false)
   const supabase = createClient()
   const router = useRouter()
 
@@ -1501,26 +1503,44 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
               <p className="text-xs text-gray-500 mt-0.5">Status anklicken zum Ändern</p>
             </CardHeader>
             <CardContent className="space-y-2">
-              {(isEigenfahrzeug ? STATUS_ORDER_EIGEN : STATUS_ORDER_FREMD).map(s => (
+              {(isEigenfahrzeug ? STATUS_ORDER_EIGEN : STATUS_ORDER_FREMD).map(s => {
+                // Skip "Verkaufen" button if we have a special modal for it
+                if (s === 'verkauft' && isEigenfahrzeug && auftrag.status === 'fertig') {
+                  return null
+                }
+                return (
+                  <button
+                    key={s}
+                    onClick={() => handleStatusChange(s)}
+                    className={cn(
+                      'flex w-full items-center gap-3 px-3 py-2.5 rounded-lg border text-sm font-medium transition-all cursor-pointer',
+                      auftrag.status === s
+                        ? cn(FAHRZEUG_STATUS_COLOR[s], 'border-current shadow-sm ring-2 ring-offset-1 ring-current/30')
+                        : 'bg-gray-50 text-gray-500 border-gray-100 hover:bg-white hover:border-gray-400 hover:text-gray-900 hover:shadow-sm'
+                    )}
+                  >
+                    {auftrag.status === s ? (
+                      <CheckCircle className="w-4 h-4 flex-shrink-0" />
+                    ) : (
+                      <Circle className="w-4 h-4 flex-shrink-0 opacity-30" />
+                    )}
+                    <span className="flex-1 text-left">{FAHRZEUG_STATUS_LABEL[s]}</span>
+                    {auftrag.status !== s && <ChevronRight className="w-3.5 h-3.5 opacity-30" />}
+                  </button>
+                )
+              })}
+
+              {/* Verkaufen-Button für Eigenfahrzeuge */}
+              {isEigenfahrzeug && auftrag.status === 'fertig' && (
                 <button
-                  key={s}
-                  onClick={() => handleStatusChange(s)}
-                  className={cn(
-                    'flex w-full items-center gap-3 px-3 py-2.5 rounded-lg border text-sm font-medium transition-all cursor-pointer',
-                    auftrag.status === s
-                      ? cn(FAHRZEUG_STATUS_COLOR[s], 'border-current shadow-sm ring-2 ring-offset-1 ring-current/30')
-                      : 'bg-gray-50 text-gray-500 border-gray-100 hover:bg-white hover:border-gray-400 hover:text-gray-900 hover:shadow-sm'
-                  )}
+                  onClick={() => setShowVerkaufenModal(true)}
+                  className="flex w-full items-center gap-3 px-3 py-2.5 rounded-lg border border-green-200 text-sm font-medium transition-all cursor-pointer bg-green-50 text-green-700 hover:bg-green-100 hover:border-green-400"
                 >
-                  {auftrag.status === s ? (
-                    <CheckCircle className="w-4 h-4 flex-shrink-0" />
-                  ) : (
-                    <Circle className="w-4 h-4 flex-shrink-0 opacity-30" />
-                  )}
-                  <span className="flex-1 text-left">{FAHRZEUG_STATUS_LABEL[s]}</span>
-                  {auftrag.status !== s && <ChevronRight className="w-3.5 h-3.5 opacity-30" />}
+                  <Car className="w-4 h-4 flex-shrink-0" />
+                  <span className="flex-1 text-left">🚗 Als verkauft markieren</span>
+                  <ChevronRight className="w-3.5 h-3.5 opacity-60" />
                 </button>
-              ))}
+              )}
 
               {buehneWarnung && (
                 <div className="mt-2 bg-yellow-50 border border-yellow-300 rounded-xl p-4 space-y-3">
@@ -1796,6 +1816,24 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
           </button>
         </div>
       </div>
+
+      {/* Verkaufen Modal */}
+      {showVerkaufenModal && (
+        <VerkaufenModal
+          auftragId={auftrag.id}
+          fahrzeugId={(auftrag.fahrzeug as any)?.id ?? null}
+          marke={(auftrag.fahrzeug as any)?.marke ?? ''}
+          modell={(auftrag.fahrzeug as any)?.modell ?? ''}
+          einkaufspreis={(auftrag.fahrzeug as any)?.einkaufspreis ?? null}
+          standardSteuerart={detailSteuerart}
+          onClose={() => setShowVerkaufenModal(false)}
+          onSuccess={() => {
+            setShowVerkaufenModal(false)
+            // Seite nach 500ms neuladen, damit Status aktualisiert ist
+            setTimeout(() => window.location.reload(), 500)
+          }}
+        />
+      )}
     </div>
   )
 }
