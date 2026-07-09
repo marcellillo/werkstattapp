@@ -4,7 +4,6 @@ import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { VerkauftButtons } from './buttons'
 
 import { Car, Search, Plus, ChevronRight, Package, Tag, Gauge, Palette, Fuel, ArrowUpDown, Wrench, Euro, ShieldCheck, CheckCircle2, ExternalLink, Trash2, AlertTriangle } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
@@ -175,7 +174,7 @@ export function FahrzeugeContent({
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-red-600">🔴 FAHRZEUGE — BUTTONS LIVE v2 🔴</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Fahrzeuge</h1>
           <p className="text-sm text-gray-800 mt-0.5">
             {fremdAuftraege.length} Kunden · {eigenImBestand.length} Lager{eigenVerkauft.length > 0 ? ` · ${eigenVerkauft.length} verkauft` : ''} · {tuevFahrzeuge.length} TÜV · {serviceFahrzeuge.length} Service
           </p>
@@ -187,9 +186,6 @@ export function FahrzeugeContent({
           </Button>
         </Link>
       </div>
-
-      {/* 🎯 BUTTONS COMPONENT */}
-      <VerkauftButtons eigenBereitsVerkauft={eigenBereitsVerkauft.length} eigenVerkauft={eigenVerkauft.length} />
 
       {/* Tabs */}
       <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide -mx-1 px-1">
