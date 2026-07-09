@@ -76,7 +76,7 @@ export function FahrzeugeContent({
   const fremdAuftraege = auftraege.filter(a => (a.fahrzeug as any)?.fahrzeug_typ !== 'eigen')
   const eigenAuftraege = auftraege.filter(a => (a.fahrzeug as any)?.fahrzeug_typ === 'eigen')
   const eigenImBestand = eigenAuftraege.filter(a => a.status !== 'ausgeliefert' && a.status !== 'storniert' && a.status !== 'verkauft')
-  const eigenBereitsVerkauft = eigenAuftraege.filter(a => a.status === 'verkauft' || a.status === 'ausgeliefert')  // BEIDE: verkauft + ausgeliefert
+  const eigenBereitsVerkauft = eigenAuftraege.filter(a => a.status === 'verkauft')  // nur verkauft
   const eigenVerkauft = eigenAuftraege.filter(a => a.status === 'ausgeliefert')  // nur ausgeliefert (für Übergeben-Tab)
 
   function openVerkaufen(auftrag: any) {
