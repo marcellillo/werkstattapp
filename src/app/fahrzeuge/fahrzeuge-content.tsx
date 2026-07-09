@@ -174,7 +174,7 @@ export function FahrzeugeContent({
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Fahrzeuge</h1>
+          <h1 className="text-2xl font-bold text-red-600">🔴 FAHRZEUGE — BUTTONS LIVE v2 🔴</h1>
           <p className="text-sm text-gray-800 mt-0.5">
             {fremdAuftraege.length} Kunden · {eigenImBestand.length} Lager{eigenVerkauft.length > 0 ? ` · ${eigenVerkauft.length} verkauft` : ''} · {tuevFahrzeuge.length} TÜV · {serviceFahrzeuge.length} Service
           </p>
