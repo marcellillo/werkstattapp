@@ -65,7 +65,7 @@ export default async function FahrzeugePage() {
   const standardSteuerart = (steuerCfg?.wert as 'differenz' | 'regel' | 'ausfuhr') ?? 'differenz'
 
   return (
-    <AppLayout title="🔴 VERCEL REBUILD LIVE 🔴">
+    <AppLayout title="Fahrzeuge">
       <FahrzeugeContent
         auftraege={auftraege}
         tuevFahrzeuge={(tuevFahrzeugeRaw ?? []) as any[]}
