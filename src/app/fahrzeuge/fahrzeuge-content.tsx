@@ -187,6 +187,28 @@ export function FahrzeugeContent({
         </Link>
       </div>
 
+      {/* 🎯 QUICK ACCESS BUTTONS — MOVED TO TOP */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-4 px-3 bg-green-50 rounded-xl border-4 border-green-500 mt-2 mb-4">
+        <Link href="/fahrzeuge/verkauft" className="w-full">
+          <button className="w-full flex flex-col sm:flex-row items-center justify-center gap-3 px-6 py-5 rounded-xl bg-gradient-to-r from-green-500 to-green-600 text-white hover:from-green-600 hover:to-green-700 transition-all shadow-lg hover:shadow-xl font-bold text-lg border-2 border-green-700">
+            <span className="text-4xl">💰</span>
+            <div className="text-center sm:text-left">
+              <div className="font-bold text-lg">Verkaufte Fahrzeuge</div>
+              <div className="text-sm opacity-90">{eigenBereitsVerkauft.length} Fahrzeuge</div>
+            </div>
+          </button>
+        </Link>
+        <Link href="/fahrzeuge/uebergeben" className="w-full">
+          <button className="w-full flex flex-col sm:flex-row items-center justify-center gap-3 px-6 py-5 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 text-white hover:from-emerald-600 hover:to-emerald-700 transition-all shadow-lg hover:shadow-xl font-bold text-lg border-2 border-emerald-700">
+            <span className="text-4xl">✅</span>
+            <div className="text-center sm:text-left">
+              <div className="font-bold text-lg">Übergeben</div>
+              <div className="text-sm opacity-90">{eigenVerkauft.length} Fahrzeuge</div>
+            </div>
+          </button>
+        </Link>
+      </div>
+
       {/* Tabs */}
       <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide -mx-1 px-1">
         <button
