@@ -140,9 +140,14 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
 
   // Lade Mitarbeiter
   useEffect(() => {
-    supabase.from('profiles').select('id, full_name, role').order('full_name').then(({ data }) => {
-      if (data) setMitarbeiter(data)
-    })
+    let mounted = true
+    supabase.from('profiles').select('id, full_name, role').order('full_name')
+      .then(({ data, error }) => {
+        if (mounted && data) setMitarbeiter(data)
+        if (error) console.error('Fehler beim Laden von Mitarbeitern:', error)
+      })
+      .catch(err => console.error('Fehler beim Laden von Mitarbeitern:', err))
+    return () => { mounted = false }
   }, [])
 
   async function handleMitarbeiterChange(profileId: string) {
@@ -219,11 +224,18 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
           fahrzeug: fz ? { marke: fz.marke, modell: fz.modell, baujahr: fz.baujahr, fahrgestellnummer: fz.fahrgestellnummer } : null,
         }),
       })
-      const data = await res.json()
+      let data
+      try {
+        data = await res.json()
+      } catch (parseErr) {
+        setKiError('Ungültige Antwort vom Server')
+        return
+      }
       if (!res.ok) { setKiError(data.error ?? 'Fehler'); return }
-      setKiVorschlaege(data.teile ?? [])
+      const teile = Array.isArray(data.teile) ? data.teile : []
+      setKiVorschlaege(teile)
       const defaultSelected = new Set<number>(
-        (data.teile ?? []).map((_: KiTeilVorschlag, i: number) => i).filter((i: number) => !(data.teile[i] as KiTeilVorschlag).optional)
+        teile.map((_: KiTeilVorschlag, i: number) => i).filter((i: number) => !(teile[i] as KiTeilVorschlag).optional)
       )
       setKiAusgewaehlt(defaultSelected)
     } catch (e: any) {
@@ -251,12 +263,17 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
 
   async function saveArbeiten() {
     setSaving(true)
-    await supabase.from('auftraege').update({
-      arbeiten,
-      geplante_fertigstellung: fertigDatum || null,
-      geschaetzte_dauer_tage: dauerTage ? parseFloat(dauerTage) : null,
-    }).eq('id', auftrag.id)
-    setSaving(false)
+    try {
+      await supabase.from('auftraege').update({
+        arbeiten,
+        geplante_fertigstellung: fertigDatum || null,
+        geschaetzte_dauer_tage: dauerTage ? parseFloat(dauerTage) : null,
+      }).eq('id', auftrag.id)
+    } catch (err) {
+      console.error('Fehler beim Speichern der Arbeiten:', err)
+    } finally {
+      setSaving(false)
+    }
   }
 
   // Heute + N Werktage (Wochenenden überspringen)
@@ -320,9 +337,14 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
       return
     }
     setBuehneWarnung(null)
-    setAuftrag(a => ({ ...a, status }))
-    await supabase.from('auftraege').update({ status }).eq('id', auftrag.id)
-    fetch('/api/benachrichtigungen/generieren', { method: 'POST' }).catch(() => {})
+    try {
+      const { error } = await supabase.from('auftraege').update({ status }).eq('id', auftrag.id)
+      if (error) throw error
+      setAuftrag(a => ({ ...a, status }))
+      fetch('/api/benachrichtigungen/generieren', { method: 'POST' }).catch(err => console.warn('Benachrichtigung fehlgeschlagen:', err))
+    } catch (err) {
+      console.error('Fehler beim Status-Update:', err)
+    }
   }
 
   async function handleChecklisteBestaetigen() {
@@ -348,7 +370,7 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
       const name = `${auftrag.fahrzeug?.marke ?? ''} ${auftrag.fahrzeug?.modell ?? ''}`.trim()
       fetch('/api/push/send', { method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: '✅ Auftrag fertig', body: `${name} (${kz}) ist fertig zur Abholung`, url: `/fahrzeuge/${auftrag.id}`, tag: 'fertig' })
-      }).catch(() => {})
+      }).catch(err => console.warn('Push-Benachrichtigung fehlgeschlagen:', err))
       const a = auftrag as any
       setUebergabeKm(String(a.annahme_km ?? ''))
       setUebergabeTank(a.annahme_tank ?? 50)
@@ -402,32 +424,42 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
 
   async function handleStornieren() {
     setStornieren(true)
-    // Teile zurück ins Lager (geliefert), außer nicht_bestellt
-    const teileZurueck = teile.filter(t => t.status !== 'nicht_bestellt')
-    if (teileZurueck.length > 0) {
-      await supabase.from('ersatzteile')
-        .update({ status: 'geliefert' })
-        .in('id', teileZurueck.map(t => t.id))
-      setTeile(prev => prev.map(t => t.status !== 'nicht_bestellt' ? { ...t, status: 'geliefert' } : t))
+    try {
+      // Teile zurück ins Lager (geliefert), außer nicht_bestellt
+      const teileZurueck = teile.filter(t => t.status !== 'nicht_bestellt')
+      if (teileZurueck.length > 0) {
+        await supabase.from('ersatzteile')
+          .update({ status: 'geliefert' })
+          .in('id', teileZurueck.map(t => t.id))
+        setTeile(prev => prev.map(t => t.status !== 'nicht_bestellt' ? { ...t, status: 'geliefert' } : t))
+      }
+      // Auftrag stornieren + Bühne freigeben
+      await supabase.from('auftraege')
+        .update({ status: 'storniert', hebebuehne_id: null })
+        .eq('id', auftrag.id)
+      setAuftrag(a => ({ ...a, status: 'storniert', hebebuehne_id: undefined, hebebuehne: undefined }))
+      setStorniereBestaetigung(false)
+    } catch (err) {
+      console.error('Fehler beim Stornieren:', err)
+    } finally {
+      setStornieren(false)
     }
-    // Auftrag stornieren + Bühne freigeben
-    await supabase.from('auftraege')
-      .update({ status: 'storniert', hebebuehne_id: null })
-      .eq('id', auftrag.id)
-    setAuftrag(a => ({ ...a, status: 'storniert', hebebuehne_id: undefined, hebebuehne: undefined }))
-    setStorniereBestaetigung(false)
-    setStornieren(false)
   }
 
   async function handleLoeschen() {
     setLoeschen(true)
-    // Teile löschen
-    await supabase.from('ersatzteile').delete().eq('auftrag_id', auftrag.id)
-    // Fotos löschen
-    await supabase.from('auftrag_fotos').delete().eq('auftrag_id', auftrag.id)
-    // Auftrag löschen
-    await supabase.from('auftraege').delete().eq('id', auftrag.id)
-    router.push('/fahrzeuge')
+    try {
+      // Teile löschen
+      await supabase.from('ersatzteile').delete().eq('auftrag_id', auftrag.id)
+      // Fotos löschen
+      await supabase.from('auftrag_fotos').delete().eq('auftrag_id', auftrag.id)
+      // Auftrag löschen
+      await supabase.from('auftraege').delete().eq('id', auftrag.id)
+      router.push('/fahrzeuge')
+    } catch (err) {
+      console.error('Fehler beim Löschen:', err)
+      setLoeschen(false)
+    }
   }
 
   async function handleBuehneUndStatus(hebebuehne_id: string) {
@@ -455,7 +487,7 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
       const kz = auftrag.fahrzeug?.kennzeichen ?? ''
       fetch('/api/push/send', { method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: '📦 Teil eingetroffen', body: `${teil.bezeichnung} für ${kz} ist angekommen`, url: `/fahrzeuge/${auftrag.id}`, tag: 'teil' })
-      }).catch(() => {})
+      }).catch(err => console.warn('Push-Benachrichtigung für Teil fehlgeschlagen:', err))
     }
   }
 
@@ -1290,9 +1322,9 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
                     </div>
                     {showVorschlaege && gefilterteVorschlaege.length > 0 && (
                       <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
-                        {gefilterteVorschlaege.map((v, i) => (
+                        {gefilterteVorschlaege.map((v) => (
                           <button
-                            key={i}
+                            key={`${v.bezeichnung}-${v.teilenummer}-${v.lieferant}`}
                             type="button"
                             onMouseDown={() => vorschlagWaehlen(v)}
                             className="w-full text-left px-3 py-2.5 hover:bg-orange-50 border-b border-gray-50 last:border-0 transition-colors"
