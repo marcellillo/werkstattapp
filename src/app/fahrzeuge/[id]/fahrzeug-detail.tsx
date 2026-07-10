@@ -1415,18 +1415,20 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
                   <div className="flex gap-2 flex-wrap">
                     {/* PV Kompass Link - öffnet neue Tab */}
                     {newTeil.bezeichnung.trim() && (
-                      <a
-                        href={generatePvKompassLink({
-                          bezeichnung: newTeil.bezeichnung,
-                          teilenummer: newTeil.teilenummer,
-                          fahrzeug: { marke: (auftrag.fahrzeug as any)?.marke, modell: (auftrag.fahrzeug as any)?.modell }
-                        })}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex-1 min-w-[140px] bg-blue-600 hover:bg-blue-700 text-white py-2 px-3 rounded-lg text-sm font-medium text-center transition-colors"
+                      <button
+                        onClick={() => {
+                          const link = generatePvKompassLink({
+                            bezeichnung: newTeil.bezeichnung,
+                            teilenummer: newTeil.teilenummer,
+                            fahrzeug: { marke: (auftrag.fahrzeug as any)?.marke, modell: (auftrag.fahrzeug as any)?.modell }
+                          })
+                          console.log('PV Kompass Link:', link)
+                          window.open(link, '_blank', 'noopener,noreferrer')
+                        }}
+                        className="flex-1 min-w-[140px] bg-blue-600 hover:bg-blue-700 text-white py-2 px-3 rounded-lg text-sm font-medium text-center transition-colors cursor-pointer"
                       >
                         🌐 Bei PV Kompass
-                      </a>
+                      </button>
                     )}
                     {/* Lokal als bestellt - speichert mit status='bestellt' */}
                     <button
