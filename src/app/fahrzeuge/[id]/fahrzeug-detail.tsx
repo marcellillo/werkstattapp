@@ -15,6 +15,7 @@ import {
 import { createClient } from '@/lib/supabase/client'
 import { createRechnungOnAusgeliefert } from '@/lib/auto-rechnung-ersteller'
 import { VerkaufenModal } from './verkaufen-modal'
+import { generatePvKompassLink } from '@/lib/pv-kompass-link'
 
 interface Props {
   auftrag: Auftrag
@@ -508,6 +509,32 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
       setNewTeil({ bezeichnung: '', teilenummer: '', lieferant: '', menge: 1, einzelpreis: '' })
       setSuchbegriff('')
       setShowAddTeil(false)
+    }
+  }
+
+  async function handleAddTeilUndBestellen() {
+    if (!newTeil.bezeichnung.trim()) return
+    try {
+      const insert = {
+        auftrag_id: auftrag.id,
+        bezeichnung: newTeil.bezeichnung.trim(),
+        teilenummer: newTeil.teilenummer || null,
+        lieferant: newTeil.lieferant || null,
+        menge: newTeil.menge,
+        einzelpreis: newTeil.einzelpreis ? parseFloat(newTeil.einzelpreis) : null,
+        status: 'bestellt' as TeilStatus,
+        bestellt_am: new Date().toISOString().split('T')[0],
+      }
+      const { data, error } = await supabase.from('ersatzteile').insert(insert).select().single()
+      if (error) throw error
+      if (data) {
+        setTeile(prev => [...prev, data as Ersatzteil])
+        setNewTeil({ bezeichnung: '', teilenummer: '', lieferant: '', menge: 1, einzelpreis: '' })
+        setSuchbegriff('')
+        setShowAddTeil(false)
+      }
+    } catch (err) {
+      console.error('Fehler beim Speichern des bestellten Teils:', err)
     }
   }
 
@@ -1385,9 +1412,37 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
                       className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
                     />
                   </div>
-                  <div className="flex gap-2">
-                    <Button onClick={handleAddTeil} size="sm" className="bg-orange-600 hover:bg-orange-700 text-white">Hinzufügen</Button>
-                    <Button onClick={() => { setShowAddTeil(false); setSuchbegriff(''); setNewTeil({ bezeichnung: '', teilenummer: '', lieferant: '', menge: 1, einzelpreis: '' }) }} size="sm" variant="ghost">Abbrechen</Button>
+                  <div className="flex gap-2 flex-wrap">
+                    {/* PV Kompass Link - öffnet neue Tab */}
+                    {newTeil.bezeichnung.trim() && (
+                      <a
+                        href={generatePvKompassLink({
+                          bezeichnung: newTeil.bezeichnung,
+                          teilenummer: newTeil.teilenummer,
+                          fahrzeug: { marke: (auftrag.fahrzeug as any)?.marke, modell: (auftrag.fahrzeug as any)?.modell }
+                        })}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-1 min-w-[140px] bg-blue-600 hover:bg-blue-700 text-white py-2 px-3 rounded-lg text-sm font-medium text-center transition-colors"
+                      >
+                        🌐 Bei PV Kompass
+                      </a>
+                    )}
+                    {/* Lokal als bestellt - speichert mit status='bestellt' */}
+                    <button
+                      onClick={handleAddTeilUndBestellen}
+                      disabled={!newTeil.bezeichnung.trim()}
+                      className="flex-1 min-w-[140px] bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white py-2 px-3 rounded-lg text-sm font-medium transition-colors"
+                    >
+                      ✅ Lokal bestellt
+                    </button>
+                    {/* Abbrechen */}
+                    <button
+                      onClick={() => { setShowAddTeil(false); setSuchbegriff(''); setNewTeil({ bezeichnung: '', teilenummer: '', lieferant: '', menge: 1, einzelpreis: '' }) }}
+                      className="flex-1 min-w-[100px] bg-gray-300 hover:bg-gray-400 text-gray-900 py-2 px-3 rounded-lg text-sm font-medium transition-colors"
+                    >
+                      ✕ Abbrechen
+                    </button>
                   </div>
                 </div>
               )}
