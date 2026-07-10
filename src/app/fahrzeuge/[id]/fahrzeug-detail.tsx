@@ -1442,9 +1442,9 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
                           console.log('PV Kompass Link:', link)
                           window.open(link, '_blank', 'noopener,noreferrer')
                         }}
-                        className="flex-1 min-w-[140px] bg-blue-600 hover:bg-blue-700 text-white py-2 px-3 rounded-lg text-sm font-medium text-center transition-colors cursor-pointer"
+                        className="flex-1 min-w-[60px] bg-blue-600 hover:bg-blue-700 text-white py-2 px-3 rounded-lg text-sm font-medium text-center transition-colors cursor-pointer"
                       >
-                        🌐 Bei PV Kompass
+                        PV
                       </button>
                     )}
                     {/* Lokal als bestellt - speichert mit status='bestellt' */}
