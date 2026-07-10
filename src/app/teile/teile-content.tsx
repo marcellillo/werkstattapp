@@ -7,6 +7,7 @@ import {
   AlertTriangle, X, BarChart2, Euro, Warehouse, PenLine, Trash2,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
+import { useConfirm } from '@/components/ui/confirm-dialog'
 import { cn, formatDate } from '@/lib/utils'
 import { type TeilStatus, TEIL_STATUS_LABEL, TEIL_STATUS_COLOR } from '@/types/database'
 import { createClient } from '@/lib/supabase/client'
@@ -93,6 +94,7 @@ function ArtikelPanel({
   onDeleted: (id: string) => void
 }) {
   const supabase = createClient()
+  const confirm = useConfirm()
   const [bezeichnung, setBezeichnung] = useState('')
   const [artikelnummer, setArtikelnummer] = useState('')
   const [kategorie, setKategorie] = useState('Allgemein')
@@ -167,7 +169,14 @@ function ArtikelPanel({
   }
 
   async function handleDelete() {
-    if (!artikel || !confirm(`„${artikel.bezeichnung}" wirklich löschen?`)) return
+    if (!artikel) return
+    const ok = await confirm({
+      title: 'Artikel löschen',
+      description: `„${artikel.bezeichnung}" wird dauerhaft aus dem Lager entfernt. Diese Aktion kann nicht rückgängig gemacht werden.`,
+      confirmLabel: 'Löschen',
+      variant: 'danger',
+    })
+    if (!ok) return
     setDeleting(true)
     await supabase.from('lager_artikel').delete().eq('id', artikel.id)
     onDeleted(artikel.id)

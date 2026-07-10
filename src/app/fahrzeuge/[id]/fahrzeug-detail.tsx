@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { ArrowLeft, Car, User, Wrench, Package, Calendar, Plus, Trash2, CheckCircle, Clock, Circle, ChevronRight, ShieldCheck, Search, Printer, Receipt, Ban, UserCheck, ClipboardCheck, X, Sparkles, MessageSquare, Mail, Phone, Camera, FolderOpen, Share2, Copy, Check } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { useConfirm } from '@/components/ui/confirm-dialog'
 import { cn, formatDate, formatDateTime } from '@/lib/utils'
 import {
   type Auftrag, type Hebebuehne, type Ersatzteil,
@@ -54,6 +55,7 @@ interface KiTeilVorschlag {
 }
 
 export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie, googleBewertungUrl = '', standardSteuerart = 'differenz' }: Props) {
+  const confirm = useConfirm()
   const [auftrag, setAuftrag] = useState(initialAuftrag)
   const [teile, setTeile] = useState<Ersatzteil[]>((initialAuftrag.ersatzteile as Ersatzteil[]) ?? [])
   const [saving, setSaving] = useState(false)
@@ -556,6 +558,13 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
   }
 
   async function handleDeleteTeil(teilId: string) {
+    const ok = await confirm({
+      title: 'Ersatzteil entfernen',
+      description: 'Möchten Sie dieses Ersatzteil wirklich vom Auftrag entfernen?',
+      confirmLabel: 'Entfernen',
+      variant: 'danger',
+    })
+    if (!ok) return
     setTeile(prev => prev.filter(t => t.id !== teilId))
     await supabase.from('ersatzteile').delete().eq('id', teilId)
   }

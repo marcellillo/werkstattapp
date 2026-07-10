@@ -5,6 +5,7 @@ import { Topbar } from './topbar'
 import { BottomNav } from './bottom-nav'
 import { RollenProvider } from '@/lib/rollen-context'
 import { PageTransition } from '@/components/ui/page-transition'
+import { ConfirmProvider } from '@/components/ui/confirm-dialog'
 import { cn } from '@/lib/utils'
 
 interface AppLayoutProps {

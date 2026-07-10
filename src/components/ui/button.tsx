@@ -4,18 +4,18 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '@/lib/utils'
 
 const buttonVariants = cva(
-  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-1 disabled:pointer-events-none disabled:opacity-50 active:scale-[0.98]',
+  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50 active:scale-[0.98]',
   {
     variants: {
       variant: {
-        default:     'bg-orange-500 text-white hover:bg-orange-600 shadow-sm',
-        destructive: 'bg-red-600 text-white hover:bg-red-700 shadow-sm',
-        outline:     'border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 shadow-sm',
-        secondary:   'bg-slate-100 text-slate-800 hover:bg-slate-200',
-        ghost:       'hover:bg-slate-100 text-slate-700',
-        link:        'text-orange-600 underline-offset-4 hover:underline',
-        success:     'bg-green-600 text-white hover:bg-green-700 shadow-sm',
-        warning:     'bg-amber-500 text-white hover:bg-amber-600 shadow-sm',
+        default:     'bg-primary text-primary-foreground hover:bg-primary-hover shadow-sm',
+        destructive: 'bg-danger text-danger-foreground hover:opacity-90 shadow-sm',
+        outline:     'border border-border bg-card hover:bg-muted text-foreground shadow-sm',
+        secondary:   'bg-secondary text-secondary-foreground hover:bg-muted',
+        ghost:       'hover:bg-muted text-foreground',
+        link:        'text-primary underline-offset-4 hover:underline',
+        success:     'bg-success text-success-foreground hover:opacity-90 shadow-sm',
+        warning:     'bg-warning text-warning-foreground hover:opacity-90 shadow-sm',
       },
       size: {
         default: 'h-9 px-4 py-2',

@@ -2,13 +2,13 @@ import { cn } from '@/lib/utils'
 
 export function Skeleton({ className }: { className?: string }) {
   return (
-    <div className={cn('animate-pulse rounded-lg bg-slate-200', className)} />
+    <div className={cn('animate-pulse rounded-lg bg-muted', className)} />
   )
 }
 
 export function CardSkeleton() {
   return (
-    <div className="rounded-xl bg-white border border-slate-200 shadow-sm p-5 space-y-3">
+    <div className="rounded-xl bg-card border border-border shadow-sm p-5 space-y-3">
       <Skeleton className="h-4 w-1/3" />
       <Skeleton className="h-3 w-2/3" />
       <Skeleton className="h-3 w-1/2" />

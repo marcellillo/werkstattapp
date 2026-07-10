@@ -25,14 +25,14 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
-  themeColor: "#ea580c",
+  themeColor: "#16191d",
   viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="de" className="h-full">
-      <body className={`${inter.className} h-full bg-gray-50`}>{children}</body>
+    <html lang="de" className="h-full bg-background">
+      <body className={`${inter.className} h-full bg-background text-foreground`}>{children}</body>
     </html>
   );
 }

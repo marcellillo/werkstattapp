@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { useConfirm } from '@/components/ui/confirm-dialog'
 import { cn } from '@/lib/utils'
 import { addBuehne, updateBuehne, deleteBuehne } from './actions'
 import { FAHRZEUG_STATUS_LABEL, FAHRZEUG_STATUS_COLOR, type FahrzeugStatus } from '@/types/database'
@@ -219,6 +220,7 @@ export function HebebuehnenContent({
   termine?: any[]
   auftraege?: any[]
 }) {
+  const confirm = useConfirm()
   const [buehnen, setBuehnen] = useState<Buehne[]>(init)
   const [ui, setUI] = useState<UIState>({ order: init.map(b => b.id), locked: [] })
   const [editId, setEditId] = useState<string | null>(null)
@@ -261,7 +263,13 @@ export function HebebuehnenContent({
   }
 
   async function handleDelete(id: string) {
-    if (!confirm('Hebebühne wirklich löschen?')) return
+    const ok = await confirm({
+      title: 'Hebebühne löschen',
+      description: 'Die Hebebühne wird dauerhaft entfernt. Diese Aktion kann nicht rückgängig gemacht werden.',
+      confirmLabel: 'Löschen',
+      variant: 'danger',
+    })
+    if (!ok) return
     setBuehnen(prev => prev.filter(b => b.id !== id))
     updateUI({ order: ui.order.filter(x => x !== id), locked: ui.locked.filter(x => x !== id) })
     startTransition(() => { deleteBuehne(id) })
