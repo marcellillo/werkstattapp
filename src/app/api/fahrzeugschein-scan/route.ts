@@ -53,6 +53,9 @@ Felder im deutschen Fahrzeugschein:
 - P.1 = Hubraum in cm³
 - P.2 = Leistung in kW
 - J = Fahrzeugklasse (PKW, LKW etc.)
+- HSN = Hersteller-Schlüssel-Nummer (meist 4 Ziffern, z.B. "0146")
+- TSN = Typ-Schlüssel-Nummer (meist 3 Ziffern, z.B. "BAA")
+- Fahrzeugtyp/Modellcode = z.B. W205 (Mercedes C-Klasse), F31 (BMW 3er), MQB (VW Plattform)
 
 Antworte mit exakt diesem JSON:
 {
@@ -63,13 +66,18 @@ Antworte mit exakt diesem JSON:
   "baujahr": 2010,
   "hubraum": 1598,
   "leistung_kw": 77,
-  "erstzulassung": "15.03.2010"
+  "erstzulassung": "15.03.2010",
+  "hsn": "0146",
+  "tsn": "BAA",
+  "fahrzeugtyp": "W205"
 }
 
 Regeln:
 - Nur Werte die klar lesbar sind eintragen, sonst null
 - kennzeichen in Großbuchstaben mit Bindestrich (z.B. "WOB-XX 123")
 - baujahr als vierstellige Zahl aus Erstzulassungsdatum
+- fahrzeugtyp aus HSN/TSN oder Dokumentfeld extrahieren (z.B. W205 für Mercedes C-Klasse)
+- Wenn HSN/TSN bekannt sind: versuche bekannten Fahrzeugtyp zu bestimmen
 - Wenn kein Fahrzeugdokument erkennbar: alle Felder null`,
           },
         ],

@@ -78,6 +78,7 @@ export function NeuFahrzeugForm({ kunden, hebebuehnen }: Props) {
   const [motortyp, setMotortyp] = useState('')
   const [hubraum, setHubraum] = useState('')
   const [leistungKw, setLeistungKw] = useState('')
+  const [fahrzeugtyp, setFahrzeugtyp] = useState('')
   const [mobileDeId, setMobileDeId] = useState('')
   const [verkaufspreis, setVerkaufspreis] = useState('')
   const [einkaufspreis, setEinkaufspreis] = useState('')
@@ -246,6 +247,7 @@ export function NeuFahrzeugForm({ kunden, hebebuehnen }: Props) {
       if (d.baujahr) setBaujahr(String(d.baujahr))
       if (d.hubraum) setHubraum(String(d.hubraum))
       if (d.leistung_kw) setLeistungKw(String(d.leistung_kw))
+      if (d.fahrzeugtyp) setFahrzeugtyp(d.fahrzeugtyp)
       setScanErfolg(true)
     } catch (err: any) {
       setScanFehler(err.message)
@@ -290,6 +292,7 @@ export function NeuFahrzeugForm({ kunden, hebebuehnen }: Props) {
         motortyp: motortyp || null,
         hubraum: hubraum || null,
         leistung_kw: leistungKw ? parseInt(leistungKw) : null,
+        fahrzeugtyp: fahrzeugtyp.trim() || null,
         mobile_de_id: mobileDeId || null,
         bilder_urls: bilderUrls.length > 0 ? JSON.stringify(bilderUrls) : null,
         verkaufspreis: verkaufspreis ? parseFloat(verkaufspreis) : null,
@@ -493,6 +496,11 @@ export function NeuFahrzeugForm({ kunden, hebebuehnen }: Props) {
               <div>
                 <label className="text-xs text-gray-800 mb-1 block">Baujahr</label>
                 <input type="number" value={baujahr} onChange={e => setBaujahr(e.target.value)} placeholder="2020"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
+              </div>
+              <div>
+                <label className="text-xs text-gray-800 mb-1 block">Fahrzeugtyp <span className="text-gray-400 text-xs">(z.B. W205)</span></label>
+                <input value={fahrzeugtyp} onChange={e => setFahrzeugtyp(e.target.value)} placeholder="z.B. W205, F31"
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
               </div>
               <div>

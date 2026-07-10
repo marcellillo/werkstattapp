@@ -6,7 +6,7 @@
 export function generatePvKompassLink(teil: {
   bezeichnung: string
   teilenummer?: string
-  fahrzeug?: { marke?: string; modell?: string }
+  fahrzeug?: { marke?: string; modell?: string; fahrzeugtyp?: string }
 }): string {
   const baseUrl = 'https://www.pvkompass.de/search'
 
@@ -23,7 +23,12 @@ export function generatePvKompassLink(teil: {
     suchBegriffe.push(teil.teilenummer.trim())
   }
 
-  // Optional: Fahrzeug-Info für bessere Ergebnisse
+  // Fahrzeugtyp hat höchste Priorität für genaue Treffer
+  if (teil.fahrzeug?.fahrzeugtyp?.trim()) {
+    suchBegriffe.push(teil.fahrzeug.fahrzeugtyp.trim())
+  }
+
+  // Fallback: Fahrzeug-Info für bessere Ergebnisse
   if (teil.fahrzeug?.marke?.trim()) {
     suchBegriffe.push(teil.fahrzeug.marke.trim())
   }

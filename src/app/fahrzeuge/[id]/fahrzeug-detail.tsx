@@ -1437,7 +1437,7 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
                           const link = generatePvKompassLink({
                             bezeichnung: newTeil.bezeichnung,
                             teilenummer: newTeil.teilenummer,
-                            fahrzeug: { marke: (auftrag.fahrzeug as any)?.marke, modell: (auftrag.fahrzeug as any)?.modell }
+                            fahrzeug: { marke: (auftrag.fahrzeug as any)?.marke, modell: (auftrag.fahrzeug as any)?.modell, fahrzeugtyp: (auftrag.fahrzeug as any)?.fahrzeugtyp }
                           })
                           console.log('PV Kompass Link:', link)
                           window.open(link, '_blank', 'noopener,noreferrer')

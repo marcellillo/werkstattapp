@@ -83,6 +83,7 @@ export interface Fahrzeug {
   motortyp?: string
   hubraum?: string
   leistung_kw?: number
+  fahrzeugtyp?: string
   naechste_hauptuntersuchung?: string
   notizen?: string
   mobile_de_id?: string
