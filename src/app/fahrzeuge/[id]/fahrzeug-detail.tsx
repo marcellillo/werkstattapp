@@ -144,10 +144,13 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
     let mounted = true
     supabase.from('profiles').select('id, full_name, role').order('full_name')
       .then(({ data, error }) => {
-        if (mounted && data) setMitarbeiter(data)
-        if (error) console.error('Fehler beim Laden von Mitarbeitern:', error)
+        if (!mounted) return
+        if (error) {
+          console.error('Fehler beim Laden von Mitarbeitern:', error)
+          return
+        }
+        if (data) setMitarbeiter(data)
       })
-      .catch(err => console.error('Fehler beim Laden von Mitarbeitern:', err))
     return () => { mounted = false }
   }, [])
 
