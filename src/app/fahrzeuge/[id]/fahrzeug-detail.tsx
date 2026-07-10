@@ -482,13 +482,27 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
 
   async function handleTeilStatusChange(teilId: string, status: TeilStatus) {
     const teil = teile.find(t => t.id === teilId)
-    setTeile(prev => prev.map(t => t.id === teilId ? { ...t, status } : t))
+    const updatedTeile = teile.map(t => t.id === teilId ? { ...t, status } : t)
+    setTeile(updatedTeile)
     await supabase.from('ersatzteile').update({ status }).eq('id', teilId)
+
     if (status === 'geliefert' && teil) {
       const kz = auftrag.fahrzeug?.kennzeichen ?? ''
       fetch('/api/push/send', { method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: '📦 Teil eingetroffen', body: `${teil.bezeichnung} für ${kz} ist angekommen`, url: `/fahrzeuge/${auftrag.id}`, tag: 'teil' })
       }).catch(err => console.warn('Push-Benachrichtigung für Teil fehlgeschlagen:', err))
+    }
+
+    // Auto-auf-fertig setzen wenn alle Teile eingebaut sind
+    if (status === 'eingebaut') {
+      const allEingebaut = updatedTeile.length > 0 && updatedTeile.every(t => t.status === 'eingebaut')
+      if (allEingebaut && auftrag.status !== 'fertig' && auftrag.status !== 'ausgeliefert') {
+        setAuftrag(a => ({ ...a, status: 'fertig' }))
+        await supabase.from('auftraege').update({ status: 'fertig', fertiggestellt_am: new Date().toISOString().split('T')[0] }).eq('id', auftrag.id)
+        fetch('/api/push/send', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title: '✅ Auftrag fertig!', body: `${auftrag.fahrzeug?.marke ?? ''} ${auftrag.fahrzeug?.modell ?? ''} ist fertig zur Abholung`, url: `/fahrzeuge/${auftrag.id}`, tag: 'fertig' })
+        }).catch(err => console.warn('Push-Benachrichtigung fehlgeschlagen:', err))
+      }
     }
   }
 
