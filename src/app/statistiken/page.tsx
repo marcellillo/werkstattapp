@@ -40,13 +40,15 @@ export default async function StatistikenPage() {
       .eq('status', 'fertig')
       .not('fahrzeug', 'is', null)
       .order('fertiggestellt_am', { ascending: false }),
-    // Lager-Fahrzeuge (im Bestand)
+    // Lager-Fahrzeuge (im Bestand) - via auftraege für Status-Filter
     supabase
-      .from('fahrzeuge')
-      .select('id, marke, modell, einkaufspreis, kennzeichen')
+      .from('auftraege')
+      .select('fahrzeug:fahrzeuge(id, marke, modell, einkaufspreis, kennzeichen)')
       .eq('betrieb_id', betriebId)
-      .eq('fahrzeug_typ', 'eigen')
-      .eq('status', 'angenommen'),
+      .neq('status', 'ausgeliefert')
+      .neq('status', 'storniert')
+      .neq('status', 'verkauft')
+      .not('fahrzeug', 'is', null),
   ])
 
   // Berechne Ersatzteile-Kosten für Werkstatt

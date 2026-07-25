@@ -81,8 +81,12 @@ export function StatistikenContent({ verkauft, werkstatt = [], lager = [] }: Sta
   }, 0)
 
   // ===== LAGER TAB =====
-  const lagerBestand = lager.length
-  const lagerWert = lager.reduce((sum, v) => sum + (v.einkaufspreis || 0), 0)
+  // Lager kommt als auftraege mit nested fahrzeuge
+  const lagerFahrzeuge = lager
+    .map((a: any) => a.fahrzeug)
+    .filter(Boolean)
+  const lagerBestand = lagerFahrzeuge.length
+  const lagerWert = lagerFahrzeuge.reduce((sum, v) => sum + (v?.einkaufspreis || 0), 0)
   const lagerDurchschnitt = lagerBestand > 0 ? lagerWert / lagerBestand : 0
 
   // Render content based on active tab
