@@ -16,6 +16,7 @@ import { createClient } from '@/lib/supabase/client'
 import { createRechnungOnAusgeliefert } from '@/lib/auto-rechnung-ersteller'
 import { VerkaufenModal } from './verkaufen-modal'
 import { generatePvKompassLink } from '@/lib/pv-kompass-link'
+import { SupplierInvoices } from './supplier-invoices'
 
 interface Props {
   auftrag: Auftrag
@@ -1922,6 +1923,16 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
           </button>
         </div>
       </div>
+
+      {/* Lieferanten-Rechnungen */}
+      <Card className="border-slate-200 mt-6">
+        <CardContent className="p-6">
+          <SupplierInvoices
+            fahrzeugId={(auftrag.fahrzeug as any)?.id ?? ''}
+            fahrzeugName={`${(auftrag.fahrzeug as any)?.marke ?? ''} ${(auftrag.fahrzeug as any)?.modell ?? ''}`}
+          />
+        </CardContent>
+      </Card>
 
       {/* Verkaufen Modal */}
       {showVerkaufenModal && (
