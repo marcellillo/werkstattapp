@@ -25,7 +25,13 @@ export function BetriebProvider({ children }: { children: ReactNode }) {
   const [availableBetriebe, setAvailableBetriebe] = useState<Betrieb[]>([])
   const [userBetriebe, setUserBetriebe] = useState<BetriebUser[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [features, setFeatures] = useState<Record<FeatureName, boolean>>({})
+  const [features, setFeatures] = useState<Record<FeatureName, boolean>>(() => {
+    const initial: Record<string, boolean> = {}
+    for (const name of Object.keys(FEATURE_CATALOG)) {
+      initial[name] = false
+    }
+    return initial as Record<FeatureName, boolean>
+  })
 
   useEffect(() => {
     loadBetriebe()
