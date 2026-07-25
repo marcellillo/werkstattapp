@@ -1,69 +1,34 @@
-import { createClient } from '@/lib/supabase/server'
+﻿import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { AppLayout } from '@/components/layout/app-layout'
 import { EinstellungenContent } from './einstellungen-content'
 
-export default async function EinstellungenPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ success?: string; error?: string }>
-}) {
+export default async function EinstellungenPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+  // Get user's betrieb
+  const { data: userBetriebe } = await supabase
+    .from('betrieb_users')
+    .select('betrieb_id')
+    .eq('profile_id', user.id)
+    .order('is_primary', { ascending: false })
+    .limit(1)
 
-  const { data: configRows } = await supabase
-    .from('werkstatt_einstellungen')
-    .select('schluessel, wert')
+  if (!userBetriebe?.[0]?.betrieb_id) redirect('/login')
+  const betriebId = userBetriebe[0].betrieb_id
 
-  const cfg: Record<string, string> = {}
-  for (const row of configRows ?? []) {
-    if (row.wert) cfg[row.schluessel] = row.wert
-  }
-
-  const params = await searchParams
+  // Load betrieb data
+  const { data: betrieb } = await supabase
+    .from('betriebe')
+    .select('*')
+    .eq('id', betriebId)
+    .single()
 
   return (
     <AppLayout title="Einstellungen">
-      <EinstellungenContent
-        profile={profile}
-        userEmail={user.email ?? ''}
-        urlSuccess={params.success}
-        urlError={params.error}
-        initialConfig={{
-          imap_email: cfg.imap_email ?? '',
-          imap_password: cfg.imap_password ?? '',
-          graph_client_id: cfg.graph_client_id ?? '',
-          graph_tenant_id: cfg.graph_tenant_id ?? '',
-          graph_client_secret: cfg.graph_client_secret ?? '',
-          graph_email: cfg.graph_email ?? '',
-          graph_refresh_token: cfg.graph_refresh_token ?? '',
-          anthropic_api_key: cfg.anthropic_api_key ?? '',
-          resend_api_key: cfg.resend_api_key ?? '',
-          firma_absender_email: cfg.firma_absender_email ?? '',
-          firma_name: cfg.firma_name ?? '',
-          firma_strasse: cfg.firma_strasse ?? '',
-          firma_plz: cfg.firma_plz ?? '',
-          firma_ort: cfg.firma_ort ?? '',
-          firma_telefon: cfg.firma_telefon ?? '',
-          firma_email: cfg.firma_email ?? '',
-          firma_ust_id: cfg.firma_ust_id ?? '',
-          firma_steuernummer: cfg.firma_steuernummer ?? '',
-          firma_iban: cfg.firma_iban ?? '',
-          firma_bic: cfg.firma_bic ?? '',
-          firma_bank: cfg.firma_bank ?? '',
-          firma_stundensatz: cfg.firma_stundensatz ?? '',
-          firma_kleinunternehmer: cfg.firma_kleinunternehmer ?? 'nein',
-          fahrzeug_steuerart_standard: cfg.fahrzeug_steuerart_standard ?? 'differenz',
-          firma_logo: cfg.firma_logo ?? '',
-          firma_paypal: cfg.firma_paypal ?? '',
-          firma_sumup: cfg.firma_sumup ?? '',
-          firma_stripe: cfg.firma_stripe ?? '',
-          google_bewertung_url: cfg.google_bewertung_url ?? '',
-        }}
-      />
+      <EinstellungenContent betrieb={betrieb} />
     </AppLayout>
   )
 }

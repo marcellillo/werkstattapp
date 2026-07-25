@@ -76,7 +76,7 @@ export function Sidebar() {
   const router = useRouter()
   const supabase = createClient()
   const { kannZugreifen, loading } = useRollen()
-  const { isFeatureEnabled } = useBetrieb()
+  const { isFeatureEnabled, currentBetrieb } = useBetrieb()
   const benAnzahl = useBenachrichtigungenAnzahl()
 
   // Filter navGroups basierend auf enabled Features
@@ -116,7 +116,13 @@ export function Sidebar() {
     <aside className="flex flex-col h-full w-64 bg-slate-950 text-white">
       {/* Logo */}
       <div className="flex items-center px-5 py-5 border-b border-slate-800">
-        <img src="/logo-v.png" alt="Logo" width={140} height={48} className="object-contain" />
+        {currentBetrieb?.logo_url ? (
+          <img src={currentBetrieb.logo_url} alt={currentBetrieb.name} width={140} height={48} className="object-contain" />
+        ) : (
+          <div className="flex items-center justify-center w-full h-12 bg-slate-800 rounded-lg text-xs text-slate-400 font-medium">
+            {currentBetrieb?.name || 'Betrieb'}
+          </div>
+        )}
       </div>
 
       {/* Navigation */}
