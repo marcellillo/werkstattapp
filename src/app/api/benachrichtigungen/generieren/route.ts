@@ -8,6 +8,16 @@ export async function POST() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Nicht angemeldet' }, { status: 401 })
 
+  const { data: userBetrieb } = await supabase
+    .from('betrieb_users')
+    .select('betrieb_id')
+    .eq('profile_id', user.id)
+    .single()
+  if (!userBetrieb?.betrieb_id) {
+    return NextResponse.json({ error: 'Kein Betrieb zugeordnet' }, { status: 403 })
+  }
+  const betriebId = userBetrieb.betrieb_id
+
   const heute = new Date()
   const heuteStr = heute.toISOString().split('T')[0]
   const dedupeGrenze = new Date(heute.getTime() - DEDUPE_STUNDEN * 3_600_000).toISOString()
@@ -16,6 +26,7 @@ export async function POST() {
   const { data: vorhanden } = await supabase
     .from('benachrichtigungen')
     .select('typ, auftrag_id, titel')
+    .eq('betrieb_id', betriebId)
     .gte('erstellt_am', dedupeGrenze)
 
   const vorhKey = new Set((vorhanden ?? []).map(n => `${n.typ}::${n.auftrag_id ?? ''}::${n.titel}`))
@@ -25,7 +36,7 @@ export async function POST() {
     const key = `${n.typ}::${n.auftrag_id ?? ''}::${n.titel}`
     if (!vorhKey.has(key)) {
       vorhKey.add(key)
-      neu.push({ ...n, gelesen: false, benutzer_id: null })
+      neu.push({ ...n, betrieb_id: betriebId, gelesen: false, benutzer_id: null })
     }
   }
 
@@ -33,6 +44,7 @@ export async function POST() {
   const { data: auftraege } = await supabase
     .from('auftraege')
     .select('id, auftrag_nr, geplante_fertigstellung, tuev_kandidat, tuev_termin, status, erstellt_am, hebebuehne_id, fahrzeug:fahrzeuge(marke, modell, kennzeichen)')
+    .eq('betrieb_id', betriebId)
     .not('status', 'in', '("fertig","ausgeliefert")')
 
   for (const a of auftraege ?? []) {
@@ -89,6 +101,7 @@ export async function POST() {
   const { data: teile } = await supabase
     .from('ersatzteile')
     .select('id, bezeichnung, lieferant, bestellt_am, status, auftrag_id')
+    .eq('betrieb_id', betriebId)
     .in('status', ['bestellt', 'unterwegs'])
 
   for (const t of teile ?? []) {
@@ -114,6 +127,7 @@ export async function POST() {
   const { data: termine } = await supabase
     .from('termine')
     .select('id, titel, datum, uhrzeit, typ, status, auftrag_id, fahrzeug:fahrzeuge(marke, modell, kennzeichen), kunde:kunden(vorname, nachname)')
+    .eq('betrieb_id', betriebId)
     .not('status', 'in', '("erledigt","abgesagt")')
     .lte('datum', uebermorgen.toISOString().split('T')[0])
 
@@ -155,6 +169,7 @@ export async function POST() {
   const { data: uebergaben } = await supabase
     .from('auftraege')
     .select('id, auslieferung_geplant, fahrzeug:fahrzeuge(marke, modell, kennzeichen)')
+    .eq('betrieb_id', betriebId)
     .eq('status', 'verkauft')
     .not('auslieferung_geplant', 'is', null)
 

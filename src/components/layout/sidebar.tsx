@@ -5,15 +5,16 @@ import {
   LayoutDashboard, Car, Users, Package, Calendar,
   Bell, Settings, LogOut, BarChart2,
   Mail, CalendarClock, Layers, Receipt, History, BookOpen,
-  ShieldAlert, Wrench, ClipboardCheck
+  ShieldAlert, Wrench, ClipboardCheck, Lock
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { useRollen } from '@/lib/rollen-context'
+import { useBetrieb } from '@/lib/betrieb-context'
 import { useBenachrichtigungenAnzahl } from '@/hooks/use-benachrichtigungen-anzahl'
 
-const navGroups = [
+const navGroupsTemplate = [
   {
     label: 'Tagesbetrieb',
     items: [
@@ -27,6 +28,7 @@ const navGroups = [
   {
     label: 'Eigenfahrzeuge',
     items: [
+      { href: '/fahrzeuge/bestand',    label: '📥 Bestand-Import',      icon: Package, key: 'fahrzeuge' },
       { href: '/fahrzeuge/verkauft',   label: '💰 Verkaufte Fahrzeuge', icon: Package, key: 'fahrzeuge' },
       { href: '/fahrzeuge/uebergeben', label: '✅ Übergeben',           icon: Package, key: 'fahrzeuge' },
     ],
@@ -74,7 +76,36 @@ export function Sidebar() {
   const router = useRouter()
   const supabase = createClient()
   const { kannZugreifen, loading } = useRollen()
+  const { isFeatureEnabled } = useBetrieb()
   const benAnzahl = useBenachrichtigungenAnzahl()
+
+  // Filter navGroups basierend auf enabled Features
+  const navGroups = navGroupsTemplate.filter(group => {
+    if (group.label === 'Finanzen') return isFeatureEnabled('rechnungssystem')
+    if (group.label === 'Auswertung') return isFeatureEnabled('statistiken')
+    if (group.label === 'Wecker' && group.items.some(i => i.key === 'kalender')) {
+      return isFeatureEnabled('kalender') || group.items.some(i => i.key !== 'kalender')
+    }
+    return true
+  }).map(group => {
+    if (group.label === 'Wecker') {
+      return {
+        ...group,
+        items: group.items.filter(item =>
+          item.key !== 'kalender' || isFeatureEnabled('kalender')
+        )
+      }
+    }
+    if (group.label === 'Kunden & Lager') {
+      return {
+        ...group,
+        items: group.items.filter(item =>
+          item.label !== 'Lager' || isFeatureEnabled('teile_bestellen')
+        )
+      }
+    }
+    return group
+  })
 
   async function handleSignOut() {
     await supabase.auth.signOut()
@@ -131,8 +162,39 @@ export function Sidebar() {
         })}
       </nav>
 
-      {/* Footer */}
+      {/* Admin & Footer */}
       <div className="px-3 py-3 border-t border-slate-800 space-y-0.5">
+        {kannZugreifen('admin') && (
+          <>
+            <p className="px-3 mb-2 text-[11px] font-bold uppercase tracking-widest text-slate-500 select-none border-t border-slate-700 pt-2">
+              Admin
+            </p>
+            <Link
+              href="/admin/mitarbeiter"
+              className={cn(
+                'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all',
+                pathname === '/admin/mitarbeiter' || pathname.startsWith('/admin/mitarbeiter/')
+                  ? 'bg-orange-500 text-white'
+                  : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100'
+              )}
+            >
+              <Users className="w-[18px] h-[18px]" />
+              <span>Mitarbeiter</span>
+            </Link>
+            <Link
+              href="/admin/betrieb-features"
+              className={cn(
+                'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all',
+                pathname === '/admin/betrieb-features' || pathname.startsWith('/admin/betrieb-features/')
+                  ? 'bg-orange-500 text-white'
+                  : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100'
+              )}
+            >
+              <Lock className="w-[18px] h-[18px]" />
+              <span>Features</span>
+            </Link>
+          </>
+        )}
         {kannZugreifen('einstellungen') && (
           <Link
             href="/einstellungen"

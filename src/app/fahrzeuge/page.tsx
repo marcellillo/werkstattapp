@@ -8,6 +8,17 @@ export default async function FahrzeugePage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
+  // Get user's betrieb
+  const { data: userBetriebe } = await supabase
+    .from('betrieb_users')
+    .select('betrieb_id')
+    .eq('profile_id', user.id)
+    .order('is_primary', { ascending: false })
+    .limit(1)
+
+  if (!userBetriebe?.[0]?.betrieb_id) redirect('/login')
+  const betriebId = userBetriebe[0].betrieb_id
+
   const [
     { data: auftraegeRaw },
     { data: hebebuehnenRaw },
@@ -17,18 +28,21 @@ export default async function FahrzeugePage() {
     supabase
       .from('auftraege')
       .select(`*, fahrzeug:fahrzeuge(*), kunde:kunden(*), ersatzteile(*)`)
+      .eq('betrieb_id', betriebId)
       .neq('status', 'storniert')
       .order('erstellt_am', { ascending: false }),
     supabase.from('hebebuehnen').select('*').order('nummer'),
     supabase
       .from('fahrzeuge')
       .select('id, kennzeichen, marke, modell, naechste_hauptuntersuchung, tuev_erinnerung, kunde_id, kunde:kunden(id, vorname, nachname, telefon, email)')
+      .eq('betrieb_id', betriebId)
       .not('naechste_hauptuntersuchung', 'is', null)
       .neq('tuev_erinnerung', false)
       .order('naechste_hauptuntersuchung', { ascending: true }),
     supabase
       .from('fahrzeuge')
       .select('id, kennzeichen, marke, modell, baujahr, kilometerstand, naechster_service_datum, kunde_id, kunde:kunden(id, vorname, nachname, telefon, email)')
+      .eq('betrieb_id', betriebId)
       .eq('fahrzeug_typ', 'fremd')
       .order('kennzeichen'),
   ])

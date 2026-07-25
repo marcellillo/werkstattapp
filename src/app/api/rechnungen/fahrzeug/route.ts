@@ -12,6 +12,18 @@ export async function POST(req: NextRequest) {
     if (!auftragId) return NextResponse.json({ error: 'auftragId required' }, { status: 400 })
 
     const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const { data: userBetrieb } = await supabase
+      .from('betrieb_users')
+      .select('betrieb_id')
+      .eq('profile_id', user.id)
+      .single()
+    if (!userBetrieb?.betrieb_id) {
+      return NextResponse.json({ error: 'Kein Betrieb zugeordnet' }, { status: 403 })
+    }
+    const betriebId = userBetrieb.betrieb_id
 
     // 1. Auftrag + Fahrzeug laden
     const { data: auftrag, error: auftragError } = await supabase
@@ -24,6 +36,7 @@ export async function POST(req: NextRequest) {
         ),
         kunde:kunden(email)
       `)
+      .eq('betrieb_id', betriebId)
       .eq('id', auftragId)
       .single()
 
@@ -98,6 +111,7 @@ export async function POST(req: NextRequest) {
     const { data: rechnung, error: insertError } = await supabase
       .from('fahrzeug_rechnungen')
       .insert({
+        betrieb_id: betriebId,
         auftrag_id: auftragId,
         fahrzeug_id: fz.id,
         rechnungsnummer,

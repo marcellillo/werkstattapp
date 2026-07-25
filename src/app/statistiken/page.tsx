@@ -8,35 +8,59 @@ export default async function StatistikenPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
+  // Get user's betrieb
+  const { data: userBetriebe } = await supabase
+    .from('betrieb_users')
+    .select('betrieb_id')
+    .eq('profile_id', user.id)
+    .order('is_primary', { ascending: false })
+    .limit(1)
+
+  if (!userBetriebe?.[0]?.betrieb_id) redirect('/login')
+  const betriebId = userBetriebe[0].betrieb_id
+
+  // Lade alle Daten parallel
   const [
-    { data: auftraegeRaw },
-    { data: teileRaw },
-    { data: rechnungenRaw },
-    { data: hebebuehnenRaw },
+    { data: verkauftRaw },
+    { data: werkstattRaw },
+    { data: lagerRaw },
   ] = await Promise.all([
+    // Verkäufe (Eigenfahrzeuge)
     supabase
       .from('auftraege')
-      .select('id, status, erstellt_am, fertiggestellt_am, verkauft_am, einnahmen, steuerart, tuev_kandidat, tuev_ergebnis, hebebuehne_id, fahrzeug:fahrzeuge(marke, modell, kennzeichen, fahrzeug_typ, einkaufspreis)')
-      .order('erstellt_am'),
+      .select('id, einnahmen, verkauft_am, fahrzeug:fahrzeuge(id, marke, modell, einkaufspreis, verkaufspreis)')
+      .eq('betrieb_id', betriebId)
+      .eq('status', 'verkauft')
+      .order('verkauft_am', { ascending: false }),
+    // Werkstatt-Aufträge (fremde Fahrzeuge)
     supabase
-      .from('ersatzteile')
-      .select('id, status, lieferant, einzelpreis, menge, bestellt_am, geliefert_am'),
+      .from('auftraege')
+      .select('id, einnahmen, fertiggestellt_am, ersatzteile(kosten)')
+      .eq('betrieb_id', betriebId)
+      .eq('status', 'fertig')
+      .not('fahrzeug', 'is', null)
+      .order('fertiggestellt_am', { ascending: false }),
+    // Lager-Fahrzeuge (im Bestand)
     supabase
-      .from('rechnungen')
-      .select('id, lieferant, gesamt, datum, quelle')
-      .order('datum'),
-    supabase
-      .from('hebebuehnen')
-      .select('id, nummer, bezeichnung'),
+      .from('fahrzeuge')
+      .select('id, marke, modell, einkaufspreis, kennzeichen')
+      .eq('betrieb_id', betriebId)
+      .eq('fahrzeug_typ', 'eigen')
+      .eq('status', 'angenommen'),
   ])
+
+  // Berechne Ersatzteile-Kosten für Werkstatt
+  const werkstattWithKosten = (werkstattRaw ?? []).map((w: any) => ({
+    ...w,
+    ersatzteile_kosten: (w.ersatzteile ?? []).reduce((sum: number, e: any) => sum + (e.kosten || 0), 0),
+  }))
 
   return (
     <AppLayout title="Statistiken">
       <StatistikenContent
-        auftraege={auftraegeRaw ?? []}
-        teile={teileRaw ?? []}
-        rechnungen={rechnungenRaw ?? []}
-        hebebuehnen={hebebuehnenRaw ?? []}
+        verkauft={verkauftRaw ?? []}
+        werkstatt={werkstattWithKosten}
+        lager={lagerRaw ?? []}
       />
     </AppLayout>
   )

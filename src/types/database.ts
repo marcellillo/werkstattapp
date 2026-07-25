@@ -2,7 +2,7 @@
 // Kfz-Werkstatt – Typen
 // ============================================================
 
-export type WerkstattUserRole = 'admin' | 'werkstattmeister' | 'mechaniker'
+export type WerkstattUserRole = 'admin' | 'werkstattmeister' | 'mechaniker' | 'buchhalter'
 
 export type FahrzeugTyp = 'eigen' | 'fremd'
 export type TerminTyp = 'werkstatt' | 'tuev' | 'online'
@@ -34,6 +34,55 @@ export type BenachrichtigungTyp =
   | 'termin_ueberschritten'
   | 'zu_lange_auf_buehne'
 
+// ============================================================
+// Multi-Tenant Types
+// ============================================================
+
+export interface Betrieb {
+  id: string
+  name: string
+  is_active: boolean
+  is_suspended: boolean
+  suspension_reason?: string
+  suspended_at?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface BetriebSubscription {
+  id: string
+  betrieb_id: string
+  stripe_customer_id?: string
+  stripe_subscription_id?: string
+  stripe_price_id?: string
+  status: 'inactive' | 'active' | 'past_due' | 'canceled' | 'pending'
+  monthly_price_cents: number
+  setup_fee_cents: number
+  setup_fee_paid: boolean
+  subscription_start?: string
+  subscription_end?: string
+  current_period_start?: string
+  current_period_end?: string
+  next_billing_date?: string
+  trial_start?: string
+  trial_end?: string
+  billing_email?: string
+  company_name?: string
+  company_address?: string
+  company_tax_id?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface BetriebUser {
+  id: string
+  betrieb_id: string
+  profile_id: string
+  role: WerkstattUserRole
+  is_primary: boolean
+  created_at: string
+}
+
 export interface Profile {
   id: string
   email: string
@@ -47,6 +96,7 @@ export interface Profile {
 
 export interface Kunde {
   id: string
+  betrieb_id: string
   vorname: string
   nachname: string
   firma?: string
@@ -71,6 +121,7 @@ export interface Hebebuehne {
 
 export interface Fahrzeug {
   id: string
+  betrieb_id: string
   kunden_id?: string
   fahrzeug_typ: FahrzeugTyp
   marke: string
@@ -97,6 +148,7 @@ export interface Fahrzeug {
 
 export interface Termin {
   id: string
+  betrieb_id: string
   titel: string
   beschreibung?: string
   datum: string
@@ -118,6 +170,7 @@ export interface Termin {
 
 export interface Auftrag {
   id: string
+  betrieb_id: string
   auftrag_nr: string
   fahrzeug_id: string
   kunden_id?: string
@@ -148,6 +201,7 @@ export interface Auftrag {
 
 export interface Ersatzteil {
   id: string
+  betrieb_id: string
   auftrag_id: string
   bezeichnung: string
   teilenummer?: string
@@ -164,6 +218,7 @@ export interface Ersatzteil {
 
 export interface StatusHistorie {
   id: string
+  betrieb_id: string
   auftrag_id: string
   status_alt?: string
   status_neu: string
@@ -175,6 +230,7 @@ export interface StatusHistorie {
 
 export interface EmailProtokoll {
   id: string
+  betrieb_id: string
   auftrag_id?: string
   ersatzteil_id?: string
   absender?: string
@@ -187,6 +243,7 @@ export interface EmailProtokoll {
 
 export interface Benachrichtigung {
   id: string
+  betrieb_id: string
   benutzer_id?: string
   titel: string
   nachricht: string

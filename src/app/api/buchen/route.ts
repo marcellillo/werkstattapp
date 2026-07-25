@@ -9,6 +9,12 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
+// Get default betrieb ID for public bookings
+async function getDefaultBetriebId(): Promise<string | null> {
+  const { data } = await supabase.from('betriebe').select('id').eq('name', 'Standardwerkstatt').single()
+  return data?.id ?? null
+}
+
 export async function POST(req: NextRequest) {
   // CORS-Header damit die Website den Endpunkt aufrufen darf
   const headers = {
@@ -46,6 +52,11 @@ export async function POST(req: NextRequest) {
     nachricht ? `Nachricht: ${nachricht}` : null,
   ].filter(Boolean).join('\n')
 
+  const defaultBetriebId = await getDefaultBetriebId()
+  if (!defaultBetriebId) {
+    return NextResponse.json({ error: 'Keine Standard-Werkstatt konfiguriert' }, { status: 500, headers })
+  }
+
   // ── 1. Kunde: Duplikat per Telefon → E-Mail → neu anlegen ──────────────
   let kundeId: string | null = null
   try {
@@ -64,6 +75,7 @@ export async function POST(req: NextRequest) {
       kundeId = existing.id
     } else {
       const { data: neuerKunde } = await supabase.from('kunden').insert({
+        betrieb_id: defaultBetriebId,
         vorname, nachname,
         telefon: telefon || null,
         email: email || null,
@@ -85,6 +97,7 @@ export async function POST(req: NextRequest) {
         const marke = parts[0] || null
         const modell = parts.slice(1).join(' ') || null
         const { data: neuesFz } = await supabase.from('fahrzeuge').insert({
+          betrieb_id: defaultBetriebId,
           kunden_id: kundeId,
           fahrzeug_typ: 'kunde',
           kennzeichen: kzNorm,
@@ -107,6 +120,7 @@ export async function POST(req: NextRequest) {
         : ''
 
       await supabase.from('auftraege').insert({
+        betrieb_id: defaultBetriebId,
         auftrag_nr: auftragNr,
         fahrzeug_id: fahrzeugId,
         kunden_id: kundeId,
@@ -121,6 +135,7 @@ export async function POST(req: NextRequest) {
   }
 
   const { error } = await supabase.from('termine').insert({
+    betrieb_id: defaultBetriebId,
     titel,
     beschreibung,
     datum,

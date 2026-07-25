@@ -142,13 +142,26 @@ export async function POST(req: Request) {
   const isCron = cronToken && cronToken === (process.env.CRON_SECRET ?? 'cron')
 
   let supabase: any
+  let betriebId: string | null = null
   if (isCron) {
     const { createAdminClient } = await import('@/lib/supabase/admin')
     supabase = createAdminClient()
+    const { data: defaultBetrieb } = await supabase.from('betriebe').select('id').eq('name', 'Standardwerkstatt').single()
+    betriebId = defaultBetrieb?.id || null
   } else {
     supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Nicht angemeldet' }, { status: 401 })
+
+    const { data: userBetrieb } = await supabase
+      .from('betrieb_users')
+      .select('betrieb_id')
+      .eq('profile_id', user.id)
+      .single()
+    if (!userBetrieb?.betrieb_id) {
+      return NextResponse.json({ error: 'Kein Betrieb zugeordnet' }, { status: 403 })
+    }
+    betriebId = userBetrieb.betrieb_id
   }
 
   const { data: rows } = await supabase.from('werkstatt_einstellungen').select('schluessel, wert')
@@ -249,7 +262,7 @@ export async function POST(req: Request) {
           // Duplikat-Check: gleiche Rechnungsnummer ODER gleicher Absender + gleiches Datum
           if (r?.rechnungsnummer) {
             const { data: exist } = await supabase.from('rechnungen')
-              .select('id').eq('rechnungsnummer', r.rechnungsnummer).maybeSingle()
+              .select('id').eq('betrieb_id', betriebId).eq('rechnungsnummer', r.rechnungsnummer).maybeSingle()
             if (exist) {
               duplikate++
               await markMessageAsRead(accessToken, msg.id)
@@ -260,7 +273,7 @@ export async function POST(req: Request) {
             const absenderEmail = msg.from.emailAddress.address
             const datum = r?.datum ?? new Date().toISOString().split('T')[0]
             const { data: exist } = await supabase.from('rechnungen')
-              .select('id').eq('absender_email', absenderEmail).eq('datum', datum).maybeSingle()
+              .select('id').eq('betrieb_id', betriebId).eq('absender_email', absenderEmail).eq('datum', datum).maybeSingle()
             if (exist) {
               duplikate++
               await markMessageAsRead(accessToken, msg.id)
@@ -269,6 +282,7 @@ export async function POST(req: Request) {
           }
 
           const { data: neu } = await supabase.from('rechnungen').insert({
+            betrieb_id: betriebId,
             lieferant: analyse.lieferant,
             rechnungsnummer: r?.rechnungsnummer ?? null,
             datum: r?.datum ?? null,
@@ -306,14 +320,15 @@ export async function POST(req: Request) {
         let auftragId: string | null = null
         if (analyse.auftragsnummer) {
           const { data: a } = await supabase.from('auftraege').select('id')
-            .ilike('auftrag_nr', `%${analyse.auftragsnummer}%`).maybeSingle()
+            .eq('betrieb_id', betriebId).ilike('auftrag_nr', `%${analyse.auftragsnummer}%`).maybeSingle()
           if (a) auftragId = a.id
         }
         if (!auftragId && analyse.kennzeichen) {
           const { data: fz } = await supabase.from('fahrzeuge').select('id')
-            .ilike('kennzeichen', `%${analyse.kennzeichen}%`).maybeSingle()
+            .eq('betrieb_id', betriebId).ilike('kennzeichen', `%${analyse.kennzeichen}%`).maybeSingle()
           if (fz) {
             const { data: a } = await supabase.from('auftraege').select('id')
+              .eq('betrieb_id', betriebId)
               .eq('fahrzeug_id', fz.id)
               .not('status', 'in', '(fertig,ausgeliefert,storniert)')
               .order('erstellt_am', { ascending: false }).limit(1).maybeSingle()
@@ -326,6 +341,7 @@ export async function POST(req: Request) {
           : msg.body.content.slice(0, 3000)
 
         const { data: protokoll } = await supabase.from('email_protokoll').insert({
+          betrieb_id: betriebId,
           auftrag_id: auftragId,
           absender: msg.from.emailAddress.address,
           betreff: msg.subject,
@@ -342,7 +358,7 @@ export async function POST(req: Request) {
             .map(async teil => {
               let vorhandenId: string | null = null
               if (auftragId) {
-                let q = supabase.from('ersatzteile').select('id, status').eq('auftrag_id', auftragId)
+                let q = supabase.from('ersatzteile').select('id, status').eq('betrieb_id', betriebId).eq('auftrag_id', auftragId)
                 if (teil.teilenummer) {
                   q = q.or(`teilenummer.eq.${teil.teilenummer},bezeichnung.ilike.%${teil.bezeichnung.slice(0, 20)}%`)
                 } else {
@@ -360,6 +376,7 @@ export async function POST(req: Request) {
           if (auftragId) {
             const { data: fzData } = await supabase.from('auftraege')
               .select('auftrag_nr, fahrzeug:fahrzeuge(marke, modell, kennzeichen)')
+              .eq('betrieb_id', betriebId)
               .eq('id', auftragId).maybeSingle()
             if (fzData) {
               const fz = fzData.fahrzeug as any

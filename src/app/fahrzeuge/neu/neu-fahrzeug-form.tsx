@@ -6,6 +6,7 @@ import { ArrowLeft, Car, User, Plus, Download, Upload, ShieldAlert, Bell, BellOf
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { createClient } from '@/lib/supabase/client'
+import { useBetrieb } from '@/lib/betrieb-context'
 import type { Kunde, Hebebuehne } from '@/types/database'
 
 interface MobileAd {
@@ -51,6 +52,7 @@ function parseYear(firstReg?: string): string {
 export function NeuFahrzeugForm({ kunden, hebebuehnen }: Props) {
   const router = useRouter()
   const supabase = createClient()
+  const { currentBetriebId } = useBetrieb()
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -267,9 +269,16 @@ export function NeuFahrzeugForm({ kunden, hebebuehnen }: Props) {
     setError('')
 
     try {
+      if (!currentBetriebId) {
+        setError('Keine Betrieb-ID vorhanden. Bitte melden Sie sich neu an.')
+        setSaving(false)
+        return
+      }
+
       let finalKundenId = kundenId || null
       if (newKunde && kNachname) {
         const { data: newK } = await supabase.from('kunden').insert({
+          betrieb_id: currentBetriebId,
           vorname: kVorname,
           nachname: kNachname,
           firma: kFirma || null,
@@ -279,7 +288,8 @@ export function NeuFahrzeugForm({ kunden, hebebuehnen }: Props) {
         finalKundenId = newK?.id ?? null
       }
 
-      const { data: fahrzeug } = await supabase.from('fahrzeuge').insert({
+      const { data: fahrzeug, error: fahrzeugError } = await supabase.from('fahrzeuge').insert({
+        betrieb_id: currentBetriebId,
         kunden_id: finalKundenId,
         fahrzeug_typ: fahrzeugTyp,
         marke,
@@ -303,11 +313,17 @@ export function NeuFahrzeugForm({ kunden, hebebuehnen }: Props) {
         naechster_service_datum: naechsterService || null,
       }).select().single()
 
+      if (fahrzeugError) {
+        console.error('Supabase Fehler:', fahrzeugError)
+        throw new Error(`Fahrzeug-Fehler: ${fahrzeugError.message}`)
+      }
+
       if (!fahrzeug) throw new Error('Fahrzeug konnte nicht erstellt werden')
 
       const finSuffix = fahrgestellnummer ? fahrgestellnummer.slice(-6).toUpperCase() : Date.now().toString().slice(-6)
       const auftragNr = `AU-${finSuffix}`
       const { data: auftrag } = await supabase.from('auftraege').insert({
+        betrieb_id: currentBetriebId,
         auftrag_nr: auftragNr,
         fahrzeug_id: fahrzeug.id,
         kunden_id: finalKundenId,

@@ -4,6 +4,7 @@ import { Sidebar } from './sidebar'
 import { Topbar } from './topbar'
 import { BottomNav } from './bottom-nav'
 import { RollenProvider } from '@/lib/rollen-context'
+import { BetriebProvider } from '@/lib/betrieb-context'
 import { PageTransition } from '@/components/ui/page-transition'
 import { cn } from '@/lib/utils'
 
@@ -16,8 +17,9 @@ export function AppLayout({ children, title }: AppLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   return (
-    <RollenProvider>
-      <div className="flex bg-slate-50 min-h-screen">
+    <BetriebProvider>
+      <RollenProvider>
+        <div className="flex bg-slate-50 min-h-screen">
         {sidebarOpen && (
           <div
             className="fixed inset-0 bg-black/40 z-40 lg:hidden backdrop-blur-sm"
@@ -44,7 +46,8 @@ export function AppLayout({ children, title }: AppLayoutProps) {
         </div>
 
         <BottomNav />
-      </div>
-    </RollenProvider>
+        </div>
+      </RollenProvider>
+    </BetriebProvider>
   )
 }

@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
-import { Car, Search, Plus, ChevronRight, Package, Tag, Gauge, Palette, Fuel, ArrowUpDown, Wrench, Euro, ShieldCheck, CheckCircle2, ExternalLink, Trash2, AlertTriangle } from 'lucide-react'
+import { Car, Search, Plus, ChevronRight, Package, Tag, Gauge, Palette, Fuel, ArrowUpDown, Wrench, Euro, ShieldCheck, CheckCircle2, ExternalLink, Trash2, AlertTriangle, Edit2 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { cn, formatDate } from '@/lib/utils'
@@ -16,6 +16,7 @@ import {
 import { berechnePrioritaet, PRIORITAET_LABEL, PRIORITAET_COLOR, PRIORITAET_DOT } from '@/lib/prioritaet'
 import { TuevWeckerContent } from '@/app/tuev-wecker/tuev-wecker-content'
 import { ServiceWeckerContent } from '@/app/service-wecker/service-wecker-content'
+import { VehicleEditDialog } from './vehicle-edit-dialog'
 
 const STATUS_FILTERS: { label: string; value: FahrzeugStatus | 'alle' }[] = [
   { label: 'Alle', value: 'alle' },
@@ -60,6 +61,7 @@ export function FahrzeugeContent({
   const [loeschen, setLoeschen] = useState<{ fahrzeugId: string; name: string; kennzeichen?: string } | null>(null)
   const [loeschenLoading, setLoeschenLoading] = useState(false)
   const [eigenSubTab, setEigenSubTab] = useState<'bestand' | 'verkauft' | 'uebergeben'>('bestand')
+  const [editFahrzeug, setEditFahrzeug] = useState<any | null>(null)
 
   // URL-Parameter verarbeiten
   useEffect(() => {
@@ -109,8 +111,18 @@ export function FahrzeugeContent({
     if (!isNaN(preis) && preis > 0) updates.einnahmen = preis
     if (verkaufenAuslieferung) updates.auslieferung_geplant = verkaufenAuslieferung
     if (verkaufenKaeufer.trim()) updates.kaeufer_name = verkaufenKaeufer.trim()
-    await sb.from('auftraege').update(updates).eq('id', verkaufenId)
 
+    console.log('[Verkauft] Updating auftrag:', verkaufenId, 'with:', updates)
+    const { error } = await sb.from('auftraege').update(updates).eq('id', verkaufenId)
+
+    if (error) {
+      console.error('[Verkauft] Update error:', error)
+      alert(`Fehler beim Aktualisieren: ${error.message}`)
+      setVerkaufenLoading(false)
+      return
+    }
+
+    console.log('[Verkauft] Update successful, refreshing...')
     setVerkaufenLoading(false)
     resetVerkaufen()
     router.refresh()
@@ -123,7 +135,18 @@ export function FahrzeugeContent({
     const updates: Record<string, any> = { status: 'ausgeliefert' }
     if (uebergabeDatum) updates.auslieferung_geplant = uebergabeDatum
     else updates.auslieferung_geplant = new Date().toISOString().split('T')[0]
-    await sb.from('auftraege').update(updates).eq('id', uebergabeId)
+
+    console.log('[Übergabe] Updating auftrag:', uebergabeId, 'with:', updates)
+    const { error } = await sb.from('auftraege').update(updates).eq('id', uebergabeId)
+
+    if (error) {
+      console.error('[Übergabe] Update error:', error)
+      alert(`Fehler beim Aktualisieren: ${error.message}`)
+      setUebergabeLoading(false)
+      return
+    }
+
+    console.log('[Übergabe] Update successful, refreshing...')
     setUebergabeLoading(false)
     setUebergabeId(null)
     setUebergabeDatum('')
@@ -212,7 +235,7 @@ export function FahrzeugeContent({
           <Wrench className="w-4 h-4" />
           Lagerbestand
           <span className={cn('text-xs px-1.5 py-0.5 rounded-full', tab === 'eigen' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600')}>
-            {eigenAuftraege.length}
+            {eigenImBestand.length}
           </span>
         </button>
         <button
@@ -759,13 +782,41 @@ export function FahrzeugeContent({
                         </div>
                       )}
 
-                      {/* Kennzeichen + Verkaufspreis */}
-                      <div className="flex items-center justify-between pt-3 border-t border-gray-100">
-                        <span className="text-xs font-mono text-gray-500">{fz?.kennzeichen || 'Kein KZ'}</span>
-                        {verkaufspreis && (
-                          <div className="text-right">
-                            <p className="text-[10px] text-gray-400 leading-none mb-0.5">Verkaufspreis</p>
-                            <p className="text-sm font-bold text-purple-700">{verkaufspreis} €</p>
+                      {/* Kennzeichen + Preise */}
+                      <div className="pt-3 border-t border-gray-100">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-mono text-gray-500">{fz?.kennzeichen || 'Kein KZ'}</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          {fz?.einkaufspreis ? (
+                            <div className="bg-blue-50 rounded px-2 py-1.5">
+                              <p className="text-[10px] text-blue-600 leading-none mb-0.5">Einkauf</p>
+                              <p className="font-bold text-blue-700">{Number(fz.einkaufspreis).toLocaleString('de-DE', { minimumFractionDigits: 0 })} €</p>
+                            </div>
+                          ) : (
+                            <div className="bg-gray-50 rounded px-2 py-1.5 text-gray-400">
+                              <p className="text-[10px] leading-none mb-0.5">Einkauf</p>
+                              <p className="font-bold">—</p>
+                            </div>
+                          )}
+                          {verkaufspreis ? (
+                            <div className="bg-purple-50 rounded px-2 py-1.5">
+                              <p className="text-[10px] text-purple-600 leading-none mb-0.5">Verkauf</p>
+                              <p className="font-bold text-purple-700">{verkaufspreis} €</p>
+                            </div>
+                          ) : (
+                            <div className="bg-gray-50 rounded px-2 py-1.5 text-gray-400">
+                              <p className="text-[10px] leading-none mb-0.5">Verkauf</p>
+                              <p className="font-bold">—</p>
+                            </div>
+                          )}
+                        </div>
+                        {fz?.einkaufspreis && verkaufspreis && (
+                          <div className="mt-2 bg-green-50 rounded px-2 py-1.5">
+                            <p className="text-[10px] text-green-600 leading-none mb-0.5">Marge</p>
+                            <p className="font-bold text-green-700">
+                              {Math.round(((Number(verkaufspreis.replace(/\./g, '').replace(',', '.')) - Number(fz.einkaufspreis)) / Number(fz.einkaufspreis)) * 100)}%
+                            </p>
                           </div>
                         )}
                       </div>
@@ -774,6 +825,13 @@ export function FahrzeugeContent({
 
                   {/* Aktionen */}
                   <div className="px-4 pb-4 flex items-center gap-2">
+                    <button
+                      onClick={() => setEditFahrzeug(fz)}
+                      title="Fahrzeug bearbeiten"
+                      className="flex-shrink-0 p-2 rounded-lg border border-gray-200 text-gray-500 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 transition-colors"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                    </button>
                     {auftrag.status === 'verkauft' ? (
                       <button
                         onClick={() => setUebergabeId(auftrag.id)}
@@ -943,6 +1001,14 @@ export function FahrzeugeContent({
           </div>
         </div>
       )}
+
+      {/* Vehicle Edit Dialog */}
+      <VehicleEditDialog
+        fahrzeug={editFahrzeug}
+        open={!!editFahrzeug}
+        onClose={() => setEditFahrzeug(null)}
+        onSave={() => router.refresh()}
+      />
     </div>
   )
 }
