@@ -80,9 +80,12 @@ export function Sidebar() {
   const benAnzahl = useBenachrichtigungenAnzahl()
 
   // Filter navGroups basierend auf enabled Features
+  // Note: Einstellungen & Admin sind immer sichtbar (werden nicht gefiltert)
   const navGroups = navGroupsTemplate.filter(group => {
-    if (group.label === 'Finanzen') return isFeatureEnabled('rechnungssystem')
-    if (group.label === 'Auswertung') return isFeatureEnabled('statistiken')
+    // Immer anzeigen
+    if (group.label === 'Kunden & Lager') return true
+    if (group.label === 'Finanzen') return true // Immer anzeigen
+    if (group.label === 'Auswertung') return true // Immer anzeigen
     if (group.label === 'Wecker' && group.items.some(i => i.key === 'kalender')) {
       return isFeatureEnabled('kalender') || group.items.some(i => i.key !== 'kalender')
     }
