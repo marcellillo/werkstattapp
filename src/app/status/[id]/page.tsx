@@ -1,17 +1,81 @@
-import { createClient } from '@/lib/supabase/server'
-import { notFound } from 'next/navigation'
+'use client'
+import { useEffect, useState } from 'react'
+import { createClient } from '@/lib/supabase/client'
+import { useParams } from 'next/navigation'
 
-export default async function StatusPage({ params }: { params: { id: string } }) {
-  const supabase = await createClient()
+interface Auftrag {
+  id: string
+  status: string
+  beschreibung: string
+  erstellt_am: string
+  fahrzeug?: { kennzeichen: string; marke: string; model: string }
+  kunde?: { name: string; telefon: string }
+}
 
-  const { data: auftrag, error } = await supabase
-    .from('auftraege')
-    .select('*, fahrzeug:fahrzeuge(*), kunde:kunden(*)')
-    .eq('id', params.id)
-    .single()
+export default function StatusPage() {
+  const params = useParams()
+  const id = params.id as string
+  const [auftrag, setAuftrag] = useState<Auftrag | null>(null)
+  const [loading, setLoading] = useState(true)
+  const supabase = createClient()
 
-  if (error || !auftrag) {
-    notFound()
+  useEffect(() => {
+    if (!id) return
+
+    // Initialer Load
+    const loadAuftrag = async () => {
+      const { data } = await supabase
+        .from('auftraege')
+        .select('*, fahrzeug:fahrzeuge(*), kunde:kunden(*)')
+        .eq('id', id)
+        .single()
+
+      if (data) {
+        setAuftrag(data)
+      }
+      setLoading(false)
+    }
+
+    loadAuftrag()
+
+    // Realtime Listener
+    const subscription = supabase
+      .channel(`auftrag:${id}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'auftraege', filter: `id=eq.${id}` },
+        (payload) => {
+          setAuftrag((prev) => (prev ? { ...prev, ...payload.new } : null))
+        }
+      )
+      .subscribe()
+
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [id, supabase])
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin text-4xl mb-4">⏳</div>
+          <p className="text-gray-600">Laden...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!auftrag) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-xl p-8 text-center max-w-md">
+          <div className="text-6xl mb-4">❌</div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Auftrag nicht gefunden</h1>
+          <p className="text-gray-600">Der angeforderte Auftrag existiert nicht.</p>
+        </div>
+      </div>
+    )
   }
 
   const statusLabels: Record<string, string> = {
@@ -20,6 +84,14 @@ export default async function StatusPage({ params }: { params: { id: string } })
     inarbeit: '⚙️ In Arbeit',
     fertig: '✅ Fertig',
     abgeholt: '🚗 Abgeholt',
+  }
+
+  const statusColors: Record<string, string> = {
+    neu: 'bg-blue-500',
+    angenommen: 'bg-yellow-500',
+    inarbeit: 'bg-orange-500',
+    fertig: 'bg-green-500',
+    abgeholt: 'bg-green-600',
   }
 
   return (
@@ -32,9 +104,9 @@ export default async function StatusPage({ params }: { params: { id: string } })
         </div>
 
         {/* Status Card */}
-        <div className="bg-white rounded-2xl shadow-xl p-8 mb-6">
+        <div className="bg-white rounded-2xl shadow-xl p-8 mb-6 transition-all duration-500">
           <div className="text-center mb-8">
-            <div className="text-6xl mb-4">
+            <div className="text-6xl mb-4 animate-pulse">
               {auftrag.status === 'fertig' ? '✅' :
                auftrag.status === 'inarbeit' ? '⚙️' :
                auftrag.status === 'angenommen' ? '📋' :
@@ -44,6 +116,7 @@ export default async function StatusPage({ params }: { params: { id: string } })
               {statusLabels[auftrag.status] || auftrag.status}
             </h2>
             <p className="text-gray-600">Auftrag #{auftrag.id?.substring(0, 8).toUpperCase()}</p>
+            <p className="text-xs text-gray-500 mt-2">🔄 Wird automatisch aktualisiert</p>
           </div>
 
           {/* Details */}
@@ -94,36 +167,24 @@ export default async function StatusPage({ params }: { params: { id: string } })
           </div>
         </div>
 
-        {/* Status Timeline */}
+        {/* Status Progress */}
         <div className="bg-white rounded-2xl shadow-xl p-8">
-          <h3 className="text-xl font-bold text-gray-900 mb-6">Zeitverlauf</h3>
-          <div className="space-y-4">
-            {auftrag.status === 'fertig' && (
-              <div className="flex items-start">
-                <div className="flex-shrink-0">
-                  <div className="flex items-center justify-center h-10 w-10 rounded-full bg-green-500 text-white">
-                    ✅
-                  </div>
+          <h3 className="text-xl font-bold text-gray-900 mb-6">Fortschritt</h3>
+          <div className="flex items-center justify-between">
+            {['neu', 'angenommen', 'inarbeit', 'fertig', 'abgeholt'].map((s, i) => (
+              <div key={s} className="flex flex-col items-center flex-1">
+                <div
+                  className={`h-12 w-12 rounded-full flex items-center justify-center text-white font-bold transition-all duration-500 ${
+                    ['neu', 'angenommen', 'inarbeit', 'fertig', 'abgeholt'].indexOf(auftrag.status) >= i
+                      ? statusColors[s]
+                      : 'bg-gray-300'
+                  }`}
+                >
+                  {i + 1}
                 </div>
-                <div className="ml-4">
-                  <p className="font-semibold text-gray-900">Fertig</p>
-                  <p className="text-sm text-gray-600">Der Auftrag wurde abgeschlossen</p>
-                </div>
+                <p className="text-xs text-gray-600 mt-2 capitalize text-center">{s}</p>
               </div>
-            )}
-            {auftrag.status === 'abgeholt' && (
-              <div className="flex items-start">
-                <div className="flex-shrink-0">
-                  <div className="flex items-center justify-center h-10 w-10 rounded-full bg-green-500 text-white">
-                    🚗
-                  </div>
-                </div>
-                <div className="ml-4">
-                  <p className="font-semibold text-gray-900">Abgeholt</p>
-                  <p className="text-sm text-gray-600">Ihr Fahrzeug wurde abgeholt</p>
-                </div>
-              </div>
-            )}
+            ))}
           </div>
         </div>
 
