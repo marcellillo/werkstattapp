@@ -33,9 +33,9 @@ const RollenContext = createContext<RollenContextValue>({
 })
 
 export function RollenProvider({ children }: { children: React.ReactNode }) {
-  const [rolle, setRolle] = useState<Rolle>('mechaniker')
-  const [berechtigungen, setBerechtigungen] = useState<string[]>([])
-  const [loading, setLoading] = useState(true)
+  const [rolle, setRolle] = useState<Rolle>('admin')
+  const [berechtigungen, setBerechtigungen] = useState<string[]>(DEFAULT_BERECHTIGUNGEN.admin)
+  const [loading, setLoading] = useState(false)
   const supabase = createClient()
 
   useEffect(() => {
