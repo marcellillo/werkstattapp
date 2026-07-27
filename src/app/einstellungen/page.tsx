@@ -26,9 +26,40 @@ export default async function EinstellungenPage() {
     .eq('id', betriebId)
     .single()
 
+  // Load or create default config
+  const initialConfig = {
+    imap_email: betrieb?.imap_email ?? '',
+    imap_password: betrieb?.imap_password ?? '',
+    graph_client_id: betrieb?.graph_client_id ?? '',
+    graph_tenant_id: betrieb?.graph_tenant_id ?? '',
+    graph_client_secret: betrieb?.graph_client_secret ?? '',
+    graph_email: betrieb?.graph_email ?? '',
+    graph_refresh_token: betrieb?.graph_refresh_token ?? '',
+    anthropic_api_key: betrieb?.anthropic_api_key ?? '',
+    resend_api_key: betrieb?.resend_api_key ?? '',
+    firma_absender_email: betrieb?.firma_absender_email ?? '',
+    firma_name: betrieb?.firma_name ?? '',
+    firma_strasse: betrieb?.firma_strasse ?? '',
+    firma_plz: betrieb?.firma_plz ?? '',
+    firma_ort: betrieb?.firma_ort ?? '',
+    firma_telefon: betrieb?.firma_telefon ?? '',
+    firma_email: betrieb?.firma_email ?? '',
+    firma_ust_id: betrieb?.firma_ust_id ?? '',
+    firma_steuernummer: betrieb?.firma_steuernummer ?? '',
+    firma_iban: betrieb?.firma_iban ?? '',
+    firma_bic: betrieb?.firma_bic ?? '',
+    firma_bank: betrieb?.firma_bank ?? '',
+    firma_stundensatz: betrieb?.firma_stundensatz ?? '',
+    firma_kleinunternehmer: betrieb?.firma_kleinunternehmer ?? '',
+    firma_logo: betrieb?.firma_logo ?? '',
+    firma_paypal: betrieb?.firma_paypal ?? '',
+    firma_sumup: betrieb?.firma_sumup ?? '',
+    firma_stripe: betrieb?.firma_stripe ?? '',
+  }
+
   return (
     <AppLayout title="Einstellungen">
-      <EinstellungenContent betrieb={betrieb} />
+      <EinstellungenContent initialConfig={initialConfig} betriebName={betrieb?.name ?? 'Werkstatt'} />
     </AppLayout>
   )
 }
