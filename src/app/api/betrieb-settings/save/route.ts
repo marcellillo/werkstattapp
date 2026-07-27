@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
 
     // Upsert settings
     const { error } = await supabase
-      .from('betrieb_settings')
+      .from('betriebs_einstellungen')
       .upsert({
         betrieb_id: betriebId,
         ...config,

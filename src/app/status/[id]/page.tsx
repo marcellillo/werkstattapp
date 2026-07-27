@@ -35,7 +35,7 @@ export default function StatusPage() {
       if (auftragData) {
         // Load betrieb settings for contact info
         const { data: settingsData } = await supabase
-          .from('betrieb_settings')
+          .from('betriebs_einstellungen')
           .select('firma_name, firma_telefon, firma_email')
           .eq('betrieb_id', auftragData.betrieb_id)
           .single()
