@@ -8,8 +8,10 @@ interface Auftrag {
   status: string
   beschreibung: string
   erstellt_am: string
+  bearbeiter_id?: string
   fahrzeug?: { kennzeichen: string; marke: string; model: string }
   betrieb?: { name: string; firma_telefon: string; firma_email: string }
+  bearbeiter?: { full_name: string; email?: string }
 }
 
 export default function StatusPage() {
@@ -26,7 +28,7 @@ export default function StatusPage() {
     const loadAuftrag = async () => {
       const { data: auftragData } = await supabase
         .from('auftraege')
-        .select('*, fahrzeug:fahrzeuge(*), betrieb:betriebe(*)')
+        .select('*, fahrzeug:fahrzeuge(*), betrieb:betriebe(*), bearbeiter:profiles(full_name, email)')
         .eq('id', id)
         .single()
 
@@ -138,7 +140,7 @@ export default function StatusPage() {
             {/* Fahrzeug */}
             <div className="flex justify-between items-center pb-4 border-b">
               <div>
-                <p className="text-sm text-gray-600">Fahrzeug</p>
+                <p className="text-sm text-gray-600">🚗 Fahrzeug</p>
                 <p className="text-lg font-semibold text-gray-900">
                   {auftrag.fahrzeug?.kennzeichen}
                 </p>
@@ -148,6 +150,22 @@ export default function StatusPage() {
                 <p className="text-lg font-semibold text-gray-900">{auftrag.fahrzeug?.model}</p>
               </div>
             </div>
+
+            {/* Bearbeiter */}
+            {auftrag.bearbeiter && (
+              <div className="flex justify-between items-center pb-4 border-b">
+                <div>
+                  <p className="text-sm text-gray-600">🔧 Bearbeiter</p>
+                  <p className="text-lg font-semibold text-gray-900">
+                    {auftrag.bearbeiter.full_name}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm text-gray-600">Kontakt</p>
+                  <p className="text-sm text-blue-600 font-semibold">{auftrag.bearbeiter.email || '—'}</p>
+                </div>
+              </div>
+            )}
 
             {/* Werkstatt Kontakt */}
             <div className="flex justify-between items-center pb-4 border-b bg-blue-50 -mx-8 px-8 py-4">
