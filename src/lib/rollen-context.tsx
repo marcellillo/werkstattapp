@@ -2,17 +2,13 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
-export type Rolle = 'admin' | 'werkstattmeister' | 'mechaniker' | 'buchhalter'
+export type Rolle = 'admin' | 'mechaniker' | 'buchhalter'
 
 export const DEFAULT_BERECHTIGUNGEN: Record<Rolle, string[]> = {
   admin: [
     'dashboard', 'hebebuehnen', 'fahrzeuge', 'termine', 'kunden', 'teile',
     'kalender', 'tuev_wecker', 'service_wecker', 'rechnungen', 'emails', 'verlauf', 'statistiken',
-    'benachrichtigungen', 'einstellungen', 'buchhaltung',
-  ],
-  werkstattmeister: [
-    'dashboard', 'hebebuehnen', 'fahrzeuge', 'termine', 'kunden', 'teile',
-    'kalender', 'tuev_wecker', 'service_wecker', 'rechnungen', 'emails', 'verlauf', 'statistiken', 'benachrichtigungen',
+    'benachrichtigungen', 'einstellungen', 'buchhaltung', 'admin',
   ],
   mechaniker: [
     'dashboard', 'hebebuehnen', 'fahrzeuge', 'termine', 'teile', 'tuev_wecker', 'service_wecker', 'benachrichtigungen',
@@ -47,19 +43,19 @@ export function RollenProvider({ children }: { children: React.ReactNode }) {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { setLoading(false); return }
 
-      const [{ data: profile }, { data: config }] = await Promise.all([
-        supabase.from('profiles').select('role').eq('id', user.id).single(),
-        supabase.from('werkstatt_einstellungen').select('wert').eq('schluessel', 'rollen_berechtigungen').single(),
-      ])
+      // Get user's primary betrieb and rolle
+      const { data: betriebUser } = await supabase
+        .from('betrieb_users')
+        .select('rolle')
+        .eq('profile_id', user.id)
+        .eq('is_primary', true)
+        .single()
 
-      const userRolle: Rolle = (profile?.role as Rolle) ?? 'mechaniker'
+      const userRolle: Rolle = (betriebUser?.rolle as Rolle) ?? 'mechaniker'
       setRolle(userRolle)
 
-      let berechtigungenMap = DEFAULT_BERECHTIGUNGEN
-      if (config?.wert) {
-        try { berechtigungenMap = JSON.parse(config.wert) } catch {}
-      }
-      setBerechtigungen(berechtigungenMap[userRolle] ?? DEFAULT_BERECHTIGUNGEN[userRolle])
+      // Use default berechtigungen for this rolle
+      setBerechtigungen(DEFAULT_BERECHTIGUNGEN[userRolle] ?? DEFAULT_BERECHTIGUNGEN.mechaniker)
       setLoading(false)
     }
     laden()
