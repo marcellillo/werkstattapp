@@ -48,7 +48,8 @@ export function RollenProvider({ children }: { children: React.ReactNode }) {
         .from('betrieb_users')
         .select('rolle')
         .eq('profile_id', user.id)
-        .eq('is_primary', true)
+        .order('is_primary', { ascending: false })
+        .limit(1)
         .single()
 
       const userRolle: Rolle = (betriebUser?.rolle as Rolle) ?? 'mechaniker'
