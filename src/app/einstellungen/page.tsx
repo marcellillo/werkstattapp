@@ -28,7 +28,7 @@ export default async function EinstellungenPage() {
 
   // Load settings
   const { data: settings } = await supabase
-    .from('betriebs_einstellungen')
+    .from('betrieb_einstellungen')
     .select('*')
     .eq('betrieb_id', betriebId)
     .single()
