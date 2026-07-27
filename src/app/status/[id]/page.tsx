@@ -24,14 +24,28 @@ export default function StatusPage() {
 
     // Initialer Load
     const loadAuftrag = async () => {
-      const { data } = await supabase
+      const { data: auftragData } = await supabase
         .from('auftraege')
         .select('*, fahrzeug:fahrzeuge(*), betrieb:betriebe(*)')
         .eq('id', id)
         .single()
 
-      if (data) {
-        setAuftrag(data)
+      if (auftragData) {
+        // Load betrieb settings for contact info
+        const { data: settingsData } = await supabase
+          .from('betrieb_settings')
+          .select('firma_name, firma_telefon, firma_email')
+          .eq('betrieb_id', auftragData.betrieb_id)
+          .single()
+
+        setAuftrag({
+          ...auftragData,
+          betrieb: {
+            name: settingsData?.firma_name || auftragData.betrieb?.name || 'Werkstatt',
+            firma_telefon: settingsData?.firma_telefon || '',
+            firma_email: settingsData?.firma_email || '',
+          },
+        })
       }
       setLoading(false)
     }
