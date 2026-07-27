@@ -27,13 +27,12 @@ export function AppLayout({ children, title }: AppLayoutProps) {
           />
         )}
 
-        {/* TODO: Fix Sidebar - temporarily hidden */}
-        {/* <div className={cn(
+        <div className={cn(
           'fixed lg:sticky lg:top-0 lg:h-screen inset-y-0 left-0 z-50 lg:z-auto transition-transform duration-300 hidden lg:block lg:flex-shrink-0',
           sidebarOpen ? 'translate-x-0 !block' : '-translate-x-full lg:translate-x-0'
         )}>
           <Sidebar />
-        </div> */}
+        </div>
 
         <div className="flex flex-col flex-1 min-w-0">
           <div className="sticky top-0 z-20">
