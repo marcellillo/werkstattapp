@@ -9,7 +9,7 @@ interface Auftrag {
   beschreibung: string
   erstellt_am: string
   fahrzeug?: { kennzeichen: string; marke: string; model: string }
-  kunde?: { name: string; telefon: string }
+  betrieb?: { name: string; firma_telefon: string; firma_email: string }
 }
 
 export default function StatusPage() {
@@ -26,7 +26,7 @@ export default function StatusPage() {
     const loadAuftrag = async () => {
       const { data } = await supabase
         .from('auftraege')
-        .select('*, fahrzeug:fahrzeuge(*), kunde:kunden(*)')
+        .select('*, fahrzeug:fahrzeuge(*), betrieb:betriebe(*)')
         .eq('id', id)
         .single()
 
@@ -135,17 +135,17 @@ export default function StatusPage() {
               </div>
             </div>
 
-            {/* Kunde */}
-            <div className="flex justify-between items-center pb-4 border-b">
+            {/* Werkstatt Kontakt */}
+            <div className="flex justify-between items-center pb-4 border-b bg-blue-50 -mx-8 px-8 py-4">
               <div>
-                <p className="text-sm text-gray-600">Kunde</p>
+                <p className="text-sm text-gray-600">📞 Kontakt</p>
                 <p className="text-lg font-semibold text-gray-900">
-                  {auftrag.kunde?.name}
+                  {auftrag.betrieb?.name}
                 </p>
               </div>
               <div className="text-right">
-                <p className="text-sm text-gray-600">Telefon</p>
-                <p className="text-lg font-semibold text-gray-900">{auftrag.kunde?.telefon || '—'}</p>
+                <p className="text-sm text-gray-600">{auftrag.betrieb?.firma_telefon}</p>
+                <p className="text-sm text-blue-600 font-semibold">{auftrag.betrieb?.firma_email}</p>
               </div>
             </div>
 
