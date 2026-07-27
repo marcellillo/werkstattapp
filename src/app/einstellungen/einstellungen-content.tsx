@@ -66,6 +66,10 @@ export function EinstellungenContent({ initialConfig, betriebName, betriebId }: 
   const isKonfiguriert = !!(config.imap_email && config.imap_password)
   const isAdmin = userRolle === 'admin'
 
+  useEffect(() => {
+    console.log('DEBUG Einstellungen:', { userRolle, isAdmin })
+  }, [userRolle, isAdmin])
+
   const ROLLEN = {
     admin: 'Admin',
     mechaniker: 'Mechaniker',
