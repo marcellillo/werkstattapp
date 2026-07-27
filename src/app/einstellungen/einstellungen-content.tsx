@@ -37,9 +37,10 @@ interface Config {
   firma_stripe: string
 }
 
-export function EinstellungenContent({ initialConfig, betriebName }: {
+export function EinstellungenContent({ initialConfig, betriebName, betriebId }: {
   initialConfig: Config
   betriebName: string
+  betriebId: string
 }) {
   const [config, setConfig] = useState<Config>(initialConfig)
   const [logoUploading, setLogoUploading] = useState(false)
@@ -57,13 +58,26 @@ export function EinstellungenContent({ initialConfig, betriebName }: {
   async function speichern() {
     setSaving(true)
     setSaved(false)
-    const { error } = await supabase.rpc('upsert_betrieb_settings', {
-      p_config: config
-    })
-    if (error) console.error('Save error:', error)
-    setSaving(false)
-    setSaved(true)
-    setTimeout(() => setSaved(false), 3000)
+    try {
+      const res = await fetch('/api/betrieb-settings/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ betriebId, config }),
+      })
+
+      if (!res.ok) {
+        const error = await res.json()
+        throw new Error(error.error || 'Fehler beim Speichern')
+      }
+
+      setSaved(true)
+      setTimeout(() => setSaved(false), 3000)
+    } catch (error: any) {
+      console.error('Save error:', error)
+      alert(`Fehler: ${error.message}`)
+    } finally {
+      setSaving(false)
+    }
   }
 
   async function verbindungTesten() {
