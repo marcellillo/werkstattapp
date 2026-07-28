@@ -2,12 +2,14 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { AppLayout } from '@/components/layout/app-layout'
 import { KalenderContent } from './kalender-content'
+import { getBetriebIdForUser } from '@/lib/server-betrieb'
 
 export default async function KalenderPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
+  const betriebId = await getBetriebIdForUser(supabase, user.id)
   const today = new Date().toISOString().split('T')[0]
 
   const [{ data: auftraegeRaw }, { data: termineRaw }, { data: kundenRaw }, { data: fahrzeugeRaw }] = await Promise.all([
@@ -19,6 +21,7 @@ export default async function KalenderPage() {
         kunde:kunden(vorname, nachname),
         hebebuehne:hebebuehnen(bezeichnung)
       `)
+      .eq('betrieb_id', betriebId)
       .not('status', 'eq', 'ausgeliefert')
       .not('status', 'eq', 'storniert')
       .not('status', 'eq', 'fertig')
@@ -26,6 +29,7 @@ export default async function KalenderPage() {
     supabase
       .from('termine')
       .select('id, titel, datum, uhrzeit, dauer_minuten, typ, status, beschreibung, fahrzeug:fahrzeuge(marke, modell, kennzeichen), kunde:kunden(vorname, nachname)')
+      .eq('betrieb_id', betriebId)
       .neq('status', 'abgesagt')
       .gte('datum', today)
       .order('datum')
@@ -33,10 +37,12 @@ export default async function KalenderPage() {
     supabase
       .from('kunden')
       .select('id, vorname, nachname, telefon, email')
+      .eq('betrieb_id', betriebId)
       .order('nachname'),
     supabase
       .from('fahrzeuge')
       .select('id, kennzeichen, marke, modell, kunde_id, naechste_hauptuntersuchung, tuev_erinnerung, naechster_service_datum')
+      .eq('betrieb_id', betriebId)
       .order('kennzeichen'),
   ])
 
