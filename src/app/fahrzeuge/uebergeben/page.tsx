@@ -2,11 +2,14 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { AppLayout } from '@/components/layout/app-layout'
 import { VerkauftContent } from '../verkauft/verkauft-content'
+import { getBetriebIdForUser } from '@/lib/server-betrieb'
 
 export default async function UebergebenPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
+
+  const betriebId = await getBetriebIdForUser(supabase, user.id)
 
   const { data: raw } = await supabase
     .from('auftraege')
@@ -19,6 +22,7 @@ export default async function UebergebenPage() {
         verkaufspreis, einkaufspreis
       )
     `)
+    .eq('betrieb_id', betriebId)
     .eq('status', 'ausgeliefert')
     .order('verkauft_am', { ascending: false, nullsFirst: false })
 

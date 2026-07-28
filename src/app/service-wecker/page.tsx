@@ -2,11 +2,14 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { AppLayout } from '@/components/layout/app-layout'
 import { ServiceWeckerContent } from './service-wecker-content'
+import { getBetriebIdForUser } from '@/lib/server-betrieb'
 
 export default async function ServiceWeckerPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
+
+  const betriebId = await getBetriebIdForUser(supabase, user.id)
 
   // Alle Fremdfahrzeuge mit Kunde + letztem Auftrag
   const { data: fahrzeugeRaw } = await supabase
@@ -17,6 +20,7 @@ export default async function ServiceWeckerPage() {
       kunde_id,
       kunde:kunden(id, vorname, nachname, telefon, email)
     `)
+    .eq('betrieb_id', betriebId)
     .eq('fahrzeug_typ', 'fremd')
     .order('kennzeichen')
 
@@ -26,6 +30,7 @@ export default async function ServiceWeckerPage() {
     ? await supabase
         .from('auftraege')
         .select('id, fahrzeug_id, erstellt_am, status, arbeiten, einnahmen')
+        .eq('betrieb_id', betriebId)
         .in('fahrzeug_id', fahrzeugIds)
         .in('status', ['fertig', 'ausgeliefert'])
         .order('erstellt_am', { ascending: false })

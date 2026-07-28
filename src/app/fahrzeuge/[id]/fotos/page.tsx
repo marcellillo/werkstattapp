@@ -4,6 +4,7 @@ import { AppLayout } from '@/components/layout/app-layout'
 import { FotosContent } from './fotos-content'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
+import { getBetriebIdForUser } from '@/lib/server-betrieb'
 
 export default async function FotosPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -11,8 +12,10 @@ export default async function FotosPage({ params }: { params: Promise<{ id: stri
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
+  const betriebId = await getBetriebIdForUser(supabase, user.id)
+
   const [{ data: auftrag }, { data: fotos }] = await Promise.all([
-    supabase.from('auftraege').select('auftrag_nr, fahrzeug:fahrzeuge(marke, modell, kennzeichen)').eq('id', id).single(),
+    supabase.from('auftraege').select('auftrag_nr, fahrzeug:fahrzeuge(marke, modell, kennzeichen)').eq('betrieb_id', betriebId).eq('id', id).single(),
     supabase.from('auftrag_fotos').select('*').eq('auftrag_id', id).order('erstellt_am'),
   ])
 

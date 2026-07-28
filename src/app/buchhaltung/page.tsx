@@ -2,11 +2,14 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { AppLayout } from '@/components/layout/app-layout'
 import { BuchhaltungContent } from './buchhaltung-content'
+import { getBetriebIdForUser } from '@/lib/server-betrieb'
 
 export default async function BuchhaltungPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
+
+  const betriebId = await getBetriebIdForUser(supabase, user.id)
 
   const [
     { data: auftraege },
@@ -17,16 +20,19 @@ export default async function BuchhaltungPage() {
     supabase
       .from('auftraege')
       .select('id, auftrag_nr, einnahmen, erstellt_am, verkauft_am, status, steuerart, fahrzeug:fahrzeuge(kennzeichen, marke, modell, mobile_de_id, fahrzeug_typ, einkaufspreis)')
+      .eq('betrieb_id', betriebId)
       .not('einnahmen', 'is', null)
       .gt('einnahmen', 0)
       .order('erstellt_am', { ascending: false }),
     supabase
       .from('rechnungen')
       .select('id, gesamt, datum, bezahlt, lieferant, rechnungsnummer, faellig_am')
+      .eq('betrieb_id', betriebId)
       .order('datum', { ascending: false }),
     supabase
       .from('kunden_rechnungen')
       .select('*, kunde:kunden(vorname, nachname, telefon), fahrzeug:fahrzeuge(kennzeichen, marke, modell)')
+      .eq('betrieb_id', betriebId)
       .order('erstellt_am', { ascending: false }),
     supabase
       .from('werkstatt_einstellungen')

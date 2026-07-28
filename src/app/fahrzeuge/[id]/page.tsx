@@ -2,12 +2,15 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect, notFound } from 'next/navigation'
 import { AppLayout } from '@/components/layout/app-layout'
 import { FahrzeugDetail } from './fahrzeug-detail'
+import { getBetriebIdForUser } from '@/lib/server-betrieb'
 
 export default async function FahrzeugDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
+
+  const betriebId = await getBetriebIdForUser(supabase, user.id)
 
   const [
     { data: auftrag, error: auftragError },
@@ -23,9 +26,10 @@ export default async function FahrzeugDetailPage({ params }: { params: Promise<{
         kunde:kunden(*),
         ersatzteile(*)
       `)
+      .eq('betrieb_id', betriebId)
       .eq('id', id)
       .single(),
-    supabase.from('hebebuehnen').select('*').order('nummer'),
+    supabase.from('hebebuehnen').select('*').eq('betrieb_id', betriebId).order('nummer'),
     supabase
       .from('status_historie')
       .select('*')

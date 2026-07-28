@@ -2,11 +2,14 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { AppLayout } from '@/components/layout/app-layout'
 import { EmailsContent } from './emails-content'
+import { getBetriebIdForUser } from '@/lib/server-betrieb'
 
 export default async function EmailsPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
+
+  const betriebId = await getBetriebIdForUser(supabase, user.id)
 
   const { data: emails } = await supabase
     .from('email_protokoll')
@@ -17,6 +20,7 @@ export default async function EmailsPage() {
         fahrzeug:fahrzeuge(marke, modell, kennzeichen)
       )
     `)
+    .eq('betrieb_id', betriebId)
     .order('empfangen_am', { ascending: false })
     .limit(100)
 

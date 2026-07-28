@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect, notFound } from 'next/navigation'
 import { RechnungFlow } from './rechnung-flow'
+import { getBetriebIdForUser } from '@/lib/server-betrieb'
 
 export default async function RechnungPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -8,10 +9,13 @@ export default async function RechnungPage({ params }: { params: Promise<{ id: s
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
+  const betriebId = await getBetriebIdForUser(supabase, user.id)
+
   const [{ data: auftrag }, { data: configRows }] = await Promise.all([
     supabase
       .from('auftraege')
       .select('*, fahrzeug:fahrzeuge(*), kunde:kunden(*), ersatzteile(*)')
+      .eq('betrieb_id', betriebId)
       .eq('id', id)
       .single(),
     supabase.from('werkstatt_einstellungen').select('schluessel, wert'),
