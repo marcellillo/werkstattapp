@@ -37,19 +37,33 @@ export async function POST(req: NextRequest) {
     }
 
     // Accept invitation - add user to betrieb
-    const { error: addError } = await supabase.from('betrieb_users').insert({
-      betrieb_id: invitation.betrieb_id,
-      profile_id: user.id,
-      rolle: invitation.rolle,
-      is_primary: false,
-    }).on('CONFLICT', () => {
-      // User exists already, just update role
-      return supabase
+    // First check if user already exists in this betrieb
+    const { data: existingUser } = await supabase
+      .from('betrieb_users')
+      .select('id')
+      .eq('betrieb_id', invitation.betrieb_id)
+      .eq('profile_id', user.id)
+      .single()
+
+    let addError = null
+    if (existingUser) {
+      // User exists, update role
+      const { error } = await supabase
         .from('betrieb_users')
-        .update({ role: invitation.role })
+        .update({ rolle: invitation.rolle })
         .eq('betrieb_id', invitation.betrieb_id)
         .eq('profile_id', user.id)
-    })
+      addError = error
+    } else {
+      // User doesn't exist, insert
+      const { error } = await supabase.from('betrieb_users').insert({
+        betrieb_id: invitation.betrieb_id,
+        profile_id: user.id,
+        rolle: invitation.rolle,
+        is_primary: false,
+      })
+      addError = error
+    }
 
     if (addError) throw addError
 
