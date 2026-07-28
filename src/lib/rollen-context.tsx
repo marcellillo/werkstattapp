@@ -13,12 +13,12 @@ export const DEFAULT_BERECHTIGUNGEN: Record<Rolle, string[]> = {
   superadmin: [
     'dashboard', 'hebebuehnen', 'fahrzeuge', 'termine', 'kunden', 'teile',
     'kalender', 'tuev_wecker', 'service_wecker', 'rechnungen', 'emails', 'verlauf', 'statistiken',
-    'benachrichtigungen', 'einstellungen', 'buchhaltung', 'admin', 'superadmin',
+    'benachrichtigungen', 'einstellungen', 'buchhaltung', 'admin', 'mitarbeiter', 'superadmin',
   ],
   admin: [
     'dashboard', 'hebebuehnen', 'fahrzeuge', 'termine', 'kunden', 'teile',
     'kalender', 'tuev_wecker', 'service_wecker', 'rechnungen', 'emails', 'verlauf', 'statistiken',
-    'benachrichtigungen', 'einstellungen', 'buchhaltung', 'admin',
+    'benachrichtigungen', 'einstellungen', 'buchhaltung', 'mitarbeiter', 'admin',
   ],
   mechaniker: [
     'dashboard', 'hebebuehnen', 'fahrzeuge', 'termine', 'teile', 'tuev_wecker', 'service_wecker', 'benachrichtigungen',

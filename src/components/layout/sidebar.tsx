@@ -214,6 +214,18 @@ export function Sidebar() {
               Admin
             </p>
             <Link
+              href="/mitarbeiter"
+              className={cn(
+                'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all',
+                pathname === '/mitarbeiter' || pathname.startsWith('/mitarbeiter/')
+                  ? 'bg-orange-500 text-white'
+                  : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100'
+              )}
+            >
+              <Users className="w-[18px] h-[18px]" />
+              <span>Mitarbeiter</span>
+            </Link>
+            <Link
               href="/admin/betrieb-features"
               className={cn(
                 'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all',
