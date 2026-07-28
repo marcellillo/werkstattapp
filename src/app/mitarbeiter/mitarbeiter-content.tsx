@@ -9,7 +9,7 @@ import { Users, Mail, Plus, Copy, Check, Loader2, Calendar } from 'lucide-react'
 interface User {
   id: string
   profile_id: string
-  role: string
+  rolle: string
   profiles?: {
     full_name: string
     email: string
@@ -20,7 +20,7 @@ interface Invitation {
   id: string
   email: string
   token: string
-  role: string
+  rolle: string
   status: string
   erstellt_am: string
   abgelaufen_am: string

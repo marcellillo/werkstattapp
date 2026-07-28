@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
     const { error: addError } = await supabase.from('betrieb_users').insert({
       betrieb_id: invitation.betrieb_id,
       profile_id: user.id,
-      role: invitation.role,
+      rolle: invitation.rolle,
       is_primary: false,
     }).on('CONFLICT', () => {
       // User exists already, just update role
@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       betriebId: invitation.betrieb_id,
-      role: invitation.role,
+      rolle: invitation.rolle,
     })
   } catch (error: any) {
     console.error('[Accept Invitation] Error:', error)

@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
       betrieb_id: betriebId,
       email,
       token,
-      role: rolle,
+      rolle,
       erstellt_von: user.id,
     }).select().single()
 
