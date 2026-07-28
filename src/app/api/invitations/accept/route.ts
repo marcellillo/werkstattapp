@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
       // User exists, update role
       const { error } = await supabase
         .from('betrieb_users')
-        .update({ rolle: invitation.rolle })
+        .update({ role: invitation.rolle })
         .eq('betrieb_id', invitation.betrieb_id)
         .eq('profile_id', user.id)
       addError = error
@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
       const { error } = await supabase.from('betrieb_users').insert({
         betrieb_id: invitation.betrieb_id,
         profile_id: user.id,
-        rolle: invitation.rolle,
+        role: invitation.rolle,
         is_primary: false,
       })
       addError = error
