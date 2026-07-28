@@ -40,13 +40,13 @@ export async function POST(req: NextRequest) {
     const { error: addError } = await supabase.from('betrieb_users').insert({
       betrieb_id: invitation.betrieb_id,
       profile_id: user.id,
-      rolle: invitation.rolle,
+      role: invitation.role,
       is_primary: false,
     }).on('CONFLICT', () => {
-      // User exists already, just update rolle
+      // User exists already, just update role
       return supabase
         .from('betrieb_users')
-        .update({ rolle: invitation.rolle })
+        .update({ role: invitation.role })
         .eq('betrieb_id', invitation.betrieb_id)
         .eq('profile_id', user.id)
     })
@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       betriebId: invitation.betrieb_id,
-      rolle: invitation.rolle,
+      role: invitation.role,
     })
   } catch (error: any) {
     console.error('[Accept Invitation] Error:', error)

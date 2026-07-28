@@ -17,12 +17,12 @@ export async function POST(req: NextRequest) {
     // Check ob User Admin ist
     const { data: userRole } = await supabase
       .from('betrieb_users')
-      .select('rolle')
+      .select('role')
       .eq('betrieb_id', betriebId)
       .eq('profile_id', user.id)
       .single()
 
-    if (userRole?.rolle !== 'admin') {
+    if (userRole?.role !== 'admin' && userRole?.role !== 'superadmin') {
       return NextResponse.json({ error: 'Nur Admins können einladen' }, { status: 403 })
     }
 
@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
       betrieb_id: betriebId,
       email,
       token,
-      rolle,
+      role: rolle,
       erstellt_von: user.id,
     }).select().single()
 
