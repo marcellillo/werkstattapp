@@ -2,11 +2,14 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { AppLayout } from '@/components/layout/app-layout'
 import { DashboardContent } from './dashboard-content'
+import { getBetriebIdForUser } from '@/lib/server-betrieb'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
+
+  const betriebId = await getBetriebIdForUser(supabase, user.id)
 
   const monatStart = new Date()
   monatStart.setDate(1)
@@ -24,19 +27,21 @@ export default async function DashboardPage() {
     { data: offeneRechnungenRaw },
     { data: bewertungenRaw },
   ] = await Promise.all([
-    supabase.from('hebebuehnen').select('*').order('position').order('nummer'),
+    supabase.from('hebebuehnen').select('*').eq('betrieb_id', betriebId).order('position').order('nummer'),
     supabase
       .from('auftraege')
       .select(`*, fahrzeug:fahrzeuge(*), kunde:kunden(*), ersatzteile(*)`)
+      .eq('betrieb_id', betriebId)
       .not('status', 'eq', 'ausgeliefert')
       .not('status', 'eq', 'storniert')
       .order('erstellt_am', { ascending: false }),
-    supabase.from('termine').select('*, kunde:kunden(vorname,nachname), fahrzeug:fahrzeuge(kennzeichen,marke,modell)').gte('datum', new Date().toISOString().split('T')[0]).not('status', 'eq', 'abgesagt').order('datum').order('uhrzeit').limit(20),
-    supabase.from('fahrzeuge').select('*', { count: 'exact', head: true }).eq('fahrzeug_typ', 'eigen'),
+    supabase.from('termine').select('*, kunde:kunden(vorname,nachname), fahrzeug:fahrzeuge(kennzeichen,marke,modell)').eq('betrieb_id', betriebId).gte('datum', new Date().toISOString().split('T')[0]).not('status', 'eq', 'abgesagt').order('datum').order('uhrzeit').limit(20),
+    supabase.from('fahrzeuge').select('*', { count: 'exact', head: true }).eq('betrieb_id', betriebId).eq('fahrzeug_typ', 'eigen'),
     supabase.from('profiles').select('id, full_name, role').order('full_name'),
-    supabase.from('auftraege').select('einnahmen, fertiggestellt_am, fahrzeug:fahrzeuge(fahrzeug_typ)').not('einnahmen', 'is', null).gte('fertiggestellt_am', monatStartDate),
-    supabase.from('rechnungen').select('gesamt').eq('bezahlt', false),
+    supabase.from('auftraege').select('einnahmen, fertiggestellt_am, fahrzeug:fahrzeuge(fahrzeug_typ)').eq('betrieb_id', betriebId).not('einnahmen', 'is', null).gte('fertiggestellt_am', monatStartDate),
+    supabase.from('rechnungen').select('gesamt').eq('betrieb_id', betriebId).eq('bezahlt', false),
     supabase.from('auftraege').select('bewertung_sterne, bewertung_kommentar, bewertung_datum, fahrzeug:fahrzeuge(marke, modell, kennzeichen), kunde:kunden(vorname, nachname)')
+      .eq('betrieb_id', betriebId)
       .not('bewertung_sterne', 'is', null)
       .order('bewertung_datum', { ascending: false })
       .limit(10),
