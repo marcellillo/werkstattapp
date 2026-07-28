@@ -13,18 +13,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'betriebId and config required' }, { status: 400 })
     }
 
-    // TODO: Verify user is admin of betrieb
-    // For now, allow any authenticated user to update settings
-    // const { data: userRole } = await supabase
-    //   .from('betrieb_users')
-    //   .select('rolle')
-    //   .eq('betrieb_id', betriebId)
-    //   .eq('profile_id', user.id)
-    //   .single()
-    //
-    // if (userRole?.rolle !== 'admin') {
-    //   return NextResponse.json({ error: 'Only admins can update settings' }, { status: 403 })
-    // }
+    // Verify user is admin of betrieb
+    const { data: userRole } = await supabase
+      .from('betrieb_users')
+      .select('rolle')
+      .eq('betrieb_id', betriebId)
+      .eq('profile_id', user.id)
+      .single()
+
+    if (userRole?.rolle !== 'admin') {
+      return NextResponse.json({ error: 'Only admins can update settings' }, { status: 403 })
+    }
 
     // Upsert settings
     const { error } = await supabase

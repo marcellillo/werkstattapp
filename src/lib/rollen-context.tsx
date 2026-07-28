@@ -33,13 +33,45 @@ const RollenContext = createContext<RollenContextValue>({
 })
 
 export function RollenProvider({ children }: { children: React.ReactNode }) {
-  const [rolle, setRolle] = useState<Rolle>('admin')
-  const [berechtigungen, setBerechtigungen] = useState<string[]>(DEFAULT_BERECHTIGUNGEN.admin)
-  const [loading, setLoading] = useState(false)
+  const [rolle, setRolle] = useState<Rolle>('mechaniker')
+  const [berechtigungen, setBerechtigungen] = useState<string[]>([])
+  const [loading, setLoading] = useState(true)
   const supabase = createClient()
 
-  // TODO: Implement proper role loading from DB
-  // For now, using admin role as default for debugging
+  useEffect(() => {
+    async function laden() {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) {
+          setRolle('mechaniker')
+          setBerechtigungen(DEFAULT_BERECHTIGUNGEN.mechaniker)
+          setLoading(false)
+          return
+        }
+
+        // Get user's primary betrieb and rolle
+        const { data: betriebUser } = await supabase
+          .from('betrieb_users')
+          .select('rolle')
+          .eq('profile_id', user.id)
+          .order('is_primary', { ascending: false })
+          .limit(1)
+          .single()
+
+        const userRolle: Rolle = (betriebUser?.rolle as Rolle) ?? 'mechaniker'
+        setRolle(userRolle)
+        setBerechtigungen(DEFAULT_BERECHTIGUNGEN[userRolle] ?? DEFAULT_BERECHTIGUNGEN.mechaniker)
+      } catch (error) {
+        console.error('Error loading role:', error)
+        setRolle('mechaniker')
+        setBerechtigungen(DEFAULT_BERECHTIGUNGEN.mechaniker)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    laden()
+  }, [])
 
   return (
     <RollenContext.Provider value={{
