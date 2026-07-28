@@ -16,12 +16,12 @@ export async function POST(req: NextRequest) {
     // Verify user is admin of betrieb
     const { data: userRole } = await supabase
       .from('betrieb_users')
-      .select('rolle')
+      .select('role')
       .eq('betrieb_id', betriebId)
       .eq('profile_id', user.id)
       .single()
 
-    if (userRole?.rolle !== 'admin') {
+    if (userRole?.role !== 'admin') {
       return NextResponse.json({ error: 'Only admins can update settings' }, { status: 403 })
     }
 

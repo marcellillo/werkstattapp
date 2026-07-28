@@ -19,21 +19,21 @@ export const DEFAULT_BERECHTIGUNGEN: Record<Rolle, string[]> = {
 }
 
 interface RollenContextValue {
-  rolle: Rolle
+  role: Rolle
   berechtigungen: string[]
   kannZugreifen: (key: string) => boolean
   loading: boolean
 }
 
 const RollenContext = createContext<RollenContextValue>({
-  rolle: 'mechaniker',
+  role: 'mechaniker',
   berechtigungen: DEFAULT_BERECHTIGUNGEN.mechaniker,
   kannZugreifen: () => false,
   loading: true,
 })
 
 export function RollenProvider({ children }: { children: React.ReactNode }) {
-  const [rolle, setRolle] = useState<Rolle>('mechaniker')
+  const [role, setRolle] = useState<Rolle>('mechaniker')
   const [berechtigungen, setBerechtigungen] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const supabase = createClient()
@@ -49,16 +49,16 @@ export function RollenProvider({ children }: { children: React.ReactNode }) {
           return
         }
 
-        // Get user's primary betrieb and rolle
+        // Get user's primary betrieb and role
         const { data: betriebUser } = await supabase
           .from('betrieb_users')
-          .select('rolle')
+          .select('role')
           .eq('profile_id', user.id)
           .order('is_primary', { ascending: false })
           .limit(1)
           .single()
 
-        const userRolle: Rolle = (betriebUser?.rolle as Rolle) ?? 'mechaniker'
+        const userRolle: Rolle = (betriebUser?.role as Rolle) ?? 'mechaniker'
         setRolle(userRolle)
         setBerechtigungen(DEFAULT_BERECHTIGUNGEN[userRolle] ?? DEFAULT_BERECHTIGUNGEN.mechaniker)
       } catch (error) {
@@ -75,7 +75,7 @@ export function RollenProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <RollenContext.Provider value={{
-      rolle,
+      role,
       berechtigungen,
       kannZugreifen: (key) => berechtigungen.includes(key),
       loading,
