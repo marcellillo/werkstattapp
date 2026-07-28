@@ -76,8 +76,8 @@ export function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
-  const { kannZugreifen, loading, isSuperAdmin, betriebe, currentBetrieb, wechselBetrieb } = useRollen()
-  const { isFeatureEnabled, currentBetrieb: betriebFromContext } = useBetrieb()
+  const { kannZugreifen, loading, isSuperAdmin } = useRollen()
+  const { isFeatureEnabled, currentBetrieb, availableBetriebe, switchBetrieb } = useBetrieb()
   const benAnzahl = useBenachrichtigungenAnzahl()
   const [dropdownOpen, setDropdownOpen] = useState(false)
 
@@ -130,7 +130,7 @@ export function Sidebar() {
         )}
 
         {/* Super-Admin Betrieb Dropdown */}
-        {isSuperAdmin && betriebe.length > 1 && (
+        {isSuperAdmin && availableBetriebe.length > 1 && (
           <div className="mt-3 relative">
             <button
               onClick={() => setDropdownOpen(!dropdownOpen)}
@@ -142,11 +142,11 @@ export function Sidebar() {
 
             {dropdownOpen && (
               <div className="absolute top-full left-0 right-0 mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-lg z-50 max-h-48 overflow-y-auto">
-                {betriebe.map(betrieb => (
+                {availableBetriebe.map(betrieb => (
                   <button
                     key={betrieb.id}
                     onClick={() => {
-                      wechselBetrieb(betrieb.id)
+                      switchBetrieb(betrieb.id)
                       setDropdownOpen(false)
                     }}
                     className={cn(
