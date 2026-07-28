@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
       .eq('profile_id', user.id)
       .single()
 
-    if (userRole?.role !== 'admin') {
+    if (userRole?.role !== 'admin' && userRole?.role !== 'superadmin') {
       return NextResponse.json({ error: 'Only admins can update settings' }, { status: 403 })
     }
 

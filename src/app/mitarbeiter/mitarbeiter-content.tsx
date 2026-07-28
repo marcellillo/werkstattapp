@@ -36,12 +36,13 @@ const ROLLEN = {
   admin: 'Admin',
   mechaniker: 'Mechaniker',
   buchhalter: 'Buchhalter',
+  verkaeufer: 'Verkäufer',
 }
 
 export function MitarbeiterContent({ betriebId, users, invitations }: Props) {
   const supabase = createClient()
   const [email, setEmail] = useState('')
-  const [rolle, setRolle] = useState<'mechaniker' | 'buchhalter' | 'admin'>('mechaniker')
+  const [rolle, setRolle] = useState<'mechaniker' | 'buchhalter' | 'admin' | 'verkaeufer'>('mechaniker')
   const [loading, setLoading] = useState(false)
   const [copied, setCopied] = useState<string | null>(null)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
@@ -133,9 +134,9 @@ export function MitarbeiterContent({ betriebId, users, invitations }: Props) {
                 className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 disabled={loading}
               >
-                <option value="mechaniker">Mechaniker</option>
-                <option value="buchhalter">Buchhalter</option>
-                <option value="admin">Admin</option>
+                {Object.entries(ROLLEN).map(([key, label]) => (
+                  <option key={key} value={key}>{label}</option>
+                ))}
               </select>
             </div>
 

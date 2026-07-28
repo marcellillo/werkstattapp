@@ -64,7 +64,7 @@ export function EinstellungenContent({ initialConfig, betriebName, betriebId }: 
   const { rolle: userRolle } = useRollen()
 
   const isKonfiguriert = !!(config.imap_email && config.imap_password)
-  const isAdmin = userRolle === 'admin'
+  const isAdmin = userRolle === 'admin' || userRolle === 'superadmin'
 
   useEffect(() => {
     console.log('DEBUG Einstellungen:', { userRolle, isAdmin })

@@ -6,6 +6,7 @@ import { MitarbeiterContent } from './mitarbeiter-content'
 export default async function MitarbeiterPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
+  console.log('[Mitarbeiter] User:', user?.id)
   if (!user) redirect('/login')
 
   // Get user's betrieb
@@ -16,18 +17,20 @@ export default async function MitarbeiterPage() {
     .order('is_primary', { ascending: false })
     .limit(1)
 
+  console.log('[Mitarbeiter] UserBetriebe:', userBetriebe)
   if (!userBetriebe?.[0]?.betrieb_id) redirect('/login')
   const betriebId = userBetriebe[0].betrieb_id
 
-  // Check if admin or superadmin
-  const { data: userRole } = await supabase
+  // Check if admin or superadmin in ANY betrieb
+  const { data: allUserRoles } = await supabase
     .from('betrieb_users')
     .select('role')
-    .eq('betrieb_id', betriebId)
     .eq('profile_id', user.id)
-    .single()
 
-  if (userRole?.role !== 'admin' && userRole?.role !== 'superadmin') {
+  console.log('[Mitarbeiter] AllUserRoles:', allUserRoles)
+  const isAuthorized = allUserRoles?.some(r => r.role === 'admin' || r.role === 'superadmin')
+  if (!isAuthorized) {
+    console.log('[Mitarbeiter] NOT AUTHORIZED - Redirecting to dashboard')
     redirect('/dashboard')
   }
 
