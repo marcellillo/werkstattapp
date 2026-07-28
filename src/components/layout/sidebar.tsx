@@ -1,11 +1,12 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useState } from 'react'
 import {
   LayoutDashboard, Car, Users, Package, Calendar,
   Bell, Settings, LogOut, BarChart2,
   Mail, CalendarClock, Layers, Receipt, History, BookOpen,
-  ShieldAlert, Wrench, ClipboardCheck, Lock
+  ShieldAlert, Wrench, ClipboardCheck, Lock, ChevronDown
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
@@ -75,9 +76,10 @@ export function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
-  const { kannZugreifen, loading } = useRollen()
-  const { isFeatureEnabled, currentBetrieb } = useBetrieb()
+  const { kannZugreifen, loading, isSuperAdmin, betriebe, currentBetrieb, wechselBetrieb } = useRollen()
+  const { isFeatureEnabled, currentBetrieb: betriebFromContext } = useBetrieb()
   const benAnzahl = useBenachrichtigungenAnzahl()
+  const [dropdownOpen, setDropdownOpen] = useState(false)
 
   // Filter navGroups basierend auf enabled Features
   // Note: Einstellungen & Admin sind immer sichtbar (werden nicht gefiltert)
@@ -117,13 +119,46 @@ export function Sidebar() {
 
   return (
     <aside className="flex flex-col h-full w-64 bg-slate-950 text-white">
-      {/* Logo */}
-      <div className="flex items-center px-5 py-5 border-b border-slate-800">
+      {/* Logo & Betrieb Selector */}
+      <div className="px-5 py-5 border-b border-slate-800">
         {currentBetrieb?.logo_url ? (
           <img src={currentBetrieb.logo_url} alt={currentBetrieb.name} width={140} height={48} className="object-contain" />
         ) : (
           <div className="flex items-center justify-center w-full h-12 bg-slate-800 rounded-lg text-xs text-slate-400 font-medium">
             {currentBetrieb?.name || 'Betrieb'}
+          </div>
+        )}
+
+        {/* Super-Admin Betrieb Dropdown */}
+        {isSuperAdmin && betriebe.length > 1 && (
+          <div className="mt-3 relative">
+            <button
+              onClick={() => setDropdownOpen(!dropdownOpen)}
+              className="w-full flex items-center justify-between px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm text-slate-200 transition-colors"
+            >
+              <span className="truncate">{currentBetrieb?.name || 'Betrieb wählen'}</span>
+              <ChevronDown className={cn('w-4 h-4 flex-shrink-0 ml-2 transition-transform', dropdownOpen && 'rotate-180')} />
+            </button>
+
+            {dropdownOpen && (
+              <div className="absolute top-full left-0 right-0 mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-lg z-50 max-h-48 overflow-y-auto">
+                {betriebe.map(betrieb => (
+                  <button
+                    key={betrieb.id}
+                    onClick={() => {
+                      wechselBetrieb(betrieb.id)
+                      setDropdownOpen(false)
+                    }}
+                    className={cn(
+                      'w-full text-left px-3 py-2.5 text-sm transition-colors border-b border-slate-700 last:border-b-0 hover:bg-slate-700',
+                      currentBetrieb?.id === betrieb.id ? 'bg-orange-500 text-white font-medium' : 'text-slate-300'
+                    )}
+                  >
+                    {betrieb.name}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>
