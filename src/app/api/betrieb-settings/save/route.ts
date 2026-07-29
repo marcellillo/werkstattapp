@@ -31,7 +31,6 @@ export async function POST(req: NextRequest) {
       .upsert({
         betrieb_id: betriebId,
         ...config,
-        aktualisiert_am: new Date().toISOString(),
       }, {
         onConflict: 'betrieb_id'
       })
