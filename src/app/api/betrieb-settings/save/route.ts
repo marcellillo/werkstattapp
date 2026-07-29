@@ -21,20 +21,21 @@ export async function POST(req: NextRequest) {
       .eq('profile_id', user.id)
       .single()
 
-    console.log('[Settings Save] DEBUG:', { userId: user.id, betriebId, userRole })
     if (userRole?.role !== 'admin' && userRole?.role !== 'superadmin') {
-      console.log('[Settings Save] DENIED - Role:', userRole?.role)
       return NextResponse.json({ error: 'Only admins can update settings' }, { status: 403 })
     }
 
-    // Upsert settings
+    // Upsert settings as key-value pairs
+    const updates = Object.entries(config).map(([schluessel, wert]) => ({
+      betrieb_id: betriebId,
+      schluessel,
+      wert: String(wert),
+    }))
+
     const { error } = await supabase
       .from('betrieb_einstellungen')
-      .upsert({
-        betrieb_id: betriebId,
-        ...config,
-      }, {
-        onConflict: 'betrieb_id'
+      .upsert(updates, {
+        onConflict: 'betrieb_id,schluessel'
       })
 
     if (error) throw error
