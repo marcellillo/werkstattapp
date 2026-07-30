@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { generateKostenvoranschlagNummer } from '@/lib/nummernvergabe'
 
 export async function POST(req: NextRequest) {
   try {
@@ -7,13 +8,17 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { auftragId, betriebId, typ } = await req.json()
+    const { auftragId, betriebId, fahrzeugId, typ } = await req.json()
+
+    // Generiere Nummer basierend auf FIN
+    const nummer = await generateKostenvoranschlagNummer(supabase, fahrzeugId, betriebId)
 
     const { data: kostenvoranschlag, error } = await supabase
       .from('kostenvoranschlaege')
       .insert({
         betrieb_id: betriebId,
         typ,
+        nummer,
         status: 'entwurf',
       })
       .select()

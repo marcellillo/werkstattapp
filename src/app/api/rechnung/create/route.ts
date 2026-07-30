@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { generateRechnungsNummer } from '@/lib/nummernvergabe'
 
 export async function POST(req: NextRequest) {
   try {
@@ -9,6 +10,9 @@ export async function POST(req: NextRequest) {
 
     const { auftragId, betriebId, fahrzeugId, typ } = await req.json()
 
+    // Generiere Nummer
+    const nummer = await generateRechnungsNummer(supabase, typ, betriebId)
+
     const { data: rechnung, error } = await supabase
       .from('rechnungen')
       .insert({
@@ -16,6 +20,7 @@ export async function POST(req: NextRequest) {
         werkstattauftrag_id: typ === 'werkstatt' ? auftragId : null,
         fahrzeug_id: typ === 'verkauf' ? fahrzeugId : null,
         typ,
+        nummer,
         status: 'entwurf',
       })
       .select()

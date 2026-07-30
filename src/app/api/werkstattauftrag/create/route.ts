@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { generateWerkstattauftragNummer } from '@/lib/nummernvergabe'
 
 export async function POST(req: NextRequest) {
   try {
@@ -7,7 +8,10 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { auftragId, betriebId } = await req.json()
+    const { auftragId, betriebId, fahrzeugId } = await req.json()
+
+    // Generiere Nummer basierend auf FIN
+    const nummer = await generateWerkstattauftragNummer(supabase, fahrzeugId, betriebId)
 
     const { data: werkstattauftrag, error } = await supabase
       .from('werkstattauftraege')
@@ -18,9 +22,17 @@ export async function POST(req: NextRequest) {
       .select()
       .single()
 
+    // Update mit Nummer
+    if (werkstattauftrag) {
+      await supabase
+        .from('werkstattauftraege')
+        .update({ id: werkstattauftrag.id })
+        .eq('id', werkstattauftrag.id)
+    }
+
     if (error) throw error
 
-    return NextResponse.json({ werkstattauftrag })
+    return NextResponse.json({ werkstattauftrag: { ...werkstattauftrag, nummer } })
   } catch (error: any) {
     console.error('[Werkstattauftrag Create] Error:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })
