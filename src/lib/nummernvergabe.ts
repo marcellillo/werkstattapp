@@ -112,3 +112,40 @@ export async function generateRechnungsNummer(
 
   return `${prefix}-${year}${String(nextNum).padStart(4, '0')}`
 }
+
+/**
+ * Generiert Vorvertrag-Nummer (Verkauf)
+ */
+export async function generateVorvertragNummer(
+  supabase: SupabaseClient,
+  fahrzeugId: string,
+  betriebId: string
+): Promise<string> {
+  const { data: fahrzeug } = await supabase
+    .from('fahrzeuge')
+    .select('fin')
+    .eq('id', fahrzeugId)
+    .single()
+
+  if (!fahrzeug?.fin) throw new Error('Fahrzeug-FIN nicht gefunden')
+
+  const finTail = fahrzeug.fin.slice(-6).toUpperCase()
+  const year = new Date().getFullYear().toString().slice(-2)
+
+  const { data: lastVv } = await supabase
+    .from('vorvertraege')
+    .select('nummer')
+    .eq('betrieb_id', betriebId)
+    .ilike('nummer', `VV-${finTail}-${year}%`)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single()
+
+  let nextNum = 1
+  if (lastVv?.nummer) {
+    const match = lastVv.nummer.match(/(\d{4})$/)
+    if (match) nextNum = parseInt(match[1]) + 1
+  }
+
+  return `VV-${finTail}-${year}${String(nextNum).padStart(4, '0')}`
+}
