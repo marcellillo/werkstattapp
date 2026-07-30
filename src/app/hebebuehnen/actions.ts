@@ -3,30 +3,23 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
 
 export async function addBuehne(betriebId: string, bezeichnung: string, beschreibung: string) {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY!
-  const headers = {
-    'Content-Type': 'application/json',
-    'apikey': key,
-    'Authorization': `Bearer ${key}`,
-  }
+  const supabase = createAdminClient()
 
   // Get max nummer
-  const listRes = await fetch(`${url}/rest/v1/hebebuehnen?select=nummer&order=nummer.desc&limit=1`, { headers })
-  const rows = await listRes.json()
-  const maxNummer = Array.isArray(rows) && rows.length > 0 ? rows[0].nummer + 1 : 1
+  const { data: rows } = await supabase
+    .from('hebebuehnen')
+    .select('nummer')
+    .order('nummer', { ascending: false })
+    .limit(1)
+
+  const maxNummer = (rows && rows.length > 0) ? (rows[0] as any).nummer + 1 : 1
 
   // Insert
-  const insertRes = await fetch(`${url}/rest/v1/hebebuehnen`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({ betrieb_id: betriebId, nummer: maxNummer, bezeichnung, beschreibung: beschreibung || null }),
-  })
+  const { error } = await supabase
+    .from('hebebuehnen')
+    .insert({ nummer: maxNummer, bezeichnung, beschreibung: beschreibung || null })
 
-  if (!insertRes.ok) {
-    const body = await insertRes.text()
-    return { error: body }
-  }
+  if (error) return { error: error.message }
 
   revalidatePath('/hebebuehnen')
   revalidatePath('/dashboard')
