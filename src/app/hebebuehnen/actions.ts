@@ -2,7 +2,7 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
 
-export async function addBuehne(bezeichnung: string, beschreibung: string) {
+export async function addBuehne(betriebId: string, bezeichnung: string, beschreibung: string) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY!
   const headers = {
@@ -20,7 +20,7 @@ export async function addBuehne(bezeichnung: string, beschreibung: string) {
   const insertRes = await fetch(`${url}/rest/v1/hebebuehnen`, {
     method: 'POST',
     headers,
-    body: JSON.stringify({ nummer: maxNummer, bezeichnung, beschreibung: beschreibung || null }),
+    body: JSON.stringify({ betrieb_id: betriebId, nummer: maxNummer, bezeichnung, beschreibung: beschreibung || null }),
   })
 
   if (!insertRes.ok) {

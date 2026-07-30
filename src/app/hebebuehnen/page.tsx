@@ -36,6 +36,7 @@ export default async function HebebuehnenPage() {
   return (
     <AppLayout title="Hebebühnen verwalten">
       <HebebuehnenContent
+        betriebId={betriebId}
         hebebuehnen={(hebebuehnen ?? []) as any[]}
         termine={(termine ?? []) as any[]}
         auftraege={(auftraege ?? []) as any[]}

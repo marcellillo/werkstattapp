@@ -211,10 +211,12 @@ function FahrzeugModal({ auftrag, onClose }: { auftrag: any; onClose: () => void
 
 // ─── Hauptkomponente ──────────────────────────────────────────────────────────
 export function HebebuehnenContent({
+  betriebId,
   hebebuehnen: init,
   termine = [],
   auftraege = [],
 }: {
+  betriebId: string
   hebebuehnen: Buehne[]
   termine?: any[]
   auftraege?: any[]
@@ -247,7 +249,7 @@ export function HebebuehnenContent({
     if (!newName.trim()) { setError('Bitte einen Namen eingeben.'); return }
     setError('')
     startTransition(async () => {
-      const res = await addBuehne(newName, newBeschreibung)
+      const res = await addBuehne(betriebId, newName, newBeschreibung)
       if (res?.error) { setError(res.error); return }
       setNewName(''); setNewBeschreibung(''); setShowAdd(false)
     })
