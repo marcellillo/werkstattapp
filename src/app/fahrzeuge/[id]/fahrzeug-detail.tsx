@@ -17,6 +17,9 @@ import { createRechnungOnAusgeliefert } from '@/lib/auto-rechnung-ersteller'
 import { VerkaufenModal } from './verkaufen-modal'
 import { generatePvKompassLink } from '@/lib/pv-kompass-link'
 import { SupplierInvoices } from './supplier-invoices'
+import { KostenvoranschlagSection } from './kostenvoranschlag-section'
+import { WerkstattauftragSection } from './werkstattauftrag-section'
+import { RechnungSection } from './rechnung-section'
 
 interface Props {
   auftrag: Auftrag
@@ -24,6 +27,7 @@ interface Props {
   historie: any[]
   googleBewertungUrl?: string
   standardSteuerart?: 'differenz' | 'regel' | 'ausfuhr'
+  betriebId?: string
 }
 
 const STATUS_ORDER_FREMD: FahrzeugStatus[] = [
@@ -1933,6 +1937,17 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
           />
         </CardContent>
       </Card>
+
+      {/* Kostenvoranschlag, Werkstattauftrag, Rechnungen */}
+      <div className="space-y-6 mt-6">
+        {betriebId && (
+          <>
+            <KostenvoranschlagSection auftragId={auftrag.id} betriebId={betriebId} />
+            <WerkstattauftragSection auftragId={auftrag.id} betriebId={betriebId} />
+            <RechnungSection auftragId={auftrag.id} betriebId={betriebId} fahrzeugId={(auftrag.fahrzeug as any)?.id} />
+          </>
+        )}
+      </div>
 
       {/* Verkaufen Modal */}
       {showVerkaufenModal && (

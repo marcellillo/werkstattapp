@@ -60,6 +60,7 @@ export default async function FahrzeugDetailPage({ params }: { params: Promise<{
         historie={(historie ?? []) as any[]}
         googleBewertungUrl={(cfgRow as any)?.wert ?? ''}
         standardSteuerart={standardSteuerart}
+        betriebId={betriebId}
       />
     </AppLayout>
   )
