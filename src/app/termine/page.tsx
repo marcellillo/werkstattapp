@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { AppLayout } from '@/components/layout/app-layout'
@@ -20,12 +21,14 @@ export default async function TerminePage() {
 
   return (
     <AppLayout title="Termine">
-      <TermineContent
-        termine={(termine ?? []) as any[]}
-        kunden={(kunden ?? []) as any[]}
-        fahrzeuge={(fahrzeuge ?? []) as any[]}
-        hebebuehnen={(hebebuehnen ?? []) as any[]}
-      />
+      <Suspense fallback={<div>Loading...</div>}>
+        <TermineContent
+          termine={(termine ?? []) as any[]}
+          kunden={(kunden ?? []) as any[]}
+          fahrzeuge={(fahrzeuge ?? []) as any[]}
+          hebebuehnen={(hebebuehnen ?? []) as any[]}
+        />
+      </Suspense>
     </AppLayout>
   )
 }
