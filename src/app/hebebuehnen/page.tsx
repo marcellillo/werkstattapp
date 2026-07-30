@@ -15,7 +15,7 @@ export default async function HebebuehnenPage() {
   const today = new Date().toISOString().split('T')[0]
 
   const [{ data: hebebuehnen }, { data: termine }, { data: auftraege }] = await Promise.all([
-    supabase.from('hebebuehnen').select('*').eq('betrieb_id', betriebId).order('position'),
+    supabase.from('hebebuehnen').select('*').order('position'),
     supabase
       .from('termine')
       .select('id, titel, datum, uhrzeit, dauer_minuten, typ, status, hebebuehne_id, fahrzeug:fahrzeuge(kennzeichen, marke, modell), kunde:kunden(vorname, nachname)')
