@@ -3,26 +3,38 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
 
 export async function addBuehne(betriebId: string, bezeichnung: string, beschreibung: string) {
+  console.log('addBuehne SERVER ACTION called:', { betriebId, bezeichnung, beschreibung })
   const supabase = createAdminClient()
 
   // Get max nummer
-  const { data: rows } = await supabase
+  const { data: rows, error: selectError } = await supabase
     .from('hebebuehnen')
     .select('nummer')
+    .eq('betrieb_id', betriebId)
     .order('nummer', { ascending: false })
     .limit(1)
 
+  console.log('SELECT nummer result:', { rows, selectError })
+
   const maxNummer = (rows && rows.length > 0) ? (rows[0] as any).nummer + 1 : 1
+  console.log('maxNummer:', maxNummer)
 
   // Insert
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('hebebuehnen')
-    .insert({ nummer: maxNummer, bezeichnung, beschreibung: beschreibung || null })
+    .insert({ betrieb_id: betriebId, nummer: maxNummer, bezeichnung, beschreibung: beschreibung || null })
 
-  if (error) return { error: error.message }
+  console.log('INSERT result:', { data, error })
 
+  if (error) {
+    console.error('INSERT error:', error)
+    return { error: error.message }
+  }
+
+  console.log('Revalidating paths...')
   revalidatePath('/hebebuehnen')
   revalidatePath('/dashboard')
+  console.log('Done!')
   return { success: true }
 }
 

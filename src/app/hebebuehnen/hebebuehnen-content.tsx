@@ -248,8 +248,11 @@ export function HebebuehnenContent({
   async function handleAdd() {
     if (!newName.trim()) { setError('Bitte einen Namen eingeben.'); return }
     setError('')
+    console.log('handleAdd called with:', { betriebId, newName, newBeschreibung })
     startTransition(async () => {
+      console.log('startTransition: calling addBuehne...')
       const res = await addBuehne(betriebId, newName, newBeschreibung)
+      console.log('addBuehne response:', res)
       if (res?.error) { setError(res.error); return }
       setNewName(''); setNewBeschreibung(''); setShowAdd(false)
     })
