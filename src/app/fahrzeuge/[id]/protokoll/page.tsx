@@ -22,7 +22,7 @@ export default async function ProtokolPage({ params }: { params: Promise<{ id: s
       .eq('betrieb_id', betriebId)
       .eq('id', id)
       .single(),
-    supabase.from('hebebuehnen').select('*').eq('betrieb_id', betriebId),
+    supabase.from('hebebuehnen').select('*'),
     supabase.from('rechnungen').select('*').eq('betrieb_id', betriebId).eq('auftrag_id', id).order('datum'),
   ])
 

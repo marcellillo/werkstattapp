@@ -16,7 +16,7 @@ export default async function TerminePage() {
     supabase.from('termine').select('*, kunde:kunden(*), fahrzeug:fahrzeuge(*), hebebuehne:hebebuehnen(id,bezeichnung,nummer)').eq('betrieb_id', betriebId).order('datum').order('uhrzeit'),
     supabase.from('kunden').select('id, vorname, nachname, firma').eq('betrieb_id', betriebId).order('nachname'),
     supabase.from('fahrzeuge').select('id, marke, modell, kennzeichen').eq('betrieb_id', betriebId).order('kennzeichen'),
-    supabase.from('hebebuehnen').select('id, bezeichnung, nummer').eq('betrieb_id', betriebId).order('nummer'),
+    supabase.from('hebebuehnen').select('id, bezeichnung, nummer').order('nummer'),
   ])
 
   return (

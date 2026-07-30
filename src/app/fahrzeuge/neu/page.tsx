@@ -21,7 +21,7 @@ export default async function NeuFahrzeugPage() {
 
   const [{ data: kunden }, { data: hebebuehnen }] = await Promise.all([
     supabase.from('kunden').select('*').eq('betrieb_id', betriebId).order('nachname'),
-    supabase.from('hebebuehnen').select('*').eq('betrieb_id', betriebId).order('nummer'),
+    supabase.from('hebebuehnen').select('*').order('nummer'),
   ])
 
   return (

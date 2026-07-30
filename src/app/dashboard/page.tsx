@@ -27,7 +27,7 @@ export default async function DashboardPage() {
     { data: offeneRechnungenRaw },
     { data: bewertungenRaw },
   ] = await Promise.all([
-    supabase.from('hebebuehnen').select('*').eq('betrieb_id', betriebId).order('position').order('nummer'),
+    supabase.from('hebebuehnen').select('*').order('position').order('nummer'),
     supabase
       .from('auftraege')
       .select(`*, fahrzeug:fahrzeuge(*), kunde:kunden(*), ersatzteile(*)`)

@@ -29,7 +29,7 @@ export default async function FahrzeugDetailPage({ params }: { params: Promise<{
       .eq('betrieb_id', betriebId)
       .eq('id', id)
       .single(),
-    supabase.from('hebebuehnen').select('*').eq('betrieb_id', betriebId).order('nummer'),
+    supabase.from('hebebuehnen').select('*').order('nummer'),
     supabase
       .from('status_historie')
       .select('*')
