@@ -58,7 +58,7 @@ interface KiTeilVorschlag {
   optional: boolean
 }
 
-export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie, googleBewertungUrl = '', standardSteuerart = 'differenz' }: Props) {
+export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie, googleBewertungUrl = '', standardSteuerart = 'differenz', betriebId }: Props) {
   const [auftrag, setAuftrag] = useState(initialAuftrag)
   const [teile, setTeile] = useState<Ersatzteil[]>((initialAuftrag.ersatzteile as Ersatzteil[]) ?? [])
   const [saving, setSaving] = useState(false)
