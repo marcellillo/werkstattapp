@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Plus, Clock, CheckCircle } from 'lucide-react'
+import { Plus, Clock, CheckCircle, Printer } from 'lucide-react'
 
 interface Props {
   auftragId: string
@@ -42,6 +42,28 @@ export function WerkstattauftragSection({ auftragId, betriebId }: Props) {
     }
   }
 
+  const handleExportPDF = async (auftragId: string) => {
+    try {
+      const response = await fetch('/api/werkstattauftrag/pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ auftragId, betriebId }),
+      })
+      if (!response.ok) throw new Error('PDF-Export fehlgeschlagen')
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `Werkstattauftrag_${auftragId}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+    } catch (error) {
+      console.error('PDF-Export Fehler:', error)
+    }
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -65,6 +87,9 @@ export function WerkstattauftragSection({ auftragId, betriebId }: Props) {
                   <p className="text-sm text-slate-600">Status: {auftrag.status}</p>
                 </div>
                 <div className="flex gap-2">
+                  <Button size="sm" variant="ghost" onClick={() => handleExportPDF(auftrag.id)} title="PDF drucken">
+                    <Printer className="w-4 h-4" />
+                  </Button>
                   <Button size="sm" variant="ghost" onClick={() => handleStatusChange(auftrag.id, 'in_bearbeitung')}>
                     <Clock className="w-4 h-4" />
                   </Button>
