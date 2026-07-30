@@ -1,9 +1,10 @@
 import { redirect } from 'next/navigation'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { AppLayout } from '@/components/layout/app-layout'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Plus } from 'lucide-react'
+import { Plus, ChevronRight } from 'lucide-react'
 
 export default async function WerkstattaufraetagePage() {
   const supabase = await createClient()
@@ -21,10 +22,11 @@ export default async function WerkstattaufraetagePage() {
   const betriebId = userBetriebe[0].betrieb_id
 
   const { data: auftraege } = await supabase
-    .from('werkstattauftraege')
-    .select('*')
+    .from('auftraege')
+    .select('*, fahrzeug:fahrzeuge(marke, modell, kennzeichen), kunde:kunden(vorname, nachname)')
     .eq('betrieb_id', betriebId)
-    .order('created_at', { ascending: false })
+    .not('status', 'in', '("ausgeliefert","storniert")')
+    .order('erstellt_am', { ascending: false })
 
   return (
     <AppLayout title="Werkstattaufträge">
@@ -50,12 +52,19 @@ export default async function WerkstattaufraetagePage() {
             ) : (
               <div className="space-y-3">
                 {auftraege.map(auftrag => (
-                  <div key={auftrag.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                    <div>
-                      <p className="font-medium">{auftrag.beschreibung || 'Auftrag'}</p>
-                      <p className="text-sm text-slate-600">Status: {auftrag.status}</p>
+                  <Link key={auftrag.id} href={`/fahrzeuge/${auftrag.id}`}>
+                    <div className="flex items-center justify-between p-3 bg-slate-50 hover:bg-blue-50 rounded-lg cursor-pointer transition border border-slate-200 hover:border-blue-300">
+                      <div>
+                        <p className="font-medium">
+                          {(auftrag.fahrzeug as any)?.marke} {(auftrag.fahrzeug as any)?.modell}
+                        </p>
+                        <p className="text-sm text-slate-600">
+                          {(auftrag.kunde as any)?.vorname} {(auftrag.kunde as any)?.nachname} • Status: {auftrag.status}
+                        </p>
+                      </div>
+                      <ChevronRight className="w-5 h-5 text-slate-400" />
                     </div>
-                  </div>
+                  </Link>
                 ))}
               </div>
             )}
