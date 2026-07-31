@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
     const { kostenvoranschlagId, betriebId } = await req.json()
 
     // Hole Kostenvoranschlag mit Details
-    const { data: kv } = await supabase
+    const { data: kv, error: kvError } = await supabase
       .from('kostenvoranschlaege')
       .select(`
         *,
@@ -19,31 +19,33 @@ export async function POST(req: NextRequest) {
       `)
       .eq('id', kostenvoranschlagId)
       .eq('betrieb_id', betriebId)
-      .single()
+      .maybeSingle()
 
+    if (kvError) throw kvError
     if (!kv) return NextResponse.json({ error: 'Kostenvoranschlag nicht gefunden' }, { status: 404 })
 
     // Hole Betrieb-Daten
-    const { data: betrieb } = await supabase
+    const { data: betrieb, error: betriebError } = await supabase
       .from('betriebe')
       .select('*')
       .eq('id', betriebId)
-      .single()
+      .maybeSingle()
 
-    // Hole Kunde-Daten
-    const { data: kunde } = await supabase
+    // Hole Kunde-Daten (optional)
+    const { data: kunde } = kv.kunde_id ? await supabase
       .from('kunden')
       .select('*')
       .eq('id', kv.kunde_id)
-      .single()
+      .maybeSingle() : { data: null }
 
-    // Hole Fahrzeug-Daten
-    const { data: fahrzeug } = await supabase
+    // Hole Fahrzeug-Daten (optional)
+    const { data: fahrzeug } = kv.fahrzeug_id ? await supabase
       .from('fahrzeuge')
       .select('*')
       .eq('id', kv.fahrzeug_id)
-      .single()
+      .maybeSingle() : { data: null }
 
+    if (betriebError) throw betriebError
     if (!betrieb) throw new Error('Betrieb nicht gefunden')
 
     // Berechne Summen

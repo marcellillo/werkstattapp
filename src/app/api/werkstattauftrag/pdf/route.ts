@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
     const { werkstattauftragId, betriebId } = await req.json()
 
     // Hole Werkstattauftrag mit Details
-    const { data: wa } = await supabase
+    const { data: wa, error: waError } = await supabase
       .from('werkstattauftraege')
       .select(`
         *,
@@ -20,17 +20,19 @@ export async function POST(req: NextRequest) {
       `)
       .eq('id', werkstattauftragId)
       .eq('betrieb_id', betriebId)
-      .single()
+      .maybeSingle()
 
+    if (waError) throw waError
     if (!wa) return NextResponse.json({ error: 'Werkstattauftrag nicht gefunden' }, { status: 404 })
 
     // Hole Betrieb-Daten
-    const { data: betrieb } = await supabase
+    const { data: betrieb, error: betriebError } = await supabase
       .from('betriebe')
       .select('*')
       .eq('id', betriebId)
-      .single()
+      .maybeSingle()
 
+    if (betriebError) throw betriebError
     if (!betrieb) throw new Error('Betrieb nicht gefunden')
 
     // Generiere PDF
