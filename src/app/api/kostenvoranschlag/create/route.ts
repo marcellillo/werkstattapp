@@ -10,8 +10,14 @@ export async function POST(req: NextRequest) {
 
     const { auftragId, betriebId, fahrzeugId, typ } = await req.json()
 
+    console.log('[KV Create] Input:', { auftragId, betriebId, fahrzeugId, typ })
+
+    if (!fahrzeugId) return NextResponse.json({ error: 'fahrzeugId erforderlich' }, { status: 400 })
+    if (!betriebId) return NextResponse.json({ error: 'betriebId erforderlich' }, { status: 400 })
+
     // Generiere Nummer basierend auf FIN
     const nummer = await generateKostenvoranschlagNummer(supabase, fahrzeugId, betriebId)
+    console.log('[KV Create] Generated nummer:', nummer)
 
     const { data: kostenvoranschlag, error } = await supabase
       .from('kostenvoranschlaege')

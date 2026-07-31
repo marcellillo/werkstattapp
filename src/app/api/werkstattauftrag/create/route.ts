@@ -10,8 +10,14 @@ export async function POST(req: NextRequest) {
 
     const { auftragId, betriebId, fahrzeugId } = await req.json()
 
+    console.log('[WA Create] Input:', { auftragId, betriebId, fahrzeugId })
+
+    if (!fahrzeugId) return NextResponse.json({ error: 'fahrzeugId erforderlich' }, { status: 400 })
+    if (!betriebId) return NextResponse.json({ error: 'betriebId erforderlich' }, { status: 400 })
+
     // Generiere Nummer basierend auf FIN
     const nummer = await generateWerkstattauftragNummer(supabase, fahrzeugId, betriebId)
+    console.log('[WA Create] Generated nummer:', nummer)
 
     const { data: werkstattauftrag, error } = await supabase
       .from('werkstattauftraege')
