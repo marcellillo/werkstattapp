@@ -27,6 +27,7 @@ export function KostenvoranschlagSection({ auftragId, betriebId, fahrzeugId }: P
         .from('kostenvoranschlaege')
         .select('*')
         .eq('betrieb_id', betriebId)
+        .eq('fahrzeug_id', fahrzeugId)
         .order('created_at', { ascending: false })
 
       if (error) throw error

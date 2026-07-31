@@ -27,6 +27,7 @@ export function WerkstattauftragSection({ auftragId, betriebId, fahrzeugId }: Pr
         .from('werkstattauftraege')
         .select('*')
         .eq('betrieb_id', betriebId)
+        .eq('fahrzeug_id', fahrzeugId)
         .order('created_at', { ascending: false })
 
       if (error) throw error
