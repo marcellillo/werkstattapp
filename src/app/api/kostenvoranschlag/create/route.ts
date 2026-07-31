@@ -46,7 +46,6 @@ export async function POST(req: NextRequest) {
         typ,
         nummer,
         fahrzeug_id: fahrzeugId || null,
-        auftrag_id: auftragId || null,
       })
       .select()
       .maybeSingle()
