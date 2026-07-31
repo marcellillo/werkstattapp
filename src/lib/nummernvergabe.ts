@@ -31,7 +31,7 @@ export async function generateKostenvoranschlagNummer(
     .ilike('nummer', `KV-${year}%`)
     .order('created_at', { ascending: false })
     .limit(1)
-    .single()
+    .maybeSingle()
 
   let nextNum = 1
   if (lastKv?.nummer) {
@@ -67,7 +67,7 @@ export async function generateWerkstattauftragNummer(
     .eq('betrieb_id', betriebId)
     .order('created_at', { ascending: false })
     .limit(1)
-    .single()
+    .maybeSingle()
 
   let nextNum = 1
   if (lastWa?.id) {
@@ -102,7 +102,7 @@ export async function generateRechnungsNummer(
     .ilike('nummer', `${prefix}-${year}%`)
     .order('created_at', { ascending: false })
     .limit(1)
-    .single()
+    .maybeSingle()
 
   let nextNum = 1
   if (lastRechnung?.nummer) {
@@ -139,7 +139,7 @@ export async function generateVorvertragNummer(
     .ilike('nummer', `VV-${finTail}-${year}%`)
     .order('created_at', { ascending: false })
     .limit(1)
-    .single()
+    .maybeSingle()
 
   let nextNum = 1
   if (lastVv?.nummer) {
