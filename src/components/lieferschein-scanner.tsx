@@ -27,10 +27,11 @@ interface ScanResult {
 
 interface LieferscheinScannerProps {
   betriebId: string
+  kostenvoranschlag_id?: string
   onSuccess?: (result: ScanResult) => void
 }
 
-export function LieferscheinScanner({ betriebId, onSuccess }: LieferscheinScannerProps) {
+export function LieferscheinScanner({ betriebId, kostenvoranschlag_id, onSuccess }: LieferscheinScannerProps) {
   const [isDragging, setIsDragging] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [preview, setPreview] = useState<string | null>(null)
@@ -93,6 +94,25 @@ export function LieferscheinScanner({ betriebId, onSuccess }: LieferscheinScanne
       setResult(scanResult)
 
       if (scanResult.erfolg) {
+        // Wenn kostenvoranschlag_id vorhanden, Teile automatisch hinzufügen
+        if (kostenvoranschlag_id && scanResult.unmatchedTeile.length > 0) {
+          try {
+            const addRes = await fetch('/api/kostenvoranschlag/add-teile', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                kostenvoranschlag_id,
+                betrieb_id: betriebId,
+                teile: scanResult.unmatchedTeile,
+              }),
+            })
+            if (!addRes.ok) {
+              console.warn('Teile konnten nicht zum Kostenvoranschlag hinzugefügt werden')
+            }
+          } catch (e) {
+            console.warn('Fehler beim Hinzufügen der Teile:', e)
+          }
+        }
         onSuccess?.(scanResult)
       } else {
         setError('Lieferschein konnte nicht erkannt werden')

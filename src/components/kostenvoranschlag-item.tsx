@@ -1,8 +1,9 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { ChevronDown, Plus, Trash2 } from 'lucide-react'
+import { ChevronDown, Plus, Trash2, Edit } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { createClient } from '@/lib/supabase/client'
+import { KostenvoranschlagDetailsModal } from './kostenvoranschlag-details-modal'
 
 interface Props {
   kostenvoranschlag: any
@@ -12,6 +13,7 @@ interface Props {
 
 export function KostenvoranschlagItem({ kostenvoranschlag, betriebId, onDelete }: Props) {
   const [expanded, setExpanded] = useState(false)
+  const [showModal, setShowModal] = useState(false)
   const [positionen, setPositionen] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [modus, setModus] = useState<'festpreis' | 'einzeln'>('festpreis')
@@ -31,7 +33,7 @@ export function KostenvoranschlagItem({ kostenvoranschlag, betriebId, onDelete }
 
       // Lade Positionen
       const { data: pos } = await supabase
-        .from('kostenvoranschlag_positionen')
+        .from('kostenvoranschlag_position')
         .select('*')
         .eq('kostenvoranschlag_id', kostenvoranschlag.id)
         .order('created_at')
@@ -75,7 +77,7 @@ export function KostenvoranschlagItem({ kostenvoranschlag, betriebId, onDelete }
     try {
       const supabase = await createClient()
       const { data, error } = await supabase
-        .from('kostenvoranschlag_positionen')
+        .from('kostenvoranschlag_position')
         .insert({
           kostenvoranschlag_id: kostenvoranschlag.id,
           beschreibung: newPos.beschreibung,
@@ -98,7 +100,7 @@ export function KostenvoranschlagItem({ kostenvoranschlag, betriebId, onDelete }
     try {
       const supabase = await createClient()
       await supabase
-        .from('kostenvoranschlag_positionen')
+        .from('kostenvoranschlag_position')
         .delete()
         .eq('id', posId)
 
@@ -140,6 +142,15 @@ export function KostenvoranschlagItem({ kostenvoranschlag, betriebId, onDelete }
           </div>
         </div>
         <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setShowModal(true)}
+            className="text-blue-600 hover:text-blue-800"
+            title="Details & Lieferschein"
+          >
+            <Edit className="w-4 h-4" />
+          </Button>
           <Button
             size="sm"
             variant="ghost"
@@ -358,6 +369,13 @@ export function KostenvoranschlagItem({ kostenvoranschlag, betriebId, onDelete }
           )}
         </div>
       )}
+
+      <KostenvoranschlagDetailsModal
+        kostenvoranschlagId={kostenvoranschlag.id}
+        betriebId={betriebId}
+        open={showModal}
+        onOpenChange={setShowModal}
+      />
     </div>
   )
 }

@@ -100,15 +100,15 @@ export function SupplierInvoices({ fahrzeugId, fahrzeugName }: Props) {
     setUploading(true)
 
     try {
-      const fileName = `${fahrzeugId}/${Date.now()}_${file.name}`
+      const fileName = `${fahrzeugId}/${Date.now()}.jpg`
       const { error: uploadError } = await supabase.storage
-        .from('supplier-invoices')
+        .from('supplier-invoice')
         .upload(fileName, file)
 
       if (uploadError) throw uploadError
 
       const { data: urlData } = supabase.storage
-        .from('supplier-invoices')
+        .from('supplier-invoice')
         .getPublicUrl(fileName)
 
       const { error: dbError } = await supabase.from('supplier_invoices').insert({

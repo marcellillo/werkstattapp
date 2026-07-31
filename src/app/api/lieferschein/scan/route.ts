@@ -30,6 +30,28 @@ export async function POST(req: NextRequest) {
       })
     }
 
+    // Speichere Lieferschein-Datei im Storage (optional, für Archivierung)
+    const timestamp = Date.now()
+    const safeFileName = `${timestamp}.jpg`
+    const storagePath = `${betriebId}/${safeFileName}`
+
+    try {
+      const { data, error } = await supabase.storage
+        .from('supplier-invoice')
+        .upload(storagePath, buffer, {
+          contentType: 'image/jpeg',
+          upsert: false,
+        })
+      if (error) {
+        console.warn('[Lieferschein Storage] Upload error:', error.message)
+      } else {
+        console.log('[Lieferschein Storage] Upload successful:', data)
+      }
+    } catch (storageError: any) {
+      console.warn('[Lieferschein Storage] Upload exception:', storageError.message)
+      // Nicht-blockierend: Scan funktioniert auch ohne Speicherung
+    }
+
     // Versuche Teile zu bestehenden Bestellungen zuzuordnen
     const { data: bestellungen } = await supabase
       .from('ersatzteile')
