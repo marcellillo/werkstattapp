@@ -123,7 +123,7 @@ export function WerkstattauftragItem({ werkstattauftrag, betriebId, onDelete }: 
         <div className="flex items-center gap-3 flex-1">
           <ChevronDown className={`w-5 h-5 transition ${expanded ? 'rotate-180' : ''}`} />
           <div className="text-left">
-            <p className="font-medium">{werkstattauftrag.nummer}</p>
+            <p className="font-medium">Werkstattauftrag {werkstattauftrag.id.slice(0, 8)}</p>
             <p className={`text-xs px-2 py-1 rounded mt-1 w-fit ${statusColors[status as keyof typeof statusColors] || 'bg-gray-100'}`}>
               {status === 'neu' && 'Neu'}
               {status === 'in_bearbeitung' && 'In Bearbeitung'}

@@ -14,28 +14,10 @@ export async function POST(req: NextRequest) {
 
     if (!betriebId) return NextResponse.json({ error: 'betriebId erforderlich' }, { status: 400 })
 
-    // Generiere Nummer
-    let nummer: string
-    if (fahrzeugId) {
-      nummer = await generateWerkstattauftragNummer(supabase, fahrzeugId, betriebId)
-    } else {
-      // Fallback: einfache Nummer ohne FIN
-      const year = new Date().getFullYear().toString().slice(-2)
-      const { count } = await supabase
-        .from('werkstattauftraege')
-        .select('*', { count: 'exact', head: true })
-        .eq('betrieb_id', betriebId)
-
-      const nextNum = (count || 0) + 1
-      nummer = `WA-${year}${String(nextNum).padStart(4, '0')}`
-    }
-    console.log('[WA Create] Generated nummer:', nummer)
-
     const { data: werkstattauftrag, error } = await supabase
       .from('werkstattauftraege')
       .insert({
         betrieb_id: betriebId,
-        nummer,
         status: 'neu',
         fahrzeug_id: fahrzeugId || null,
       })
