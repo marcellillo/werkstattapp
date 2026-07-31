@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Plus, Printer, Mail, Edit2 } from 'lucide-react'
+import { Plus, Printer, Mail, Edit2, Trash2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { KostenvoranschlagDetailsModal } from '@/components/kostenvoranschlag-details-modal'
 
@@ -93,6 +93,23 @@ export function KostenvoranschlagSection({ auftragId, betriebId, fahrzeugId }: P
     window.location.href = mailtoLink
   }
 
+  const handleDelete = async (kvId: string) => {
+    if (!confirm('Kostenvoranschlag wirklich löschen?')) return
+    try {
+      const response = await fetch('/api/kostenvoranschlag/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kostenvoranschlagId: kvId, betriebId }),
+      })
+      if (!response.ok) throw new Error('Fehler beim Löschen')
+      setKostenvoranschlaege(kostenvoranschlaege.filter(kv => kv.id !== kvId))
+      alert('Gelöscht!')
+    } catch (error) {
+      console.error('Delete error:', error)
+      alert('Fehler beim Löschen')
+    }
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -121,6 +138,9 @@ export function KostenvoranschlagSection({ auftragId, betriebId, fahrzeugId }: P
                   </Button>
                   <Button size="sm" variant="ghost" onClick={() => handleSendEmail(kv.id, kv.nummer)} title="Per E-Mail versenden">
                     <Mail className="w-4 h-4" />
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => handleDelete(kv.id)} title="Löschen" className="text-red-600 hover:text-red-800">
+                    <Trash2 className="w-4 h-4" />
                   </Button>
                 </div>
               </div>
