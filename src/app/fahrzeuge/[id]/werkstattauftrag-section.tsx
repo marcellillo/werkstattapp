@@ -2,8 +2,9 @@
 import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Plus, Clock, CheckCircle, Printer } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { WerkstattauftragItem } from '@/components/werkstattauftrag-item'
 
 interface Props {
   auftragId: string
@@ -60,38 +61,19 @@ export function WerkstattauftragSection({ auftragId, betriebId, fahrzeugId }: Pr
     }
   }
 
-  const handleStatusChange = async (auftragId: string, newStatus: string) => {
-    const response = await fetch(`/api/werkstattauftrag/${auftragId}/status`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: newStatus }),
-    })
-    const data = await response.json()
-    if (data.werkstattauftrag) {
-      setAuftraege(auftraege.map(a => a.id === auftragId ? data.werkstattauftrag : a))
-    }
-  }
-
-  const handleExportPDF = async (waId: string) => {
+  const handleDelete = async (waId: string) => {
+    if (!confirm('Werkstattauftrag wirklich löschen?')) return
     try {
-      const response = await fetch('/api/werkstattauftrag/pdf', {
+      const response = await fetch('/api/werkstattauftrag/delete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ werkstattauftragId: waId, betriebId }),
       })
-      if (!response.ok) throw new Error('PDF-Export fehlgeschlagen')
-      const blob = await response.blob()
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `Werkstattauftrag_${waId}.pdf`
-      document.body.appendChild(a)
-      a.click()
-      window.URL.revokeObjectURL(url)
-      document.body.removeChild(a)
+      if (!response.ok) throw new Error('Fehler beim Löschen')
+      setAuftraege(auftraege.filter(a => a.id !== waId))
     } catch (error) {
-      console.error('PDF-Export Fehler:', error)
-      alert('PDF-Export fehlgeschlagen')
+      console.error('Delete error:', error)
+      alert('Fehler beim Löschen')
     }
   }
 
@@ -112,23 +94,12 @@ export function WerkstattauftragSection({ auftragId, betriebId, fahrzeugId }: Pr
         ) : (
           <div className="space-y-3">
             {auftraege.map(auftrag => (
-              <div key={auftrag.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                <div>
-                  <p className="font-medium">{auftrag.beschreibung || 'Werkstattauftrag'}</p>
-                  <p className="text-sm text-slate-600">Status: {auftrag.status}</p>
-                </div>
-                <div className="flex gap-2">
-                  <Button size="sm" variant="ghost" onClick={() => handleExportPDF(auftrag.id)} title="PDF drucken">
-                    <Printer className="w-4 h-4" />
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={() => handleStatusChange(auftrag.id, 'in_bearbeitung')}>
-                    <Clock className="w-4 h-4" />
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={() => handleStatusChange(auftrag.id, 'fertig')}>
-                    <CheckCircle className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
+              <WerkstattauftragItem
+                key={auftrag.id}
+                werkstattauftrag={auftrag}
+                betriebId={betriebId}
+                onDelete={handleDelete}
+              />
             ))}
           </div>
         )}
