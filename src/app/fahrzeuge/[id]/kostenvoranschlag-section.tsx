@@ -2,9 +2,9 @@
 import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Plus, Printer, Mail, Edit2, Trash2 } from 'lucide-react'
+import { Plus, Printer, Mail } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { KostenvoranschlagDetailsModal } from '@/components/kostenvoranschlag-details-modal'
+import { KostenvoranschlagItem } from '@/components/kostenvoranschlag-item'
 
 interface Props {
   auftragId: string
@@ -15,8 +15,6 @@ interface Props {
 export function KostenvoranschlagSection({ auftragId, betriebId, fahrzeugId }: Props) {
   const [kostenvoranschlaege, setKostenvoranschlaege] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
-  const [selectedKvId, setSelectedKvId] = useState<string | null>(null)
-  const [modalOpen, setModalOpen] = useState(false)
 
   useEffect(() => {
     loadKostenvoranschlaege()
@@ -86,13 +84,6 @@ export function KostenvoranschlagSection({ auftragId, betriebId, fahrzeugId }: P
     }
   }
 
-  const handleSendEmail = (kvId: string, kvNummer: string) => {
-    const subject = `Kostenvoranschlag ${kvNummer}`
-    const body = `Guten Tag,\n\nhier ist Ihr Kostenvoranschlag ${kvNummer}.\n\nMit freundlichen Grüßen`
-    const mailtoLink = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
-    window.location.href = mailtoLink
-  }
-
   const handleDelete = async (kvId: string) => {
     if (!confirm('Kostenvoranschlag wirklich löschen?')) return
     try {
@@ -103,7 +94,6 @@ export function KostenvoranschlagSection({ auftragId, betriebId, fahrzeugId }: P
       })
       if (!response.ok) throw new Error('Fehler beim Löschen')
       setKostenvoranschlaege(kostenvoranschlaege.filter(kv => kv.id !== kvId))
-      alert('Gelöscht!')
     } catch (error) {
       console.error('Delete error:', error)
       alert('Fehler beim Löschen')
@@ -127,34 +117,14 @@ export function KostenvoranschlagSection({ auftragId, betriebId, fahrzeugId }: P
         ) : (
           <div className="space-y-3">
             {kostenvoranschlaege.map(kv => (
-              <div key={kv.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg hover:bg-slate-100 cursor-pointer transition" onClick={() => { setSelectedKvId(kv.id); setModalOpen(true); }}>
-                <div className="flex-1">
-                  <p className="font-medium">{kv.nummer || 'Kostenvoranschlag'}</p>
-                  <p className="text-sm text-slate-600">{kv.status || 'entwurf'}</p>
-                </div>
-                <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
-                  <Button size="sm" variant="ghost" onClick={() => handleExportPDF(kv.id)} title="Als PDF drucken">
-                    <Printer className="w-4 h-4" />
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={() => handleSendEmail(kv.id, kv.nummer)} title="Per E-Mail versenden">
-                    <Mail className="w-4 h-4" />
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={() => handleDelete(kv.id)} title="Löschen" className="text-red-600 hover:text-red-800">
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
+              <KostenvoranschlagItem
+                key={kv.id}
+                kostenvoranschlag={kv}
+                betriebId={betriebId}
+                onDelete={handleDelete}
+              />
             ))}
           </div>
-
-        {selectedKvId && (
-          <KostenvoranschlagDetailsModal
-            kostenvoranschlagId={selectedKvId}
-            betriebId={betriebId}
-            open={modalOpen}
-            onOpenChange={setModalOpen}
-          />
-        )}
         )}
       </CardContent>
     </Card>
