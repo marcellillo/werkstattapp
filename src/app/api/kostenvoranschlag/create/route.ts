@@ -45,7 +45,6 @@ export async function POST(req: NextRequest) {
         betrieb_id: betriebId,
         typ,
         nummer,
-        status: 'entwurf',
       })
       .select()
       .maybeSingle()
