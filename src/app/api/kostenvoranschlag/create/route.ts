@@ -12,11 +12,31 @@ export async function POST(req: NextRequest) {
 
     console.log('[KV Create] Input:', { auftragId, betriebId, fahrzeugId, typ })
 
-    if (!fahrzeugId) return NextResponse.json({ error: 'fahrzeugId erforderlich' }, { status: 400 })
     if (!betriebId) return NextResponse.json({ error: 'betriebId erforderlich' }, { status: 400 })
 
-    // Generiere Nummer basierend auf FIN
-    const nummer = await generateKostenvoranschlagNummer(supabase, fahrzeugId, betriebId)
+    // Generiere Nummer
+    let nummer: string
+    if (fahrzeugId) {
+      nummer = await generateKostenvoranschlagNummer(supabase, fahrzeugId, betriebId)
+    } else {
+      // Fallback: einfache Nummer ohne FIN
+      const year = new Date().getFullYear().toString().slice(-2)
+      const { data: lastKv } = await supabase
+        .from('kostenvoranschlaege')
+        .select('nummer')
+        .eq('betrieb_id', betriebId)
+        .ilike('nummer', `KV-${year}%`)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      let nextNum = 1
+      if (lastKv?.nummer) {
+        const match = lastKv.nummer.match(/(\d{4})$/)
+        if (match) nextNum = parseInt(match[1]) + 1
+      }
+      nummer = `KV-${year}${String(nextNum).padStart(4, '0')}`
+    }
     console.log('[KV Create] Generated nummer:', nummer)
 
     const { data: kostenvoranschlag, error } = await supabase
