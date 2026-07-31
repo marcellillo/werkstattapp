@@ -7,9 +7,10 @@ import { Plus, Clock, CheckCircle, Printer } from 'lucide-react'
 interface Props {
   auftragId: string
   betriebId: string
+  fahrzeugId: string
 }
 
-export function WerkstattauftragSection({ auftragId, betriebId }: Props) {
+export function WerkstattauftragSection({ auftragId, betriebId, fahrzeugId }: Props) {
   const [auftraege, setAuftraege] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
 
@@ -19,7 +20,7 @@ export function WerkstattauftragSection({ auftragId, betriebId }: Props) {
       const response = await fetch('/api/werkstattauftrag/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ auftragId, betriebId }),
+        body: JSON.stringify({ auftragId, betriebId, fahrzeugId }),
       })
       const data = await response.json()
       if (data.werkstattauftrag) {

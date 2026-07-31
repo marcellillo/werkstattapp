@@ -1942,8 +1942,8 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
       <div className="space-y-6 mt-6">
         {betriebId && (
           <>
-            <KostenvoranschlagSection auftragId={auftrag.id} betriebId={betriebId} />
-            <WerkstattauftragSection auftragId={auftrag.id} betriebId={betriebId} />
+            <KostenvoranschlagSection auftragId={auftrag.id} betriebId={betriebId} fahrzeugId={(auftrag.fahrzeug as any)?.id} />
+            <WerkstattauftragSection auftragId={auftrag.id} betriebId={betriebId} fahrzeugId={(auftrag.fahrzeug as any)?.id} />
             <RechnungSection auftragId={auftrag.id} betriebId={betriebId} fahrzeugId={(auftrag.fahrzeug as any)?.id} />
           </>
         )}

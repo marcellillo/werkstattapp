@@ -7,9 +7,10 @@ import { Plus, Printer, Mail, Edit2 } from 'lucide-react'
 interface Props {
   auftragId: string
   betriebId: string
+  fahrzeugId: string
 }
 
-export function KostenvoranschlagSection({ auftragId, betriebId }: Props) {
+export function KostenvoranschlagSection({ auftragId, betriebId, fahrzeugId }: Props) {
   const [kostenvoranschlaege, setKostenvoranschlaege] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
 
@@ -19,7 +20,7 @@ export function KostenvoranschlagSection({ auftragId, betriebId }: Props) {
       const response = await fetch('/api/kostenvoranschlag/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ auftragId, betriebId, typ: 'werkstatt' }),
+        body: JSON.stringify({ auftragId, betriebId, fahrzeugId, typ: 'werkstatt' }),
       })
       const data = await response.json()
       if (data.kostenvoranschlag) {
