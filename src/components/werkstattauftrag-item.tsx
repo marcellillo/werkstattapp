@@ -17,9 +17,8 @@ export function WerkstattauftragItem({ werkstattauftrag, betriebId, onDelete }: 
   const [status, setStatus] = useState(werkstattauftrag.status || 'neu')
   const [newPos, setNewPos] = useState({
     beschreibung: '',
-    menge: 1,
-    preis: 0,
-    typ: 'arbeit' // 'arbeit' oder 'ersatzteil'
+    stunden: 1,
+    stundensatz: 0,
   })
 
   useEffect(() => {
@@ -66,27 +65,24 @@ export function WerkstattauftragItem({ werkstattauftrag, betriebId, onDelete }: 
 
   const handleAddPosition = async () => {
     if (!newPos.beschreibung.trim()) return
+    if (newPos.stunden <= 0 || newPos.stundensatz < 0) {
+      alert('Bitte Stunden und Stundensatz eingeben')
+      return
+    }
 
     try {
       const supabase = await createClient()
-      const summe = newPos.menge * newPos.preis
-
-      const insertData: any = {
-        werkstattauftrag_id: werkstattauftrag.id,
-        beschreibung: newPos.beschreibung,
-        menge: newPos.menge,
-        preis: newPos.preis,
-        summe,
-      }
-
-      // Versuche typ zu speichern, ignoriere Fehler wenn Feld nicht existiert
-      if (newPos.typ) {
-        insertData.typ = newPos.typ
-      }
+      const summe = newPos.stunden * newPos.stundensatz
 
       const { data, error } = await supabase
         .from('werkstattauftrag_positionen')
-        .insert(insertData)
+        .insert({
+          werkstattauftrag_id: werkstattauftrag.id,
+          beschreibung: newPos.beschreibung,
+          menge: newPos.stunden,
+          preis: newPos.stundensatz,
+          summe,
+        })
         .select()
 
       if (error) {
@@ -95,10 +91,10 @@ export function WerkstattauftragItem({ werkstattauftrag, betriebId, onDelete }: 
       }
 
       setPositionen([...positionen, data[0]])
-      setNewPos({ beschreibung: '', menge: 1, preis: 0, typ: 'arbeit' })
+      setNewPos({ beschreibung: '', stunden: 1, stundensatz: 0 })
     } catch (error) {
       console.error('Fehler beim Hinzufügen:', error)
-      alert('Fehler beim Hinzufügen der Position')
+      alert('Fehler beim Hinzufügen der Arbeit')
     }
   }
 
@@ -202,135 +198,108 @@ export function WerkstattauftragItem({ werkstattauftrag, betriebId, onDelete }: 
             <p className="text-sm text-slate-500">Wird geladen...</p>
           ) : (
             <>
-              {/* Positionen Tabelle */}
+              {/* Arbeitszeiten Tabelle */}
               {positionen.length > 0 && (
-                <div className="space-y-4">
-                  <div>
-                    <h4 className="font-medium text-sm mb-2">🔧 Arbeitszeiten</h4>
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b bg-blue-50">
-                          <th className="text-left py-2 px-2">Arbeit / Tätigkeit</th>
-                          <th className="text-right py-2 px-2 w-20">Std/Menge</th>
-                          <th className="text-right py-2 px-2 w-24">€/Std</th>
-                          <th className="text-right py-2 px-2 w-24">Summe</th>
-                          <th className="w-8"></th>
+                <div>
+                  <h4 className="font-medium text-sm mb-3 flex items-center gap-2">
+                    <span className="text-lg">🔧</span>
+                    Arbeitszeiten
+                  </h4>
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b bg-blue-50">
+                        <th className="text-left py-2 px-2">Tätigkeit / Arbeit</th>
+                        <th className="text-right py-2 px-2 w-16">Stunden</th>
+                        <th className="text-right py-2 px-2 w-20">€/Std</th>
+                        <th className="text-right py-2 px-2 w-20">Summe</th>
+                        <th className="w-8"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {positionen.map((pos) => (
+                        <tr key={pos.id} className="border-b hover:bg-slate-50">
+                          <td className="py-2 px-2">{pos.beschreibung}</td>
+                          <td className="text-right py-2 px-2">{pos.menge} h</td>
+                          <td className="text-right py-2 px-2">{pos.preis.toFixed(2)} €</td>
+                          <td className="text-right py-2 px-2 font-medium text-blue-600">{(pos.summe || 0).toFixed(2)} €</td>
+                          <td className="text-center py-2 px-2">
+                            <button
+                              onClick={() => handleDeletePosition(pos.id)}
+                              className="text-red-600 hover:text-red-800"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </td>
                         </tr>
-                      </thead>
-                      <tbody>
-                        {positionen.filter(p => !p.typ || p.typ === 'arbeit').map((pos) => (
-                          <tr key={pos.id} className="border-b hover:bg-slate-50">
-                            <td className="py-2 px-2">{pos.beschreibung}</td>
-                            <td className="text-right py-2 px-2">{pos.menge}</td>
-                            <td className="text-right py-2 px-2">{pos.preis.toFixed(2)} €</td>
-                            <td className="text-right py-2 px-2 font-medium">{(pos.summe || 0).toFixed(2)} €</td>
-                            <td className="text-center py-2 px-2">
-                              <button
-                                onClick={() => handleDeletePosition(pos.id)}
-                                className="text-red-600 hover:text-red-800"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {positionen.some(p => p.typ === 'ersatzteil') && (
-                    <div>
-                      <h4 className="font-medium text-sm mb-2">⚙️ Ersatzteile</h4>
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="border-b bg-green-50">
-                            <th className="text-left py-2 px-2">Ersatzteil / Material</th>
-                            <th className="text-right py-2 px-2 w-20">Menge</th>
-                            <th className="text-right py-2 px-2 w-24">€/Stck</th>
-                            <th className="text-right py-2 px-2 w-24">Summe</th>
-                            <th className="w-8"></th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {positionen.filter(p => p.typ === 'ersatzteil').map((pos) => (
-                            <tr key={pos.id} className="border-b hover:bg-slate-50">
-                              <td className="py-2 px-2">{pos.beschreibung}</td>
-                              <td className="text-right py-2 px-2">{pos.menge}</td>
-                              <td className="text-right py-2 px-2">{pos.preis.toFixed(2)} €</td>
-                              <td className="text-right py-2 px-2 font-medium">{(pos.summe || 0).toFixed(2)} €</td>
-                              <td className="text-center py-2 px-2">
-                                <button
-                                  onClick={() => handleDeletePosition(pos.id)}
-                                  className="text-red-600 hover:text-red-800"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               )}
 
               {positionen.length === 0 && !loading && (
-                <p className="text-sm text-slate-500 text-center py-4">Keine Positionen</p>
+                <p className="text-sm text-slate-500 text-center py-4 italic">Keine Arbeitszeiten erfasst</p>
               )}
 
-              {/* Neue Position hinzufügen */}
-              <div className="bg-slate-50 p-3 rounded space-y-3">
-                <p className="text-sm font-medium">➕ Position hinzufügen:</p>
+              {/* Arbeitszeit hinzufügen */}
+              <div className="bg-blue-50 p-4 rounded space-y-3 border-2 border-blue-200">
+                <p className="text-sm font-medium flex items-center gap-2">
+                  <span>➕</span>
+                  Arbeitszeit hinzufügen:
+                </p>
                 <div className="space-y-2">
-                  <select
-                    value={newPos.typ}
-                    onChange={(e) => setNewPos({ ...newPos, typ: e.target.value })}
-                    className="w-full px-2 py-1 border rounded text-sm"
-                  >
-                    <option value="arbeit">🔧 Arbeitszeit / Tätigkeit</option>
-                    <option value="ersatzteil">⚙️ Ersatzteil / Material</option>
-                  </select>
-
                   <input
                     type="text"
-                    placeholder={newPos.typ === 'arbeit' ? 'z.B. Ölwechsel, Inspektion, Reparatur' : 'z.B. Bremsbeläge, Ölfilter'}
+                    placeholder="z.B. Ölwechsel, Inspektion, Bremsanlage überprüfen"
                     value={newPos.beschreibung}
                     onChange={(e) => setNewPos({ ...newPos, beschreibung: e.target.value })}
-                    className="w-full px-2 py-1 border rounded text-sm"
+                    className="w-full px-3 py-2 border rounded text-sm"
                   />
 
-                  <div className="grid grid-cols-3 gap-2">
-                    <input
-                      type="number"
-                      placeholder={newPos.typ === 'arbeit' ? 'Std' : 'Menge'}
-                      value={newPos.menge}
-                      onChange={(e) => setNewPos({ ...newPos, menge: parseFloat(e.target.value) || 0 })}
-                      className="px-2 py-1 border rounded text-sm"
-                    />
-                    <input
-                      type="number"
-                      placeholder={newPos.typ === 'arbeit' ? '€/Std' : '€/Stck'}
-                      value={newPos.preis}
-                      onChange={(e) => setNewPos({ ...newPos, preis: parseFloat(e.target.value) || 0 })}
-                      className="px-2 py-1 border rounded text-sm"
-                      step="0.01"
-                    />
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <label className="text-xs text-slate-600">Stunden</label>
+                      <input
+                        type="number"
+                        placeholder="1,5"
+                        value={newPos.stunden}
+                        onChange={(e) => setNewPos({ ...newPos, stunden: parseFloat(e.target.value) || 0 })}
+                        className="w-full px-2 py-1 border rounded text-sm"
+                        step="0.5"
+                        min="0"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-slate-600">€/Std</label>
+                      <input
+                        type="number"
+                        placeholder="55,00"
+                        value={newPos.stundensatz}
+                        onChange={(e) => setNewPos({ ...newPos, stundensatz: parseFloat(e.target.value) || 0 })}
+                        className="w-full px-2 py-1 border rounded text-sm"
+                        step="0.01"
+                        min="0"
+                      />
+                    </div>
                     <button
                       onClick={handleAddPosition}
-                      className="bg-blue-600 text-white px-2 py-1 rounded text-sm hover:bg-blue-700 flex items-center justify-center gap-1"
+                      className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700 flex items-center justify-center gap-1 col-span-1 self-end"
                     >
                       <Plus className="w-4 h-4" />
                       Add
                     </button>
                   </div>
 
-                  {newPos.menge > 0 && newPos.preis > 0 && (
-                    <div className="text-xs text-slate-600 text-right">
-                      = {(newPos.menge * newPos.preis).toFixed(2)} €
+                  {newPos.stunden > 0 && newPos.stundensatz > 0 && (
+                    <div className="text-sm font-medium text-blue-600 text-right">
+                      Summe: {(newPos.stunden * newPos.stundensatz).toFixed(2)} €
                     </div>
                   )}
                 </div>
+
+                <p className="text-xs text-slate-600 italic border-t pt-2">
+                  💡 Ersatzteile und Material-Kosten werden aus der Lieferbestätigung erfasst
+                </p>
               </div>
 
               {/* Totals */}
