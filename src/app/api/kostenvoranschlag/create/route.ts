@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
         status: 'entwurf',
       })
       .select()
-      .single()
+      .maybeSingle()
 
     if (error) throw error
 

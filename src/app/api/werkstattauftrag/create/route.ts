@@ -17,22 +17,15 @@ export async function POST(req: NextRequest) {
       .from('werkstattauftraege')
       .insert({
         betrieb_id: betriebId,
+        nummer,
         status: 'neu',
       })
       .select()
-      .single()
-
-    // Update mit Nummer
-    if (werkstattauftrag) {
-      await supabase
-        .from('werkstattauftraege')
-        .update({ id: werkstattauftrag.id })
-        .eq('id', werkstattauftrag.id)
-    }
+      .maybeSingle()
 
     if (error) throw error
 
-    return NextResponse.json({ werkstattauftrag: { ...werkstattauftrag, nummer } })
+    return NextResponse.json({ werkstattauftrag })
   } catch (error: any) {
     console.error('[Werkstattauftrag Create] Error:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })
