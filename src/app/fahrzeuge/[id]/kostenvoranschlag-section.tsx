@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Plus, Printer, Mail, Edit2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { KostenvoranschlagDetailsModal } from '@/components/kostenvoranschlag-details-modal'
 
 interface Props {
   auftragId: string
@@ -14,6 +15,8 @@ interface Props {
 export function KostenvoranschlagSection({ auftragId, betriebId, fahrzeugId }: Props) {
   const [kostenvoranschlaege, setKostenvoranschlaege] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
+  const [selectedKvId, setSelectedKvId] = useState<string | null>(null)
+  const [modalOpen, setModalOpen] = useState(false)
 
   useEffect(() => {
     loadKostenvoranschlaege()
@@ -107,12 +110,12 @@ export function KostenvoranschlagSection({ auftragId, betriebId, fahrzeugId }: P
         ) : (
           <div className="space-y-3">
             {kostenvoranschlaege.map(kv => (
-              <div key={kv.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+              <div key={kv.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg hover:bg-slate-100 cursor-pointer transition" onClick={() => { setSelectedKvId(kv.id); setModalOpen(true); }}>
                 <div className="flex-1">
                   <p className="font-medium">{kv.nummer || 'Kostenvoranschlag'}</p>
                   <p className="text-sm text-slate-600">{kv.status || 'entwurf'}</p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
                   <Button size="sm" variant="ghost" onClick={() => handleExportPDF(kv.id)} title="Als PDF drucken">
                     <Printer className="w-4 h-4" />
                   </Button>
@@ -123,6 +126,15 @@ export function KostenvoranschlagSection({ auftragId, betriebId, fahrzeugId }: P
               </div>
             ))}
           </div>
+
+        {selectedKvId && (
+          <KostenvoranschlagDetailsModal
+            kostenvoranschlagId={selectedKvId}
+            betriebId={betriebId}
+            open={modalOpen}
+            onOpenChange={setModalOpen}
+          />
+        )}
         )}
       </CardContent>
     </Card>
