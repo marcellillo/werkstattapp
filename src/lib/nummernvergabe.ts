@@ -9,17 +9,19 @@ export async function generateKostenvoranschlagNummer(
   fahrzeugId: string,
   betriebId: string
 ): Promise<string> {
-  // Hole Fahrzeug-FIN
-  const { data: fahrzeug } = await supabase
-    .from('fahrzeuge')
-    .select('fin')
-    .eq('id', fahrzeugId)
-    .single()
+  // Hole Fahrzeug-FIN (optional)
+  let finTail = ''
+  if (fahrzeugId) {
+    const { data: fahrzeug } = await supabase
+      .from('fahrzeuge')
+      .select('fin')
+      .eq('id', fahrzeugId)
+      .maybeSingle()
 
-  if (!fahrzeug?.fin) throw new Error('Fahrzeug-FIN nicht gefunden')
-
-  // Letzte 6 Ziffern der FIN
-  const finTail = fahrzeug.fin.slice(-6).toUpperCase()
+    if (fahrzeug?.fin) {
+      finTail = fahrzeug.fin.slice(-6).toUpperCase() + '-'
+    }
+  }
 
   // Laufende Nummer dieses Jahr für Kostenvoranschläge
   const year = new Date().getFullYear().toString().slice(-2)
@@ -39,7 +41,7 @@ export async function generateKostenvoranschlagNummer(
     if (match) nextNum = parseInt(match[1]) + 1
   }
 
-  return `KV-${finTail}-${year}${String(nextNum).padStart(4, '0')}`
+  return `KV-${finTail}${year}${String(nextNum).padStart(4, '0')}`
 }
 
 /**
@@ -50,37 +52,31 @@ export async function generateWerkstattauftragNummer(
   fahrzeugId: string,
   betriebId: string
 ): Promise<string> {
-  const { data: fahrzeug } = await supabase
-    .from('fahrzeuge')
-    .select('fin')
-    .eq('id', fahrzeugId)
-    .single()
+  // Hole Fahrzeug-FIN (optional)
+  let finTail = ''
+  if (fahrzeugId) {
+    const { data: fahrzeug } = await supabase
+      .from('fahrzeuge')
+      .select('fin')
+      .eq('id', fahrzeugId)
+      .maybeSingle()
 
-  if (!fahrzeug?.fin) throw new Error('Fahrzeug-FIN nicht gefunden')
-
-  const finTail = fahrzeug.fin.slice(-6).toUpperCase()
-  const year = new Date().getFullYear().toString().slice(-2)
-
-  const { data: lastWa } = await supabase
-    .from('werkstattauftraege')
-    .select('id')
-    .eq('betrieb_id', betriebId)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-
-  let nextNum = 1
-  if (lastWa?.id) {
-    // Zähle alle Werkstattaufträge dieses Jahr
-    const { count } = await supabase
-      .from('werkstattauftraege')
-      .select('*', { count: 'exact', head: true })
-      .eq('betrieb_id', betriebId)
-
-    nextNum = (count || 0) + 1
+    if (fahrzeug?.fin) {
+      finTail = fahrzeug.fin.slice(-6).toUpperCase() + '-'
+    }
   }
 
-  return `WA-${finTail}-${year}${String(nextNum).padStart(4, '0')}`
+  const year = new Date().getFullYear().toString().slice(-2)
+
+  // Zähle alle Werkstattaufträge dieses Jahr
+  const { count } = await supabase
+    .from('werkstattauftraege')
+    .select('*', { count: 'exact', head: true })
+    .eq('betrieb_id', betriebId)
+
+  const nextNum = (count || 0) + 1
+
+  return `WA-${finTail}${year}${String(nextNum).padStart(4, '0')}`
 }
 
 /**
@@ -121,22 +117,27 @@ export async function generateVorvertragNummer(
   fahrzeugId: string,
   betriebId: string
 ): Promise<string> {
-  const { data: fahrzeug } = await supabase
-    .from('fahrzeuge')
-    .select('fin')
-    .eq('id', fahrzeugId)
-    .single()
+  // Hole Fahrzeug-FIN (optional)
+  let finTail = ''
+  if (fahrzeugId) {
+    const { data: fahrzeug } = await supabase
+      .from('fahrzeuge')
+      .select('fin')
+      .eq('id', fahrzeugId)
+      .maybeSingle()
 
-  if (!fahrzeug?.fin) throw new Error('Fahrzeug-FIN nicht gefunden')
+    if (fahrzeug?.fin) {
+      finTail = fahrzeug.fin.slice(-6).toUpperCase() + '-'
+    }
+  }
 
-  const finTail = fahrzeug.fin.slice(-6).toUpperCase()
   const year = new Date().getFullYear().toString().slice(-2)
 
   const { data: lastVv } = await supabase
     .from('vorvertraege')
     .select('nummer')
     .eq('betrieb_id', betriebId)
-    .ilike('nummer', `VV-${finTail}-${year}%`)
+    .ilike('nummer', `VV-${year}%`)
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle()
@@ -147,5 +148,5 @@ export async function generateVorvertragNummer(
     if (match) nextNum = parseInt(match[1]) + 1
   }
 
-  return `VV-${finTail}-${year}${String(nextNum).padStart(4, '0')}`
+  return `VV-${finTail}${year}${String(nextNum).padStart(4, '0')}`
 }
