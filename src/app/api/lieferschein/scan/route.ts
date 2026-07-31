@@ -23,10 +23,16 @@ export async function POST(req: NextRequest) {
     const scanResult = await scanLieferschein('', base64)
 
     if (!scanResult.erfolg) {
+      console.error('[API] Scan failed:', {
+        fehler: scanResult.fehler,
+        confidence: scanResult.confidence,
+        teilCount: scanResult.teile.length,
+      })
       return NextResponse.json({
         erfolg: false,
-        fehler: scanResult.fehler || 'Lieferschein konnte nicht erkannt werden',
+        fehler: scanResult.fehler || `Lieferschein konnte nicht erkannt werden (confidence: ${scanResult.confidence.toFixed(2)})`,
         teile: [],
+        confidence: scanResult.confidence,
       })
     }
 

@@ -103,6 +103,7 @@ WICHTIG:
     // Parse Antwort
     const content = response.content[0]
     if (content.type !== 'text') {
+      console.error('[Lieferschein] Unexpected content type:', content.type)
       return {
         erfolg: false,
         fehler: 'Unerwartete API-Antwort',
@@ -111,9 +112,12 @@ WICHTIG:
       }
     }
 
+    console.log('[Lieferschein] Claude response:', content.text.substring(0, 200))
+
     // Extrahiere JSON
     const jsonMatch = content.text.match(/\{[\s\S]*\}/)
     if (!jsonMatch) {
+      console.error('[Lieferschein] No JSON found in response:', content.text)
       return {
         erfolg: false,
         fehler: 'Kein JSON in Antwort gefunden',
@@ -122,7 +126,20 @@ WICHTIG:
       }
     }
 
-    const parsed = JSON.parse(jsonMatch[0])
+    let parsed
+    try {
+      parsed = JSON.parse(jsonMatch[0])
+    } catch (parseError) {
+      console.error('[Lieferschein] JSON parse error:', parseError)
+      return {
+        erfolg: false,
+        fehler: 'JSON-Parse-Fehler',
+        teile: [],
+        confidence: 0,
+      }
+    }
+
+    console.log('[Lieferschein] Parsed result:', parsed)
 
     return {
       erfolg: (parsed.confidence || 0) > 0.2 && (parsed.teile?.length || 0) > 0,
