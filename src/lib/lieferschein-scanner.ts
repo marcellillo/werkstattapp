@@ -71,26 +71,29 @@ export async function scanLieferschein(
             },
             {
               type: 'text',
-              text: `Analysiere diesen Lieferschein und extrahiere folgende Informationen als JSON:
+              text: `Analysiere dieses Dokument und extrahiere alle aufgelisteten Teile/Artikel als JSON:
 
 {
   "teile": [
     {
-      "teilenummer": "string (optional)",
-      "beschreibung": "string (Teilbezeichnung)",
-      "menge": number,
-      "lieferant": "string (optional)",
-      "preis": number (optional, Preis pro Stück)
+      "teilenummer": "string (optional, z.B. Artikelnummer, SKU)",
+      "beschreibung": "string (Teilbezeichnung/Name)",
+      "menge": number (Menge/Anzahl),
+      "lieferant": "string (optional, Name des Lieferanten)",
+      "preis": number (optional, Preis pro Stück in EUR)
     }
   ],
   "lieferdatum": "YYYY-MM-DD (optional)",
-  "lieferant": "string (optional)",
-  "bestellnummer": "string (optional)",
-  "confidence": number (0-1, wie sicher du dich bei der Erkennung bist)
+  "lieferant": "string (optional, Absender/Lieferant)",
+  "bestellnummer": "string (optional, Rechnungs-/Bestellnummer)",
+  "confidence": number (0-1, Erkennungssicherheit: 1=sehr sicher, 0=nicht erkannt)
 }
 
-Nur das JSON zurückgeben, keine anderen Kommentare.
-Wenn es kein Lieferschein ist, confidence auf 0 setzen und teile leer lassen.`,
+WICHTIG:
+- Extrahiere ALLE aufgelisteten Teile/Positionen
+- Für menge: 0 setzen wenn nicht klar erkannt
+- confidence: 0.8-1.0 wenn dies ein Lieferschein/Artikel-Liste ist, sonst 0.1-0.3
+- Nur das JSON zurückgeben, keine anderen Kommentare`,
             },
           ],
         },
@@ -122,7 +125,7 @@ Wenn es kein Lieferschein ist, confidence auf 0 setzen und teile leer lassen.`,
     const parsed = JSON.parse(jsonMatch[0])
 
     return {
-      erfolg: parsed.confidence > 0.3,
+      erfolg: (parsed.confidence || 0) > 0.2 && (parsed.teile?.length || 0) > 0,
       teile: parsed.teile || [],
       lieferdatum: parsed.lieferdatum,
       lieferant: parsed.lieferant,
