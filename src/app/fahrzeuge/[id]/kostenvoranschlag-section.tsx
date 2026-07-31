@@ -23,9 +23,17 @@ export function KostenvoranschlagSection({ auftragId, betriebId, fahrzeugId }: P
         body: JSON.stringify({ auftragId, betriebId, fahrzeugId, typ: 'werkstatt' }),
       })
       const data = await response.json()
+      if (!response.ok) {
+        console.error('[KV] Error response:', data)
+        alert(`Fehler: ${data.error}`)
+        return
+      }
       if (data.kostenvoranschlag) {
         setKostenvoranschlaege([...kostenvoranschlaege, data.kostenvoranschlag])
       }
+    } catch (error) {
+      console.error('[KV] Fetch error:', error)
+      alert(`Fehler: ${error}`)
     } finally {
       setLoading(false)
     }

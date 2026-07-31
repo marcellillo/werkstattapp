@@ -50,11 +50,15 @@ export async function POST(req: NextRequest) {
       .select()
       .maybeSingle()
 
-    if (error) throw error
+    if (error) {
+      console.error('[KV Insert] Error:', error)
+      throw error
+    }
 
     return NextResponse.json({ kostenvoranschlag })
   } catch (error: any) {
-    console.error('[Kostenvoranschlag Create] Error:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    console.error('[Kostenvoranschlag Create] Full Error:', error)
+    const message = error?.message || JSON.stringify(error)
+    return NextResponse.json({ error: `${message}` }, { status: 500 })
   }
 }

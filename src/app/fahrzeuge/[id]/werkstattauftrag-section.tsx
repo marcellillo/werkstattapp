@@ -23,9 +23,17 @@ export function WerkstattauftragSection({ auftragId, betriebId, fahrzeugId }: Pr
         body: JSON.stringify({ auftragId, betriebId, fahrzeugId }),
       })
       const data = await response.json()
+      if (!response.ok) {
+        console.error('[WA] Error response:', data)
+        alert(`Fehler: ${data.error}`)
+        return
+      }
       if (data.werkstattauftrag) {
         setAuftraege([...auftraege, data.werkstattauftrag])
       }
+    } catch (error) {
+      console.error('[WA] Fetch error:', error)
+      alert(`Fehler: ${error}`)
     } finally {
       setLoading(false)
     }
