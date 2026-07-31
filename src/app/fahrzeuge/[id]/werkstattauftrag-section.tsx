@@ -1,8 +1,9 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Plus, Clock, CheckCircle, Printer } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
 
 interface Props {
   auftragId: string
@@ -13,6 +14,26 @@ interface Props {
 export function WerkstattauftragSection({ auftragId, betriebId, fahrzeugId }: Props) {
   const [auftraege, setAuftraege] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    loadWerkstattauftraege()
+  }, [fahrzeugId])
+
+  const loadWerkstattauftraege = async () => {
+    try {
+      const supabase = await createClient()
+      const { data, error } = await supabase
+        .from('werkstattauftraege')
+        .select('*')
+        .eq('betrieb_id', betriebId)
+        .order('created_at', { ascending: false })
+
+      if (error) throw error
+      setAuftraege(data || [])
+    } catch (error) {
+      console.error('[WA Load] Error:', error)
+    }
+  }
 
   const handleCreate = async () => {
     setLoading(true)
@@ -29,7 +50,7 @@ export function WerkstattauftragSection({ auftragId, betriebId, fahrzeugId }: Pr
         return
       }
       if (data.werkstattauftrag) {
-        setAuftraege([...auftraege, data.werkstattauftrag])
+        setAuftraege([data.werkstattauftrag, ...auftraege])
       }
     } catch (error) {
       console.error('[WA] Fetch error:', error)
@@ -51,25 +72,26 @@ export function WerkstattauftragSection({ auftragId, betriebId, fahrzeugId }: Pr
     }
   }
 
-  const handleExportPDF = async (auftragId: string) => {
+  const handleExportPDF = async (waId: string) => {
     try {
       const response = await fetch('/api/werkstattauftrag/pdf', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ auftragId, betriebId }),
+        body: JSON.stringify({ werkstattauftragId: waId, betriebId }),
       })
       if (!response.ok) throw new Error('PDF-Export fehlgeschlagen')
       const blob = await response.blob()
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `Werkstattauftrag_${auftragId}.pdf`
+      a.download = `Werkstattauftrag_${waId}.pdf`
       document.body.appendChild(a)
       a.click()
       window.URL.revokeObjectURL(url)
       document.body.removeChild(a)
     } catch (error) {
       console.error('PDF-Export Fehler:', error)
+      alert('PDF-Export fehlgeschlagen')
     }
   }
 

@@ -8,22 +8,21 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { auftragId, betriebId } = await req.json()
+    const { werkstattauftragId, betriebId } = await req.json()
 
-    // Hole Auftrag mit Details
-    const { data: auftrag } = await supabase
-      .from('auftraege')
+    // Hole Werkstattauftrag mit Details
+    const { data: wa } = await supabase
+      .from('werkstattauftraege')
       .select(`
         *,
         fahrzeug:fahrzeuge(*),
-        kunde:kunden(*),
-        ersatzteile(*)
+        positionen:werkstattauftrag_positionen(*)
       `)
-      .eq('id', auftragId)
+      .eq('id', werkstattauftragId)
       .eq('betrieb_id', betriebId)
       .single()
 
-    if (!auftrag) return NextResponse.json({ error: 'Auftrag nicht gefunden' }, { status: 404 })
+    if (!wa) return NextResponse.json({ error: 'Werkstattauftrag nicht gefunden' }, { status: 404 })
 
     // Hole Betrieb-Daten
     const { data: betrieb } = await supabase
@@ -36,31 +35,22 @@ export async function POST(req: NextRequest) {
 
     // Generiere PDF
     const pdfBuffer = await generateWerkstattauftragPDF({
-      nummer: auftrag.auftrag_nr || auftrag.id,
-      datum: new Date(auftrag.erstellt_am).toLocaleDateString('de-DE'),
-      auftragId: auftrag.id,
+      nummer: wa.nummer,
+      datum: new Date(wa.created_at).toLocaleDateString('de-DE'),
       fahrzeug: {
-        marke: auftrag.fahrzeug?.marke || '',
-        modell: auftrag.fahrzeug?.modell || '',
-        fin: auftrag.fahrzeug?.fin || '',
-        kennzeichen: auftrag.fahrzeug?.kennzeichen,
-        baujahr: auftrag.fahrzeug?.baujahr,
-        farbe: auftrag.fahrzeug?.farbe,
-        kilometerstand: auftrag.fahrzeug?.kilometerstand,
+        marke: wa.fahrzeug?.marke || '',
+        modell: wa.fahrzeug?.modell || '',
+        fin: wa.fahrzeug?.fin || '',
+        kennzeichen: wa.fahrzeug?.kennzeichen,
+        baujahr: wa.fahrzeug?.baujahr,
+        farbe: wa.fahrzeug?.farbe,
+        kilometerstand: wa.fahrzeug?.kilometerstand,
       },
-      kundenName: auftrag.kunde?.name || 'Unbekannt',
-      kundenStrasse: auftrag.kunde?.strasse || '',
-      kundenPlz: auftrag.kunde?.plz || '',
-      kundenOrt: auftrag.kunde?.ort || '',
-      kundenTelefon: auftrag.kunde?.telefon,
-      arbeiten: auftrag.arbeiten,
-      bemerkungen: auftrag.bemerkungen,
-      ersatzteile: (auftrag.ersatzteile || []).map((teil: any) => ({
-        teilenummer: teil.teilenummer,
-        beschreibung: teil.beschreibung,
-        menge: teil.menge,
-        einzelpreis: teil.einzelpreis || 0,
-        status: teil.status || 'nicht_bestellt',
+      positionen: (wa.positionen || []).map((pos: any) => ({
+        beschreibung: pos.beschreibung,
+        menge: pos.menge,
+        preis: pos.preis,
+        summe: pos.summe,
       })),
       firmaDaten: {
         name: betrieb.name,
@@ -71,14 +61,13 @@ export async function POST(req: NextRequest) {
         email: betrieb.email,
         ustId: betrieb.ust_id,
       },
-      status: auftrag.status || 'angenommen',
-      faelligkeitsDatum: auftrag.faellig_am ? new Date(auftrag.faellig_am).toLocaleDateString('de-DE') : undefined,
+      status: wa.status || 'neu',
     })
 
     return new NextResponse(pdfBuffer, {
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="Werkstattauftrag_${auftrag.auftrag_nr || auftrag.id}.pdf"`,
+        'Content-Disposition': `attachment; filename="Werkstattauftrag_${wa.nummer}.pdf"`,
       },
     })
   } catch (error: any) {
