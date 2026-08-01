@@ -54,9 +54,11 @@ export async function scanLieferschein(
   if (ext === '.webp') mediaType = 'image/webp'
 
   try {
+    console.log('[Lieferschein] Starting scan with image type:', mediaType, 'data length:', imageData.length)
+
     const response = await client.messages.create({
       model: 'claude-3-5-sonnet-20241022',
-      max_tokens: 1024,
+      max_tokens: 2048,
       messages: [
         {
           role: 'user',
@@ -71,81 +73,66 @@ export async function scanLieferschein(
             },
             {
               type: 'text',
-              text: `Extrahiere aus diesem Bild ALLE aufgelisteten Artikel/Teile als JSON. Ignoriere Qualität, extrahiere auch von schlechten Bildern:
+              text: `Beschreibe ALL TEXT im Bild. Listen Sie jeden Artikel/Teil auf:
 
-{"teile":[{"beschreibung":"TEXT DER ARTIKEL","menge":ZAHL}],"confidence":0.5}
+Beispiel Response:
+- Ölfilter, 2 Stück
+- Bremsbeläge, 1 Set
+- Luftfilter, 3 Stück
 
-MUSS enthalten:
-- teile: Array mit mindestens beschreibung und menge
-- confidence: 0.1-1.0
-
-Optional:
-- teilenummer, lieferant, preis, lieferdatum, bestellnummer
-
-Antworte NUR mit gültigem JSON. Wenn du IRGENDWELCHEN Text siehst, extrahiere ihn als Artikel.`,
+Antworte mit einfacher Liste, ein Artikel pro Zeile.`,
             },
           ],
         },
       ],
     })
 
-    // Parse Antwort
     const content = response.content[0]
     if (content.type !== 'text') {
-      console.error('[Lieferschein] Unexpected content type:', content.type)
-      return {
-        erfolg: false,
-        fehler: 'Unerwartete API-Antwort',
-        teile: [],
-        confidence: 0,
+      throw new Error('Keine Text-Antwort erhalten')
+    }
+
+    console.log('[Lieferschein] Claude full response:', content.text)
+
+    // Parse aus Text
+    const lines = content.text.split('\n').filter(l => l.trim())
+    const teile: ScannedPart[] = []
+
+    for (const line of lines) {
+      if (!line.match(/^[-•\s]/)) continue
+
+      const cleaned = line.replace(/^[-•\s]+/, '').trim()
+      if (!cleaned) continue
+
+      // Versuche Menge zu extrahieren
+      let menge = 1
+      const mengeMatch = cleaned.match(/(\d+)\s*(stk|st|piece|pcs|x|menge|qty|set|sets|paar)/i)
+      if (mengeMatch) {
+        menge = parseInt(mengeMatch[1])
+      }
+
+      const beschreibung = cleaned.replace(/\d+\s*(stk|st|piece|pcs|x|menge|qty|set|sets|paar).*/i, '').trim()
+
+      if (beschreibung.length > 2) {
+        teile.push({
+          beschreibung,
+          menge,
+        })
       }
     }
 
-    console.log('[Lieferschein] Claude response:', content.text.substring(0, 200))
-
-    // Extrahiere JSON
-    const jsonMatch = content.text.match(/\{[\s\S]*\}/)
-    if (!jsonMatch) {
-      console.error('[Lieferschein] No JSON found in response:', content.text)
-      return {
-        erfolg: false,
-        fehler: 'Kein JSON in Antwort gefunden',
-        teile: [],
-        confidence: 0,
-      }
-    }
-
-    let parsed
-    try {
-      parsed = JSON.parse(jsonMatch[0])
-    } catch (parseError) {
-      console.error('[Lieferschein] JSON parse error:', parseError)
-      return {
-        erfolg: false,
-        fehler: 'JSON-Parse-Fehler',
-        teile: [],
-        confidence: 0,
-      }
-    }
-
-    console.log('[Lieferschein] Parsed result:', parsed)
-
-    // Erfolg wenn Teile gefunden wurden und Beschreibung vorhanden ist
-    const teile = (parsed.teile || []).filter((t: any) => t.beschreibung?.trim())
-    const confidence = Math.max(parsed.confidence || 0, teile.length > 0 ? 0.5 : 0)
+    console.log('[Lieferschein] Extracted parts:', teile)
 
     return {
       erfolg: teile.length > 0,
-      teile: teile,
-      lieferdatum: parsed.lieferdatum,
-      lieferant: parsed.lieferant,
-      bestellnummer: parsed.bestellnummer,
-      confidence: confidence,
+      teile,
+      confidence: teile.length > 0 ? 0.7 : 0,
     }
   } catch (error: any) {
+    console.error('[Lieferschein] Error:', error.message, error)
     return {
       erfolg: false,
-      fehler: error.message,
+      fehler: `Fehler beim Scannen: ${error.message}`,
       teile: [],
       confidence: 0,
     }
