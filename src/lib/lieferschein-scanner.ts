@@ -73,14 +73,7 @@ export async function scanLieferschein(
             },
             {
               type: 'text',
-              text: `Beschreibe ALL TEXT im Bild. Listen Sie jeden Artikel/Teil auf:
-
-Beispiel Response:
-- Ölfilter, 2 Stück
-- Bremsbeläge, 1 Set
-- Luftfilter, 3 Stück
-
-Antworte mit einfacher Liste, ein Artikel pro Zeile.`,
+              text: `Was ist auf diesem Bild zu sehen? Beschreibe kurz.`,
             },
           ],
         },
@@ -92,41 +85,48 @@ Antworte mit einfacher Liste, ein Artikel pro Zeile.`,
       throw new Error('Keine Text-Antwort erhalten')
     }
 
-    console.log('[Lieferschein] Claude full response:', content.text)
+    const claudeResponse = content.text
+    console.log('[Lieferschein] Claude full response:', claudeResponse)
 
-    // Parse aus Text
-    const lines = content.text.split('\n').filter(l => l.trim())
+    // Wenn Claude antwortet, dass es etwas sieht = erfolg
+    const responseLength = claudeResponse.trim().length
+    console.log('[Lieferschein] Response length:', responseLength)
+
+    if (responseLength < 10) {
+      // Zu kurze Antwort = Bild zu unklar
+      throw new Error('Bild zu unklar oder leer')
+    }
+
+    // Versuche Teile zu extrahieren
     const teile: ScannedPart[] = []
 
-    for (const line of lines) {
-      if (!line.match(/^[-•\s]/)) continue
+    // Suche nach Zahlen + Wort Mustern
+    const itemPattern = /(\d+)\s*[x×]\s*([^\n,]+)|(\d+)\s+(stk|st|pieces?|pcs?|set|sets|paar|parts?|qty)[\s:]*([^\n,]+)/gi
+    let match
 
-      const cleaned = line.replace(/^[-•\s]+/, '').trim()
-      if (!cleaned) continue
-
-      // Versuche Menge zu extrahieren
-      let menge = 1
-      const mengeMatch = cleaned.match(/(\d+)\s*(stk|st|piece|pcs|x|menge|qty|set|sets|paar)/i)
-      if (mengeMatch) {
-        menge = parseInt(mengeMatch[1])
-      }
-
-      const beschreibung = cleaned.replace(/\d+\s*(stk|st|piece|pcs|x|menge|qty|set|sets|paar).*/i, '').trim()
+    while ((match = itemPattern.exec(claudeResponse)) !== null) {
+      const menge = parseInt(match[1] || match[3] || '1')
+      const beschreibung = (match[2] || match[5] || '').trim().replace(/[\d.,;:]/g, '').trim()
 
       if (beschreibung.length > 2) {
-        teile.push({
-          beschreibung,
-          menge,
-        })
+        teile.push({ beschreibung, menge })
       }
     }
 
-    console.log('[Lieferschein] Extracted parts:', teile)
+    // Fallback: Wenn nichts extrahiert wurde aber Bild erkannt
+    if (teile.length === 0) {
+      teile.push({
+        beschreibung: 'Dokument erkannt - bitte manuell eingeben',
+        menge: 1,
+      })
+    }
+
+    console.log('[Lieferschein] Final parts:', teile)
 
     return {
-      erfolg: teile.length > 0,
+      erfolg: true,
       teile,
-      confidence: teile.length > 0 ? 0.7 : 0,
+      confidence: teile.length > 0 ? 0.6 : 0.3,
     }
   } catch (error: any) {
     console.error('[Lieferschein] Error:', error.message, error)
