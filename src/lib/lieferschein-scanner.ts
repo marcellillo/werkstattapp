@@ -71,33 +71,18 @@ export async function scanLieferschein(
             },
             {
               type: 'text',
-              text: `Du bist ein OCR-Experte. Extrahiere ALLE Teile/Artikel/Positionen aus diesem Dokument/Bild als JSON, egal welches Format:
+              text: `Extrahiere aus diesem Bild ALLE aufgelisteten Artikel/Teile als JSON. Ignoriere Qualität, extrahiere auch von schlechten Bildern:
 
-{
-  "teile": [
-    {
-      "teilenummer": "optional - Artikelnummer, SKU, Nummer",
-      "beschreibung": "Teilname/Beschreibung - MUSS ausgefüllt sein",
-      "menge": "Menge als Zahl (1, 2, 5, etc.)",
-      "lieferant": "optional - Lieferant/Hersteller",
-      "preis": "optional - Preis als Dezimalzahl"
-    }
-  ],
-  "lieferdatum": "Datum wenn vorhanden",
-  "lieferant": "Name des Lieferanten/Absenders",
-  "bestellnummer": "Nummer/ID wenn vorhanden",
-  "confidence": "0.5 wenn Text erkannt, 1.0 wenn klar"
-}
+{"teile":[{"beschreibung":"TEXT DER ARTIKEL","menge":ZAHL}],"confidence":0.5}
 
-ANLEITUNG:
-1. ALLE Teile/Artikel/Positionen auflisten die du siehst
-2. beschreibung ist IMMER erforderlich
-3. menge: 1 wenn nicht sichtbar
-4. confidence: mindestens 0.5 wenn du Text erkennst, 1.0 wenn sehr klar
-5. NUR JSON-Code, keine Kommentare
+MUSS enthalten:
+- teile: Array mit mindestens beschreibung und menge
+- confidence: 0.1-1.0
 
-Beispiel gültiger Output:
-{"teile":[{"beschreibung":"Ölfilter","menge":2,"preis":15.50}],"confidence":0.9}`,
+Optional:
+- teilenummer, lieferant, preis, lieferdatum, bestellnummer
+
+Antworte NUR mit gültigem JSON. Wenn du IRGENDWELCHEN Text siehst, extrahiere ihn als Artikel.`,
             },
           ],
         },
