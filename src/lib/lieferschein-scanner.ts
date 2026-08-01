@@ -71,29 +71,33 @@ export async function scanLieferschein(
             },
             {
               type: 'text',
-              text: `Analysiere dieses Dokument und extrahiere alle aufgelisteten Teile/Artikel als JSON:
+              text: `Du bist ein OCR-Experte. Extrahiere ALLE Teile/Artikel/Positionen aus diesem Dokument/Bild als JSON, egal welches Format:
 
 {
   "teile": [
     {
-      "teilenummer": "string (optional, z.B. Artikelnummer, SKU)",
-      "beschreibung": "string (Teilbezeichnung/Name)",
-      "menge": number (Menge/Anzahl),
-      "lieferant": "string (optional, Name des Lieferanten)",
-      "preis": number (optional, Preis pro Stück in EUR)
+      "teilenummer": "optional - Artikelnummer, SKU, Nummer",
+      "beschreibung": "Teilname/Beschreibung - MUSS ausgefüllt sein",
+      "menge": "Menge als Zahl (1, 2, 5, etc.)",
+      "lieferant": "optional - Lieferant/Hersteller",
+      "preis": "optional - Preis als Dezimalzahl"
     }
   ],
-  "lieferdatum": "YYYY-MM-DD (optional)",
-  "lieferant": "string (optional, Absender/Lieferant)",
-  "bestellnummer": "string (optional, Rechnungs-/Bestellnummer)",
-  "confidence": number (0-1, Erkennungssicherheit: 1=sehr sicher, 0=nicht erkannt)
+  "lieferdatum": "Datum wenn vorhanden",
+  "lieferant": "Name des Lieferanten/Absenders",
+  "bestellnummer": "Nummer/ID wenn vorhanden",
+  "confidence": "0.5 wenn Text erkannt, 1.0 wenn klar"
 }
 
-WICHTIG:
-- Extrahiere ALLE aufgelisteten Teile/Positionen
-- Für menge: 0 setzen wenn nicht klar erkannt
-- confidence: 0.8-1.0 wenn dies ein Lieferschein/Artikel-Liste ist, sonst 0.1-0.3
-- Nur das JSON zurückgeben, keine anderen Kommentare`,
+ANLEITUNG:
+1. ALLE Teile/Artikel/Positionen auflisten die du siehst
+2. beschreibung ist IMMER erforderlich
+3. menge: 1 wenn nicht sichtbar
+4. confidence: mindestens 0.5 wenn du Text erkennst, 1.0 wenn sehr klar
+5. NUR JSON-Code, keine Kommentare
+
+Beispiel gültiger Output:
+{"teile":[{"beschreibung":"Ölfilter","menge":2,"preis":15.50}],"confidence":0.9}`,
             },
           ],
         },
@@ -141,13 +145,17 @@ WICHTIG:
 
     console.log('[Lieferschein] Parsed result:', parsed)
 
+    // Erfolg wenn Teile gefunden wurden und Beschreibung vorhanden ist
+    const teile = (parsed.teile || []).filter((t: any) => t.beschreibung?.trim())
+    const confidence = Math.max(parsed.confidence || 0, teile.length > 0 ? 0.5 : 0)
+
     return {
-      erfolg: (parsed.confidence || 0) > 0.2 && (parsed.teile?.length || 0) > 0,
-      teile: parsed.teile || [],
+      erfolg: teile.length > 0,
+      teile: teile,
       lieferdatum: parsed.lieferdatum,
       lieferant: parsed.lieferant,
       bestellnummer: parsed.bestellnummer,
-      confidence: parsed.confidence || 0,
+      confidence: confidence,
     }
   } catch (error: any) {
     return {
