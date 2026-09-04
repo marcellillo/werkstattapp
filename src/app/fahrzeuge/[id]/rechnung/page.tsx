@@ -18,7 +18,7 @@ export default async function RechnungPage({ params }: { params: Promise<{ id: s
       .eq('betrieb_id', betriebId)
       .eq('id', id)
       .single(),
-    supabase.from('werkstatt_einstellungen').select('schluessel, wert'),
+    supabase.from('betrieb_einstellungen').select('schluessel, wert').eq('betrieb_id', betriebId),
   ])
 
   if (!auftrag) notFound()
@@ -28,5 +28,5 @@ export default async function RechnungPage({ params }: { params: Promise<{ id: s
     if (row.wert) cfg[row.schluessel] = row.wert
   }
 
-  return <RechnungFlow auftrag={auftrag as any} firma={cfg} />
+  return <RechnungFlow auftrag={auftrag as any} firma={cfg} betriebId={betriebId} />
 }

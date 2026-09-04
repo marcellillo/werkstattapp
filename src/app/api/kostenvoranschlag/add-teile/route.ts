@@ -7,50 +7,59 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { kostenvoranschlag_id, teile, betrieb_id } = await req.json()
+    const { kostenvoranschlag_id, betrieb_id, teile } = await req.json()
+
+    console.log('[Add-Teile] Input:', { kostenvoranschlag_id, betrieb_id, teilCount: teile?.length })
 
     if (!kostenvoranschlag_id || !teile || !Array.isArray(teile)) {
-      return NextResponse.json({ error: 'Missing parameters' }, { status: 400 })
+      return NextResponse.json({ error: 'Invalid input' }, { status: 400 })
     }
 
-    // Füge jedes Teil als Position ein
-    const positionen = teile.map((teil: any) => ({
-      kostenvoranschlag_id,
-      betrieb_id,
-      beschreibung: teil.beschreibung,
-      menge: teil.menge || 1,
-      einzelpreis: teil.preis || 0,
-      gesamtpreis: (teil.menge || 1) * (teil.preis || 0),
-    }))
+    // Füge jedes Teil zur Tabelle hinzu (mit 45% Aufschlag auf Preis wenn vorhanden)
+    const positionen = teile.map(teil => {
+      const einzelpreis = teil.preis ? teil.preis * 1.45 : undefined
+      const gesamtpreis = einzelpreis ? einzelpreis * (teil.menge || 1) : undefined
+
+      return {
+        kostenvoranschlag_id,
+        betrieb_id,
+        beschreibung: teil.beschreibung || '',
+        menge: teil.menge || 1,
+        ...(einzelpreis && { einzelpreis }),
+        ...(gesamtpreis && { gesamtpreis }),
+      }
+    })
+
+    console.log('[Add-Teile] Positionen to insert:', JSON.stringify(positionen, null, 2))
 
     const { data, error } = await supabase
       .from('kostenvoranschlag_position')
       .insert(positionen)
       .select()
 
-    if (error) throw error
+    console.log('[Add-Teile] DB Response:', { error, dataCount: data?.length })
+    if (error) {
+      console.error('[Add-Teile] DB Error:', error)
+      throw new Error(`DB Error: ${error.message}`)
+    }
 
-    // Berechne Gesamtsumme des Kostenvoranschlags
-    const { data: allPositionen } = await supabase
-      .from('kostenvoranschlag_position')
-      .select('gesamtpreis')
-      .eq('kostenvoranschlag_id', kostenvoranschlag_id)
-
-    const gesamt = (allPositionen || []).reduce((sum: number, p: any) => sum + (p.gesamtpreis || 0), 0)
-
-    // Update Kostenvoranschlag Gesamtsumme
-    await supabase
-      .from('kostenvoranschlaege')
-      .update({ gesamt_betrag: gesamt })
-      .eq('id', kostenvoranschlag_id)
+    // Sobald echte Einzelteile erfasst wurden, auf "Einzeln"-Modus umstellen —
+    // sonst würde die Rechnung weiterhin die (meist leere) Festpreis-Pauschale nehmen
+    // statt der Summe der tatsächlich erfassten Teile.
+    if ((data?.length || 0) > 0) {
+      await supabase
+        .from('kostenvoranschlaege')
+        .update({ ersatzteile_modus: 'einzeln' })
+        .eq('id', kostenvoranschlag_id)
+    }
 
     return NextResponse.json({
       erfolg: true,
-      positionen_hinzugefuegt: data?.length || 0,
-      gesamt_betrag: gesamt,
+      hinzugefuegt: data?.length || 0,
+      teile: data || [],
     })
   } catch (error: any) {
-    console.error('[Kostenvoranschlag Add Teile] Error:', error)
+    console.error('[Kostenvoranschlag Add-Teile] Error:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }

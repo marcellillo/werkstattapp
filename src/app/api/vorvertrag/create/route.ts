@@ -32,13 +32,14 @@ export async function POST(req: NextRequest) {
     }
 
     // Prüfe Betrieb-Zugriff
-    const { data: betriebCheck } = await supabase
+    const { data: betriebCheck, error: checkError } = await supabase
       .from('betrieb_users')
       .select('id')
       .eq('betrieb_id', betrieb_id)
-      .eq('user_id', user.id)
-      .single()
+      .eq('profile_id', user.id)
+      .maybeSingle()
 
+    if (checkError) throw checkError
     if (!betriebCheck) {
       return NextResponse.json({ error: 'Betrieb-Zugriff verweigert' }, { status: 403 })
     }

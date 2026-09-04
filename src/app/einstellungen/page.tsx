@@ -26,12 +26,16 @@ export default async function EinstellungenPage() {
     .eq('id', betriebId)
     .single()
 
-  // Load settings
-  const { data: settings } = await supabase
+  // Load settings (Key-Value-Tabelle: eine Zeile pro schluessel/wert)
+  const { data: settingsRows } = await supabase
     .from('betrieb_einstellungen')
-    .select('*')
+    .select('schluessel, wert')
     .eq('betrieb_id', betriebId)
-    .single()
+
+  const settings: Record<string, string> = {}
+  for (const row of settingsRows ?? []) {
+    if (row.wert !== null) settings[row.schluessel] = row.wert
+  }
 
   // Build config with defaults
   const initialConfig = {
@@ -56,6 +60,9 @@ export default async function EinstellungenPage() {
     firma_iban: settings?.firma_iban ?? '',
     firma_bic: settings?.firma_bic ?? '',
     firma_bank: settings?.firma_bank ?? '',
+    firma_geschaeftsfuehrer: settings?.firma_geschaeftsfuehrer ?? '',
+    firma_hrb: settings?.firma_hrb ?? '',
+    firma_amtsgericht: settings?.firma_amtsgericht ?? '',
     firma_stundensatz: settings?.firma_stundensatz ?? '',
     firma_kleinunternehmer: settings?.firma_kleinunternehmer ?? '',
     firma_logo: settings?.firma_logo ?? '',

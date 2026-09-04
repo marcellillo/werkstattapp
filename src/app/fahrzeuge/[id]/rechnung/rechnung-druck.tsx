@@ -1,8 +1,8 @@
 'use client'
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import { useQrDataUrl } from '@/components/ui/qr-code'
 import { buildGiroCode } from '@/lib/girocode'
-import { createClient } from '@/lib/supabase/client'
+import type { RechnungDetail } from '@/lib/rechnung-detail'
 
 function fmt(date?: string | null) {
   if (!date) return '—'
@@ -15,17 +15,13 @@ function fmtEuro(n: number) {
 type EmailStatus = 'idle' | 'senden' | 'ok' | 'fehler'
 
 function EmailModal({
-  auftrag, firma, onClose,
-}: { auftrag: any; firma: Record<string, string>; onClose: () => void }) {
-  const kd = auftrag.kunde ?? {}
+  detail, betriebId, onClose,
+}: { detail: RechnungDetail; betriebId: string; onClose: () => void }) {
+  const kd = detail.kunde ?? {}
   const [an, setAn] = useState(kd.email ?? '')
   const [nachricht, setNachricht] = useState('')
   const [status, setStatus] = useState<EmailStatus>('idle')
   const [fehlerMsg, setFehlerMsg] = useState('')
-
-  const rechnungsJahr = new Date(auftrag.fertiggestellt_am ?? auftrag.erstellt_am ?? new Date()).getFullYear()
-  const auftragNummer = (auftrag.auftrag_nr ?? '').replace(/^AU-/i, '')
-  const rechnungsNr = `RE-${auftragNummer}-${rechnungsJahr}`
 
   async function senden() {
     if (!an.trim()) return
@@ -35,7 +31,7 @@ function EmailModal({
       const res = await fetch('/api/rechnung-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ auftrag, firma, an: an.trim(), nachricht: nachricht.trim() || undefined }),
+        body: JSON.stringify({ rechnungId: detail.rechnung.id, betriebId, an: an.trim(), nachricht: nachricht.trim() || undefined }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'Fehler beim Senden')
@@ -56,7 +52,7 @@ function EmailModal({
           <div style={{ textAlign: 'center', padding: '12px 0' }}>
             <div style={{ fontSize: '48px', marginBottom: '12px' }}>✅</div>
             <div style={{ fontSize: '18px', fontWeight: 700, color: '#15803d', marginBottom: '6px' }}>Rechnung gesendet!</div>
-            <div style={{ fontSize: '13px', color: '#64748b', marginBottom: '20px' }}>{rechnungsNr} wurde an <strong>{an}</strong> gesendet.</div>
+            <div style={{ fontSize: '13px', color: '#64748b', marginBottom: '20px' }}>{detail.rechnung.rechnungs_nr} wurde an <strong>{an}</strong> gesendet.</div>
             <button onClick={onClose} style={{ background: '#1e293b', color: 'white', border: 'none', borderRadius: '10px', padding: '10px 24px', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}>Schließen</button>
           </div>
         ) : (
@@ -64,7 +60,7 @@ function EmailModal({
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
               <div>
                 <div style={{ fontSize: '17px', fontWeight: 700, color: '#1e293b' }}>Rechnung per E-Mail senden</div>
-                <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>{rechnungsNr}</div>
+                <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>{detail.rechnung.rechnungs_nr}</div>
               </div>
               <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px', color: '#94a3b8', lineHeight: 1 }}>×</button>
             </div>
@@ -118,101 +114,59 @@ function EmailModal({
   )
 }
 
-export function RechnungDruck({ auftrag, firma }: { auftrag: any; firma: Record<string, string> }) {
+export function RechnungDruck({ rechnungId, betriebId, firma: firmaHint }: { rechnungId: string; betriebId: string; firma?: Record<string, string> }) {
+  const [detail, setDetail] = useState<RechnungDetail | null>(null)
+  const [ladeFehler, setLadeFehler] = useState<string | null>(null)
   const [emailModalOffen, setEmailModalOffen] = useState(false)
-  const [gespeichert, setGespeichert] = useState(false)
-  const savedRef = useRef(false)
-  const supabase = createClient()
-  const giroCode = firma.firma_iban
+
+  useEffect(() => {
+    let abgebrochen = false
+    fetch('/api/rechnung/detail', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rechnungId, betriebId }),
+    })
+      .then(res => res.json().then(data => ({ ok: res.ok, data })))
+      .then(({ ok, data }) => {
+        if (abgebrochen) return
+        if (!ok) { setLadeFehler(data.error || 'Rechnung konnte nicht geladen werden'); return }
+        setDetail(data)
+      })
+      .catch(e => { if (!abgebrochen) setLadeFehler(e.message) })
+    return () => { abgebrochen = true }
+  }, [rechnungId, betriebId])
+
+  useEffect(() => {
+    if (detail) window.print()
+  }, [detail])
+
+  // Hooks müssen unabhängig vom Ladezustand in gleicher Reihenfolge aufgerufen werden
+  const firmaSafe = detail?.firma
+  const giroCode = firmaSafe?.firma_iban
     ? buildGiroCode({
-        bic: firma.firma_bic,
-        name: firma.firma_name || 'Werkstatt',
-        iban: firma.firma_iban,
-        betrag: undefined, // kein Betrag vorausfüllen — Kunde wählt selbst
-        verwendungszweck: `Rechnung ${(auftrag.auftrag_nr ?? '').replace(/^AU-/i, '')}`,
+        bic: firmaSafe.firma_bic,
+        name: firmaSafe.firma_name || 'Werkstatt',
+        iban: firmaSafe.firma_iban,
+        betrag: undefined,
+        verwendungszweck: `Rechnung ${detail?.rechnung.rechnungs_nr ?? ''}`,
       })
     : null
   const giroQr = useQrDataUrl(giroCode ?? '')
-  const paypalQr = useQrDataUrl(firma.firma_paypal ?? '')
-  const sumupQr = useQrDataUrl(firma.firma_sumup ?? '')
-  const stripeQr = useQrDataUrl(firma.firma_stripe ?? '')
-  const fz = auftrag.fahrzeug ?? {}
-  const kd = auftrag.kunde ?? {}
-  const teile = (auftrag.ersatzteile ?? []) as any[]
-  const kleinunternehmer = firma.firma_kleinunternehmer === 'ja'
+  const paypalQr = useQrDataUrl(firmaSafe?.firma_paypal ?? '')
+  const sumupQr = useQrDataUrl(firmaSafe?.firma_sumup ?? '')
+  const stripeQr = useQrDataUrl(firmaSafe?.firma_stripe ?? '')
+
+  if (ladeFehler) {
+    return <div style={{ padding: 40, textAlign: 'center', color: '#dc2626' }}>{ladeFehler}</div>
+  }
+  if (!detail) {
+    return <div style={{ padding: 40, textAlign: 'center', color: '#64748b' }}>Wird geladen...</div>
+  }
+
+  const { rechnung, kunde: kd, fahrzeug: fz, firma, kleinunternehmer, ersatzteilePositionen, arbeitswertePositionen } = detail
   const mwstSatz = kleinunternehmer ? 0 : 19
 
-  // Teile-Netto (einzelpreis in DB ist Bruttopreis bei MwSt, Nettopreis bei Kleinunternehmer)
-  const teileNetto = teile.reduce((s: number, t: any) => {
-    const ep = kleinunternehmer ? (t.einzelpreis ?? 0) : (t.einzelpreis ?? 0) / 1.19
-    return s + ep * (t.menge ?? 1)
-  }, 0)
-
-  // Werte kommen vom Flow vorberechnet (via _arbeit_netto etc.)
-  const arbeitNetto: number = auftrag._arbeit_netto ?? 0
-  const sonstigesNetto: number = auftrag._sonstiges_netto ?? 0
-  const kleinteilNetto: number = auftrag._kleinteil_netto ?? 0
-  const gesamtNetto = teileNetto + arbeitNetto + sonstigesNetto + kleinteilNetto
-  const mwstBetrag = kleinunternehmer ? 0 : gesamtNetto * 0.19
-  const gesamtBrutto = gesamtNetto + mwstBetrag
-
-  const rechnungsDatum = auftrag.fertiggestellt_am ?? auftrag.aktualisiert_am ?? new Date().toISOString()
-  const zahlungsziel = new Date(new Date(rechnungsDatum).getTime() + 14 * 86_400_000)
-  const rechnungsJahr = new Date(rechnungsDatum).getFullYear()
-  const auftragNummer = (auftrag.auftrag_nr ?? '').replace(/^AU-/i, '')
-  const rechnungsNr = `RE-${auftragNummer}-${rechnungsJahr}`
-
-  useEffect(() => {
-    window.print()
-    if (savedRef.current) return
-    savedRef.current = true
-
-    async function speichern() {
-      const fz = auftrag.fahrzeug ?? {}
-      const kd = auftrag.kunde ?? {}
-      const teile = (auftrag.ersatzteile ?? []) as any[]
-      const kleinunternehmer = firma.firma_kleinunternehmer === 'ja'
-
-      const teileNetto = teile.reduce((s: number, t: any) => {
-        const ep = kleinunternehmer ? (t.einzelpreis ?? 0) : (t.einzelpreis ?? 0) / 1.19
-        return s + ep * (t.menge ?? 1)
-      }, 0)
-      const arbeitNetto: number = auftrag._arbeit_netto ?? 0
-      const sonstigesNetto: number = auftrag._sonstiges_netto ?? 0
-      const kleinteilNetto: number = auftrag._kleinteil_netto ?? 0
-      const gesamtNetto = teileNetto + arbeitNetto + sonstigesNetto + kleinteilNetto
-      const mwstBetrag = kleinunternehmer ? 0 : gesamtNetto * 0.19
-      const gesamtBrutto = gesamtNetto + mwstBetrag
-
-      const rechnungsDatum = auftrag.fertiggestellt_am ?? auftrag.aktualisiert_am ?? new Date().toISOString()
-      const rechnungsJahr = new Date(rechnungsDatum).getFullYear()
-      const auftragNummer = (auftrag.auftrag_nr ?? '').replace(/^AU-/i, '')
-      const rechnungsNr = `RE-${auftragNummer}-${rechnungsJahr}`
-      const faelligAm = new Date(new Date(rechnungsDatum).getTime() + 14 * 86_400_000).toISOString().split('T')[0]
-
-      // Auftrag.einnahmen aktualisieren
-      await supabase.from('auftraege')
-        .update({ einnahmen: gesamtBrutto })
-        .eq('id', auftrag.id)
-
-      // Kundenrechnung speichern (upsert auf rechnungs_nr — verhindert Duplikate bei mehrfachem Drucken)
-      await supabase.from('kunden_rechnungen').upsert({
-        rechnungs_nr: rechnungsNr,
-        auftrag_id: auftrag.id,
-        kunde_id: kd.id ?? null,
-        fahrzeug_id: fz.id ?? null,
-        betrag_netto: gesamtNetto,
-        betrag_mwst: mwstBetrag,
-        betrag_brutto: gesamtBrutto,
-        faellig_am: faelligAm,
-        status: 'offen',
-      }, { onConflict: 'rechnungs_nr', ignoreDuplicates: false })
-
-      setGespeichert(true)
-    }
-
-    speichern()
-  }, [])
+  const zahlungsziel = new Date(new Date(rechnung.erstellt_am).getTime() + 14 * 86_400_000)
 
   return (
     <>
@@ -223,7 +177,6 @@ export function RechnungDruck({ auftrag, firma }: { auftrag: any; firma: Record<
         @media print { .no-print { display: none !important; } body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
         .page { max-width: 794px; margin: 0 auto; padding: 20px; }
 
-        /* Briefkopf */
         .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; }
         .firma-name { font-size: 17px; font-weight: 700; color: #ea580c; }
         .firma-details { font-size: 9.5px; color: #555; margin-top: 3px; line-height: 1.55; }
@@ -232,35 +185,34 @@ export function RechnungDruck({ auftrag, firma }: { auftrag: any; firma: Record<
         .rechnung-nr { font-size: 11px; color: #64748b; margin-top: 3px; }
         .rechnung-datum { font-size: 9.5px; color: #94a3b8; margin-top: 2px; }
 
-        /* Trennlinie */
         .trennlinie { border: none; border-top: 2px solid #ea580c; margin: 10px 0; }
 
-        /* Adressblock */
         .adressen { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 14px; }
         .adresse-label { font-size: 8.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #94a3b8; margin-bottom: 4px; }
         .adresse-wert { font-size: 10.5px; line-height: 1.6; }
         .adresse-wert strong { font-size: 11px; }
 
-        /* Fahrzeug-Info */
         .fz-box { background: #f1f5f9; border: 1.5px solid #cbd5e1; border-radius: 7px; padding: 8px 12px; margin-bottom: 14px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
         .fz-feld { border-right: 1px solid #e2e8f0; padding-right: 6px; }
         .fz-feld:last-child { border-right: none; }
         .fz-label { font-size: 7.5px; text-transform: uppercase; color: #64748b; letter-spacing: 0.06em; font-weight: 700; }
         .fz-wert { font-size: 10.5px; font-weight: 700; color: #0f172a; margin-top: 2px; }
 
-        /* Positionen-Tabelle */
+        .absenderzeile { font-size: 7.5px; font-style: italic; color: #94a3b8; margin-bottom: 8px; }
+
+        .section-box { margin-bottom: 14px; border: 1.5px solid #cbd5e1; border-radius: 7px; overflow: hidden; }
+        .section-titel { background: #1e293b; color: white; font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; padding: 6px 10px; }
         table { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
-        thead tr { background: #1e293b; color: white; }
-        th { padding: 6px 8px; text-align: left; font-size: 8.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
+        thead tr { background: #f1f5f9; }
+        th { padding: 6px 8px; text-align: left; font-size: 8.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #475569; }
         th.ta-right { text-align: right; }
         td { padding: 5px 8px; font-size: 9.5px; border-bottom: 1px solid #f1f5f9; }
         td.ta-right { text-align: right; }
-        tr.section-header td { background: #f8fafc; font-weight: 700; font-size: 9.5px; color: #475569; padding: 4px 8px; }
+        tr.section-summe td { font-weight: 700; font-size: 10px; border-top: 1.5px solid #cbd5e1; background: #f8fafc; }
         tr.summen td { padding: 4px 8px; font-size: 10.5px; }
         tr.gesamt td { font-weight: 700; font-size: 12px; border-top: 2px solid #1e293b; background: #f8fafc; }
         tr.mwst-hinweis td { font-size: 8.5px; color: #64748b; font-style: italic; padding: 6px 8px; }
 
-        /* Zahlungsinfo — 3 Spalten wenn QR vorhanden, sonst 2 */
         .zahlung { display: grid; gap: 12px; margin-top: 14px; }
         .zahlung-2 { grid-template-columns: 1fr 1fr; }
         .zahlung-3 { grid-template-columns: 1fr 1fr auto; }
@@ -268,13 +220,11 @@ export function RechnungDruck({ auftrag, firma }: { auftrag: any; firma: Record<
         .zahlung-titel { font-size: 8.5px; font-weight: 700; text-transform: uppercase; color: #475569; letter-spacing: 0.06em; margin-bottom: 6px; border-bottom: 1px solid #cbd5e1; padding-bottom: 5px; }
         .zahlung-wert { font-size: 10.5px; line-height: 1.75; }
         .zahlung-wert strong { color: #ea580c; }
-        /* QR-Spalte */
         .qr-box { background: #f1f5f9; border: 1.5px solid #cbd5e1; border-radius: 7px; padding: 10px 13px; display: flex; flex-direction: column; gap: 8px; }
         .qr-item { display: flex; align-items: center; gap: 8px; }
         .qr-label { font-size: 8.5px; font-weight: 700; text-transform: uppercase; color: #475569; letter-spacing: 0.05em; }
         .qr-hint { font-size: 7.5px; color: #94a3b8; line-height: 1.35; margin-top: 1px; }
 
-        /* Fußzeile */
         .footer { margin-top: 14px; border-top: 1px solid #e2e8f0; padding-top: 8px; font-size: 8.5px; color: #94a3b8; text-align: center; line-height: 1.6; }
 
         .action-bar { position: fixed; top: 0; left: 0; right: 0; z-index: 999; display: flex; align-items: center; gap: 8px; padding: 10px 12px; padding-top: max(10px, env(safe-area-inset-top)); background: rgba(255,255,255,0.96); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border-bottom: 1px solid #e2e8f0; }
@@ -292,9 +242,9 @@ export function RechnungDruck({ auftrag, firma }: { auftrag: any; firma: Record<
         <button
           className="btn-wa"
           onClick={() => {
-            const tel = kd.telefon?.replace(/\D/g, '') ?? ''
+            const tel = kd?.telefon?.replace(/\D/g, '') ?? ''
             const msg = encodeURIComponent(
-              `Guten Tag ${kd.vorname ?? ''} ${kd.nachname ?? ''},\n\nIhre Rechnung Nr. ${rechnungsNr} liegt vor.\nGesamtbetrag: ${fmtEuro(gesamtBrutto)}\nZahlungsziel: ${zahlungsziel.toLocaleDateString('de-DE')}\n\nBitte Rechnungsnummer ${rechnungsNr} bei Überweisung angeben.${firma.firma_telefon ? `\n\nBei Fragen: ${firma.firma_telefon}` : ''}`
+              `Guten Tag ${kd?.vorname ?? ''} ${kd?.nachname ?? ''},\n\nIhre Rechnung Nr. ${rechnung.rechnungs_nr} liegt vor.\nGesamtbetrag: ${fmtEuro(rechnung.betrag_brutto)}\nZahlungsziel: ${zahlungsziel.toLocaleDateString('de-DE')}\n\nBitte Rechnungsnummer ${rechnung.rechnungs_nr} bei Überweisung angeben.${firma.firma_telefon ? `\n\nBei Fragen: ${firma.firma_telefon}` : ''}`
             )
             const url = tel ? `https://wa.me/${tel}?text=${msg}` : `https://wa.me/?text=${msg}`
             window.open(url, '_blank')
@@ -302,10 +252,9 @@ export function RechnungDruck({ auftrag, firma }: { auftrag: any; firma: Record<
         >📱 WhatsApp</button>
         <button className="btn-email" onClick={() => setEmailModalOffen(true)}>✉ E-Mail</button>
       </div>
-      {emailModalOffen && <EmailModal auftrag={auftrag} firma={firma} onClose={() => setEmailModalOffen(false)} />}
+      {emailModalOffen && <EmailModal detail={detail} betriebId={betriebId} onClose={() => setEmailModalOffen(false)} />}
 
       <div className="page">
-        {/* Briefkopf */}
         <div className="header">
           <div className="firma-block">
             {firma.firma_logo
@@ -321,20 +270,24 @@ export function RechnungDruck({ auftrag, firma }: { auftrag: any; firma: Record<
           </div>
           <div className="rechnung-block">
             <div className="rechnung-titel">RECHNUNG</div>
-            <div className="rechnung-nr">Nr. {rechnungsNr}</div>
-            <div className="rechnung-datum">Datum: {fmt(rechnungsDatum)}</div>
-            <div className="rechnung-datum">Leistungsdatum: {fmt(auftrag.fertiggestellt_am ?? auftrag.erstellt_am)}</div>
+            <div className="rechnung-nr">Nr. {rechnung.rechnungs_nr}</div>
+            <div className="rechnung-datum">Datum: {fmt(rechnung.erstellt_am)}</div>
           </div>
         </div>
 
         <hr className="trennlinie" />
 
-        {/* Adressen */}
+        <div className="absenderzeile">
+          {firma.firma_name || 'Kfz-Werkstatt'}
+          {firma.firma_strasse ? `, ${firma.firma_strasse}` : ''}
+          {(firma.firma_plz || firma.firma_ort) ? `, ${firma.firma_plz} ${firma.firma_ort}` : ''}
+        </div>
+
         <div className="adressen">
           <div className="adresse-box">
             <div className="adresse-label">Rechnungsempfänger</div>
             <div className="adresse-wert">
-              {(kd.vorname || kd.nachname) ? (
+              {(kd?.vorname || kd?.nachname) ? (
                 <>
                   {kd.firma && <><strong>{kd.firma}</strong><br /></>}
                   <strong>{kd.vorname} {kd.nachname}</strong><br />
@@ -358,128 +311,135 @@ export function RechnungDruck({ auftrag, firma }: { auftrag: any; firma: Record<
           </div>
         </div>
 
-        {/* Fahrzeugdaten */}
         <div className="fz-box">
-          <div className="fz-feld"><div className="fz-label">Fahrzeug</div><div className="fz-wert">{fz.marke} {fz.modell}</div></div>
-          <div className="fz-feld"><div className="fz-label">Kennzeichen</div><div className="fz-wert">{fz.kennzeichen || '—'}</div></div>
-          <div className="fz-feld"><div className="fz-label">FIN / VIN</div><div className="fz-wert">{fz.fahrgestellnummer || '—'}</div></div>
-          <div className="fz-feld"><div className="fz-label">Kilometerstand</div><div className="fz-wert">{fz.kilometerstand ? fz.kilometerstand.toLocaleString('de-DE') + ' km' : '—'}</div></div>
+          <div className="fz-feld"><div className="fz-label">Fahrzeug</div><div className="fz-wert">{fz?.marke} {fz?.modell}</div></div>
+          <div className="fz-feld"><div className="fz-label">Kennzeichen</div><div className="fz-wert">{fz?.kennzeichen || '—'}</div></div>
+          <div className="fz-feld"><div className="fz-label">FIN / VIN</div><div className="fz-wert">{fz?.fin || fz?.fahrgestellnummer || '—'}</div></div>
+          <div className="fz-feld"><div className="fz-label">Kilometerstand</div><div className="fz-wert">{fz?.kilometerstand ? fz.kilometerstand.toLocaleString('de-DE') + ' km' : '—'}</div></div>
         </div>
 
-        {/* Positionen */}
-        <table>
-          <thead>
-            <tr>
-              <th>Pos.</th>
-              <th>Beschreibung</th>
-              <th>Teile-Nr.</th>
-              <th className="ta-right">Menge</th>
-              <th className="ta-right">Einzel (netto)</th>
-              <th className="ta-right">Gesamt (netto)</th>
-            </tr>
-          </thead>
-          <tbody>
-            {/* Arbeitsleistung */}
-            <tr className="section-header"><td colSpan={6}>Arbeitsleistung</td></tr>
-            <tr>
-              <td>1</td>
-              <td>
-                Reparatur- und Wartungsarbeiten<br />
-                <span style={{fontSize: '9px', color: '#64748b'}}>
-                  {auftrag._arbeit_stunden
-                    ? `${auftrag._arbeit_stunden} Std. × ${auftrag._stundensatz} €/Std.`
-                    : (auftrag.arbeiten || 'Gemäß Auftrag Nr. ' + auftrag.auftrag_nr)}
-                </span>
-              </td>
-              <td>—</td>
-              <td className="ta-right">{auftrag._arbeit_stunden ? `${auftrag._arbeit_stunden} h` : '1'}</td>
-              <td className="ta-right">{auftrag._arbeit_stunden ? fmtEuro(auftrag._stundensatz ?? 0) : fmtEuro(arbeitNetto)}</td>
-              <td className="ta-right">{fmtEuro(arbeitNetto)}</td>
-            </tr>
-
-            {/* Ersatzteile */}
-            {teile.length > 0 && (
-              <>
-                <tr className="section-header"><td colSpan={6}>Ersatzteile &amp; Material</td></tr>
-                {teile.map((t: any, i: number) => {
-                  const ep = kleinunternehmer ? (t.einzelpreis ?? 0) : (t.einzelpreis ?? 0) / 1.19
-                  const gp = ep * (t.menge ?? 1)
-                  return (
-                    <tr key={t.id}>
-                      <td>{i + 2}</td>
-                      <td>{t.bezeichnung}{t.lieferant ? ` (${t.lieferant})` : ''}</td>
-                      <td style={{fontFamily:'monospace', fontSize:'9px'}}>{t.teilenummer || '—'}</td>
-                      <td className="ta-right">{t.menge}x</td>
-                      <td className="ta-right">{fmtEuro(ep)}</td>
-                      <td className="ta-right">{fmtEuro(gp)}</td>
-                    </tr>
-                  )
-                })}
-              </>
-            )}
-
-            {/* Kleinteilpauschale */}
-            {kleinteilNetto > 0 && (
-              <>
-                <tr className="section-header"><td colSpan={6}>Kleinteilpauschale</td></tr>
+        {/* Ersatzteile — eigene Box */}
+        {ersatzteilePositionen.length > 0 && (
+          <div className="section-box">
+            <div className="section-titel">Ersatzteile</div>
+            <table>
+              <thead>
                 <tr>
-                  <td>{teile.length + 2}</td>
+                  <th>Artikelbezeichnung</th>
+                  <th className="ta-right">Menge</th>
+                  <th className="ta-right">Preis (netto)</th>
+                  <th className="ta-right">Summe (netto)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ersatzteilePositionen.map((pos, i) => (
+                  <tr key={i}>
+                    <td>{pos.beschreibung}</td>
+                    <td className="ta-right">{pos.menge}x</td>
+                    <td className="ta-right">{fmtEuro(pos.preis)}</td>
+                    <td className="ta-right">{fmtEuro(pos.summe)}</td>
+                  </tr>
+                ))}
+                <tr className="section-summe">
+                  <td colSpan={3} style={{textAlign: 'right'}}>Summe</td>
+                  <td className="ta-right">{fmtEuro(detail.ersatzteileNetto)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Arbeitswerte — eigene Box */}
+        <div className="section-box">
+          <div className="section-titel">Arbeitswerte</div>
+          <table>
+            <thead>
+              <tr>
+                <th>Bezeichnung</th>
+                <th className="ta-right">Menge</th>
+                <th className="ta-right">Einzelpreis</th>
+                <th className="ta-right">Summe (netto)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {arbeitswertePositionen.length === 0 && detail.kleinteilNetto <= 0 && detail.sonstigesNetto <= 0 ? (
+                <tr><td colSpan={4} style={{color: '#94a3b8', fontStyle: 'italic'}}>Keine Arbeitszeit erfasst</td></tr>
+              ) : (
+                arbeitswertePositionen.map((pos, i) => (
+                  <tr key={i}>
+                    <td>{pos.beschreibung}</td>
+                    <td className="ta-right">{pos.menge}</td>
+                    <td className="ta-right">{fmtEuro(pos.preis)}</td>
+                    <td className="ta-right">{fmtEuro(pos.summe)}</td>
+                  </tr>
+                ))
+              )}
+              {detail.kleinteilNetto > 0 && (
+                <tr>
                   <td>Kleinteilpauschale (Schrauben, Dichtungen, Kleinmaterial)</td>
-                  <td>—</td>
                   <td className="ta-right">1</td>
-                  <td className="ta-right">{fmtEuro(kleinteilNetto)}</td>
-                  <td className="ta-right">{fmtEuro(kleinteilNetto)}</td>
+                  <td className="ta-right">{fmtEuro(detail.kleinteilNetto)}</td>
+                  <td className="ta-right">{fmtEuro(detail.kleinteilNetto)}</td>
                 </tr>
-              </>
-            )}
-
-            {/* Sonstiges */}
-            {sonstigesNetto > 0 && (
-              <>
-                <tr className="section-header"><td colSpan={6}>Sonstiges</td></tr>
+              )}
+              {detail.sonstigesNetto > 0 && (
                 <tr>
-                  <td>{teile.length + 2 + (kleinteilNetto > 0 ? 1 : 0)}</td>
-                  <td>Sonstige Leistungen</td>
-                  <td>—</td>
+                  <td>{detail.sonstigesBeschreibung || 'Sonstige Leistungen'}</td>
                   <td className="ta-right">1</td>
-                  <td className="ta-right">{fmtEuro(sonstigesNetto)}</td>
-                  <td className="ta-right">{fmtEuro(sonstigesNetto)}</td>
+                  <td className="ta-right">{fmtEuro(detail.sonstigesNetto)}</td>
+                  <td className="ta-right">{fmtEuro(detail.sonstigesNetto)}</td>
                 </tr>
-              </>
-            )}
+              )}
+              <tr className="section-summe">
+                <td colSpan={3} style={{textAlign: 'right'}}>Summe</td>
+                <td className="ta-right">{fmtEuro(detail.arbeitNetto + detail.kleinteilNetto + detail.sonstigesNetto)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
 
-            {/* Summenzeilen */}
-            <tr style={{height: '8px'}}><td colSpan={6}></td></tr>
+        {/* Gesamtsummen */}
+        <table>
+          <tbody>
+            {ersatzteilePositionen.length > 0 && (
+              <tr className="summen">
+                <td colSpan={3} style={{textAlign:'right', color:'#475569'}}>Ersatzteile Summe:</td>
+                <td className="ta-right">{fmtEuro(detail.ersatzteileNetto)}</td>
+              </tr>
+            )}
             <tr className="summen">
-              <td colSpan={5} style={{textAlign:'right', color:'#475569'}}>Zwischensumme (netto):</td>
-              <td className="ta-right">{fmtEuro(gesamtNetto)}</td>
+              <td colSpan={3} style={{textAlign:'right', color:'#475569'}}>Arbeitsaufwand Summe:</td>
+              <td className="ta-right">{fmtEuro(detail.arbeitNetto + detail.kleinteilNetto + detail.sonstigesNetto)}</td>
+            </tr>
+            <tr className="summen">
+              <td colSpan={3} style={{textAlign:'right', color:'#475569'}}>Netto-Gesamtbetrag:</td>
+              <td className="ta-right">{fmtEuro(rechnung.betrag_netto)}</td>
             </tr>
             {!kleinunternehmer ? (
               <>
                 <tr className="summen">
-                  <td colSpan={5} style={{textAlign:'right', color:'#475569'}}>zzgl. {mwstSatz}% MwSt.:</td>
-                  <td className="ta-right">{fmtEuro(mwstBetrag)}</td>
+                  <td colSpan={3} style={{textAlign:'right', color:'#475569'}}>zzgl. {mwstSatz}% MwSt.:</td>
+                  <td className="ta-right">{fmtEuro(rechnung.betrag_mwst)}</td>
                 </tr>
                 <tr className="gesamt">
-                  <td colSpan={5} style={{textAlign:'right'}}>Gesamtbetrag (brutto):</td>
-                  <td className="ta-right">{fmtEuro(gesamtBrutto)}</td>
+                  <td colSpan={3} style={{textAlign:'right'}}>Gesamtbetrag (brutto):</td>
+                  <td className="ta-right">{fmtEuro(rechnung.betrag_brutto)}</td>
                 </tr>
               </>
             ) : (
               <>
                 <tr className="gesamt">
-                  <td colSpan={5} style={{textAlign:'right'}}>Gesamtbetrag:</td>
-                  <td className="ta-right">{fmtEuro(gesamtBrutto)}</td>
+                  <td colSpan={3} style={{textAlign:'right'}}>Gesamtbetrag:</td>
+                  <td className="ta-right">{fmtEuro(rechnung.betrag_brutto)}</td>
                 </tr>
                 <tr className="mwst-hinweis">
-                  <td colSpan={6}>Gemäß §19 UStG wird keine Umsatzsteuer berechnet (Kleinunternehmerregelung).</td>
+                  <td colSpan={4}>Gemäß §19 UStG wird keine Umsatzsteuer berechnet (Kleinunternehmerregelung).</td>
                 </tr>
               </>
             )}
           </tbody>
         </table>
 
-        {/* Zahlungsinfo + QR in einer Zeile */}
         <div className={`zahlung ${(giroQr || paypalQr || sumupQr || stripeQr) ? 'zahlung-3' : 'zahlung-2'}`}>
           <div className="zahlung-box">
             <div className="zahlung-titel">Zahlungsinformationen</div>
@@ -541,12 +501,17 @@ export function RechnungDruck({ auftrag, firma }: { auftrag: any; firma: Record<
           )}
         </div>
 
-        {/* Fußzeile */}
         <div className="footer">
           {firma.firma_name || 'Kfz-Werkstatt'}
-          {firma.firma_strasse ? ` · ${firma.firma_strasse}, ${firma.firma_plz} ${firma.firma_ort}` : ''}
+          {firma.firma_strasse ? ` · ${firma.firma_strasse}` : ''}
+          {(firma.firma_plz || firma.firma_ort) ? ` · ${firma.firma_plz} ${firma.firma_ort}` : ''}
+          {firma.firma_geschaeftsfuehrer ? ` · Geschäftsführung: ${firma.firma_geschaeftsfuehrer}` : ''}
+          {firma.firma_hrb ? ` · HRB ${firma.firma_hrb}${firma.firma_amtsgericht ? ` Amtsgericht ${firma.firma_amtsgericht}` : ''}` : ''}
           {firma.firma_ust_id ? ` · USt-IdNr.: ${firma.firma_ust_id}` : ''}
           {firma.firma_steuernummer ? ` · Steuernr.: ${firma.firma_steuernummer}` : ''}
+          {firma.firma_iban ? ` · IBAN ${firma.firma_iban}` : ''}
+          {firma.firma_telefon ? ` · Tel. ${firma.firma_telefon}` : ''}
+          {firma.firma_email ? ` · ${firma.firma_email}` : ''}
           <br />
           Vielen Dank für Ihr Vertrauen!
         </div>

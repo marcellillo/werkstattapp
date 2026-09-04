@@ -3,18 +3,28 @@ export const runtime = 'nodejs'
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import Anthropic from '@anthropic-ai/sdk'
-import { createAdminClient } from '@/lib/supabase/admin'
 
 export async function POST(req: Request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { arbeiten, fahrzeug } = await req.json()
+  const { arbeiten, fahrzeug, betriebId } = await req.json()
   if (!arbeiten?.trim()) return NextResponse.json({ error: 'Keine Arbeiten angegeben' }, { status: 400 })
+  if (!betriebId) return NextResponse.json({ error: 'betriebId erforderlich' }, { status: 400 })
 
-  const adminSupabase = createAdminClient()
-  const { data: rows } = await adminSupabase.from('werkstatt_einstellungen').select('schluessel, wert')
+  const { data: betriebCheck } = await supabase
+    .from('betrieb_users')
+    .select('id')
+    .eq('betrieb_id', betriebId)
+    .eq('profile_id', user.id)
+    .maybeSingle()
+  if (!betriebCheck) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+  const { data: rows } = await supabase
+    .from('betrieb_einstellungen')
+    .select('schluessel, wert')
+    .eq('betrieb_id', betriebId)
   const cfg: Record<string, string> = {}
   for (const r of rows ?? []) if (r.wert) cfg[r.schluessel] = r.wert
 
@@ -27,7 +37,7 @@ export async function POST(req: Request) {
     ? `${fahrzeug.marke ?? ''} ${fahrzeug.modell ?? ''} ${fahrzeug.baujahr ? `(${fahrzeug.baujahr})` : ''} ${fahrzeug.fahrgestellnummer ? `VIN: ${fahrzeug.fahrgestellnummer}` : ''}`.trim()
     : 'unbekanntes Fahrzeug'
 
-  const prompt = `Du bist ein erfahrener Kfz-Meister mit Zugang zu Herstellerdaten. Schlage die benötigten Ersatzteile vor und prüfe sie gegen die Herstellervorgaben des Fahrzeugs.
+  const prompt = `Du bist ein erfahrener Kfz-Meister mit Zugang zu Herstellerdaten und Internetzugang. Schlage die benötigten Ersatzteile vor, prüfe sie gegen die Herstellervorgaben des Fahrzeugs UND suche für jedes Teil per Websuche einen ungefähren aktuellen Marktpreis (in Euro, deutscher Markt, z.B. von Autoteile-Händlern wie kfzteile24, autodoc, pv-kompass o.ä.).
 
 Fahrzeug: ${fahrzeugInfo}
 Arbeiten: ${arbeiten}
@@ -36,8 +46,9 @@ Für jedes Teil:
 1. Ermittle die Herstellervorgabe (Spezifikation, Norm, OE-Nummer falls bekannt)
 2. Prüfe ob Aftermarket-Teile zulässig sind oder ob OE-Qualität vorgeschrieben ist
 3. Gib konkrete Spezifikationen an (z.B. Ölviskosität, Bremsscheiben-Mindestdicke, Anzugsmoment, Freigabenummer)
+4. Suche aktiv im Internet nach einem realistischen, aktuellen Richtpreis für dieses konkrete Teil (Aftermarket-Qualität, sofern zulässig) — nutze das Websuche-Tool, verlasse dich nicht nur auf dein Trainingswissen
 
-Antworte NUR mit einem JSON-Array. Kein Text davor oder danach. Format:
+Antworte am Ende NUR mit einem JSON-Array (kein Text danach). Format:
 [
   {
     "bezeichnung": "Motoröl 5W-30",
@@ -56,7 +67,7 @@ Felder:
 - herstellervorgabe: exakte Norm/Freigabe/Vorgabe des Herstellers (null wenn nicht bekannt)
 - spezifikation: technische Kenndaten (Viskosität, Maße, Norm etc.), null wenn nicht relevant
 - oe_qualitaet_erforderlich: true wenn Hersteller ausdrücklich OE oder gleichwertig vorschreibt
-- preisschaetzung: Richtwert in Euro als Zahl
+- preisschaetzung: per Websuche ermittelter Richtwert in Euro als Zahl (kein reiner Trainingswissen-Schätzwert)
 - optional: true nur wenn situationsabhängig
 
 Maximal 8 Teile. Nur tatsächlich benötigte Teile.`
@@ -64,11 +75,15 @@ Maximal 8 Teile. Nur tatsächlich benötigte Teile.`
   try {
     const message = await client.messages.create({
       model: 'claude-sonnet-4-6',
-      max_tokens: 2048,
+      max_tokens: 4096,
       messages: [{ role: 'user', content: prompt }],
+      tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 8 }],
     })
 
-    const text = (message.content[0] as any).text?.trim() ?? ''
+    // Bei Websuche besteht die Antwort aus mehreren Content-Blöcken
+    // (Suchanfragen, Ergebnisse, Text); der finale Text mit dem JSON steht am Ende.
+    const textBlocks = message.content.filter((b: any) => b.type === 'text') as any[]
+    const text = textBlocks.map(b => b.text).join('\n').trim()
     const jsonMatch = text.match(/\[[\s\S]*\]/)
     if (!jsonMatch) return NextResponse.json({ error: 'Ungültige Antwort von Claude' }, { status: 500 })
 

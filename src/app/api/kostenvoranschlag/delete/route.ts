@@ -9,9 +9,38 @@ export async function POST(req: NextRequest) {
 
     const { kostenvoranschlagId, betriebId } = await req.json()
 
+    if (!kostenvoranschlagId || !betriebId) {
+      return NextResponse.json({ error: 'Invalid parameters' }, { status: 400 })
+    }
+
+    // Überprüfe, ob User dieser betriebId angehört
+    const { data: betriebCheck, error: checkError } = await supabase
+      .from('betrieb_users')
+      .select('id')
+      .eq('betrieb_id', betriebId)
+      .eq('profile_id', user.id)
+      .maybeSingle()
+
+    if (checkError) throw checkError
+    if (!betriebCheck) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    // Überprüfe, ob der Kostenvoranschlag zu diesem Betrieb gehört
+    const { data: kvCheck } = await supabase
+      .from('kostenvoranschlaege')
+      .select('id')
+      .eq('id', kostenvoranschlagId)
+      .eq('betrieb_id', betriebId)
+      .maybeSingle()
+
+    if (!kvCheck) {
+      return NextResponse.json({ error: 'Kostenvoranschlag nicht gefunden' }, { status: 404 })
+    }
+
     // Delete positions first
     await supabase
-      .from('kostenvoranschlag_positionen')
+      .from('kostenvoranschlag_position')
       .delete()
       .eq('kostenvoranschlag_id', kostenvoranschlagId)
 

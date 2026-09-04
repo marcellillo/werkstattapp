@@ -9,6 +9,35 @@ export async function POST(req: NextRequest) {
 
     const { werkstattauftragId, betriebId } = await req.json()
 
+    if (!werkstattauftragId || !betriebId) {
+      return NextResponse.json({ error: 'Invalid parameters' }, { status: 400 })
+    }
+
+    // Überprüfe, ob User dieser betriebId angehört
+    const { data: betriebCheck, error: checkError } = await supabase
+      .from('betrieb_users')
+      .select('id')
+      .eq('betrieb_id', betriebId)
+      .eq('profile_id', user.id)
+      .maybeSingle()
+
+    if (checkError) throw checkError
+    if (!betriebCheck) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    // Überprüfe, ob der Werkstattauftrag zu diesem Betrieb gehört
+    const { data: waCheck } = await supabase
+      .from('werkstattauftraege')
+      .select('id')
+      .eq('id', werkstattauftragId)
+      .eq('betrieb_id', betriebId)
+      .maybeSingle()
+
+    if (!waCheck) {
+      return NextResponse.json({ error: 'Werkstattauftrag nicht gefunden' }, { status: 404 })
+    }
+
     // Delete positions first
     await supabase
       .from('werkstattauftrag_positionen')

@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>Rechnung</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; font-size: 11px; color: #1a1a1a; line-height: 1.4; }
+        .container { max-width: 210mm; margin: 0 auto; padding: 20px; background: white; }
+
+        .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; }
+        .firma-name { font-size: 17px; font-weight: 700; color: #ea580c; }
+        .firma-details { font-size: 9.5px; color: #555; margin-top: 3px; line-height: 1.55; }
+        .rechnung-block { text-align: right; }
+        .rechnung-titel { font-size: 20px; font-weight: 700; color: #1e293b; }
+        .rechnung-nr { font-size: 11px; color: #64748b; margin-top: 3px; }
+        .rechnung-datum { font-size: 9.5px; color: #94a3b8; margin-top: 2px; }
+
+        .trennlinie { border: none; border-top: 2px solid #ea580c; margin: 10px 0; }
+        .absenderzeile { font-size: 7.5px; font-style: italic; color: #94a3b8; margin-bottom: 8px; }
+
+        .adressen { display: flex; gap: 16px; margin-bottom: 14px; }
+        .adresse-box { flex: 1; background: #f8fafc; border-radius: 8px; padding: 10px 14px; }
+        .adresse-label { font-size: 8.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #94a3b8; margin-bottom: 4px; }
+        .adresse-wert { font-size: 10.5px; line-height: 1.6; }
+        .adresse-wert strong { font-size: 11px; }
+
+        .fz-box { background: #f1f5f9; border: 1.5px solid #cbd5e1; border-radius: 7px; padding: 8px 12px; margin-bottom: 14px; display: flex; }
+        .fz-feld { flex: 1; border-right: 1px solid #e2e8f0; padding-right: 6px; }
+        .fz-feld:last-child { border-right: none; }
+        .fz-label { font-size: 7.5px; text-transform: uppercase; color: #64748b; letter-spacing: 0.06em; font-weight: 700; }
+        .fz-wert { font-size: 10.5px; font-weight: 700; color: #0f172a; margin-top: 2px; }
+
+        .section-box { margin-bottom: 14px; border: 1.5px solid #cbd5e1; border-radius: 7px; overflow: hidden; }
+        .section-titel { background: #1e293b; color: white; font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; padding: 6px 10px; }
+        table { width: 100%; border-collapse: collapse; }
+        thead tr { background: #f1f5f9; }
+        th { padding: 6px 8px; text-align: left; font-size: 8.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #475569; }
+        th.ta-right { text-align: right; }
+        td { padding: 5px 8px; font-size: 9.5px; border-bottom: 1px solid #f1f5f9; }
+        td.ta-right { text-align: right; }
+        tr.section-summe td { font-weight: 700; font-size: 10px; border-top: 1.5px solid #cbd5e1; background: #f8fafc; }
+
+        .summen-table td { border-bottom: none; padding: 4px 8px; font-size: 10.5px; }
+        .summen-table tr.gesamt td { font-weight: 700; font-size: 12px; border-top: 2px solid #1e293b; background: #f8fafc; }
+        .mwst-hinweis { font-size: 8.5px; color: #64748b; font-style: italic; padding: 6px 8px; }
+
+        .zahlung { display: flex; gap: 12px; margin-top: 14px; }
+        .zahlung-box { flex: 1; background: #f1f5f9; border: 1.5px solid #cbd5e1; border-radius: 7px; padding: 10px 13px; }
+        .zahlung-titel { font-size: 8.5px; font-weight: 700; text-transform: uppercase; color: #475569; letter-spacing: 0.06em; margin-bottom: 6px; border-bottom: 1px solid #cbd5e1; padding-bottom: 5px; }
+        .zahlung-wert { font-size: 10.5px; line-height: 1.75; }
+        .zahlung-wert strong { color: #ea580c; }
+
+        .footer { margin-top: 14px; border-top: 1px solid #e2e8f0; padding-top: 8px; font-size: 8.5px; color: #94a3b8; text-align: center; line-height: 1.6; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div>
+                {{#logoBase64}}
+                <div style="margin-bottom: 6px;">
+                    <img src="{{logoBase64}}" alt="Logo" style="max-height: 60px; max-width: 200px; object-fit: contain;" />
+                </div>
+                {{/logoBase64}}
+                <div class="firma-name">{{betriebName}}</div>
+                <div class="firma-details">
+                    {{betriebAdresse}}<br>
+                    {{betriebTelZeile}}
+                    {{betriebEmail}}
+                </div>
+            </div>
+            <div class="rechnung-block">
+                <div class="rechnung-titel">RECHNUNG</div>
+                <div class="rechnung-nr">Nr. {{rechnungsNummer}}</div>
+                <div class="rechnung-datum">Datum: {{datum}}</div>
+            </div>
+        </div>
+
+        <hr class="trennlinie">
+
+        <div class="absenderzeile">{{betriebName}}, {{betriebAdresse}}</div>
+
+        <div class="adressen">
+            <div class="adresse-box">
+                <div class="adresse-label">Rechnungsempfänger</div>
+                <div class="adresse-wert">{{kundeBlock}}</div>
+            </div>
+            <div class="adresse-box">
+                <div class="adresse-label">Rechnungssteller</div>
+                <div class="adresse-wert">
+                    <strong>{{betriebName}}</strong><br>
+                    {{betriebAdresse}}<br>
+                    {{firmaSteuerBlock}}
+                </div>
+            </div>
+        </div>
+
+        <div class="fz-box">
+            <div class="fz-feld"><div class="fz-label">Fahrzeug</div><div class="fz-wert">{{fahrzeugMarke}} {{fahrzeugModell}}</div></div>
+            <div class="fz-feld"><div class="fz-label">Kennzeichen</div><div class="fz-wert">{{fahrzeugKennzeichen}}</div></div>
+            <div class="fz-feld"><div class="fz-label">FIN / VIN</div><div class="fz-wert">{{fahrzeugFin}}</div></div>
+        </div>
+
+        {{ersatzteileSectionHtml}}
+
+        <div class="section-box">
+            <div class="section-titel">Arbeitswerte</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Bezeichnung</th>
+                        <th class="ta-right">Menge</th>
+                        <th class="ta-right">Einzelpreis</th>
+                        <th class="ta-right">Summe (netto)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{arbeitswerteRowsHtml}}
+                    <tr class="section-summe">
+                        <td colspan="3" style="text-align:right;">Summe</td>
+                        <td class="ta-right">{{arbeitswerteSumme}} €</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <table class="summen-table">
+            <tbody>
+                {{ersatzteileSummenzeileHtml}}
+                <tr><td colspan="3" style="text-align:right; color:#475569;">Arbeitsaufwand Summe:</td><td class="ta-right">{{arbeitswerteSumme}} €</td></tr>
+                <tr><td colspan="3" style="text-align:right; color:#475569;">Netto-Gesamtbetrag:</td><td class="ta-right">{{summeNetto}} €</td></tr>
+                {{mwstZeileHtml}}
+            </tbody>
+        </table>
+
+        <div class="zahlung">
+            <div class="zahlung-box">
+                <div class="zahlung-titel">Zahlungsziel</div>
+                <div class="zahlung-wert">
+                    <strong>{{zahlungsziel}}</strong><br>
+                    Zahlung per Überweisung oder bar.<br>
+                    Bitte Rechnungsnummer angeben.
+                </div>
+            </div>
+            <div class="zahlung-box">
+                <div class="zahlung-titel">Bankverbindung</div>
+                <div class="zahlung-wert">{{bankBlock}}</div>
+            </div>
+        </div>
+
+        <div class="footer">
+            {{firmaFooterzeile}}<br>
+            Vielen Dank für Ihr Vertrauen!
+        </div>
+    </div>
+</body>
+</html>

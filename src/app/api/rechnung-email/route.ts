@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { Resend } from 'resend'
 import QRCode from 'qrcode'
 import { buildGiroCode } from '@/lib/girocode'
+import { resolveRechnungDetail, type RechnungDetail } from '@/lib/rechnung-detail'
 
 function fmt(d?: string | null) {
   if (!d) return '—'
@@ -28,37 +29,21 @@ async function ladeFirmaConfig(): Promise<Record<string, string>> {
   return cfg
 }
 
-async function buildRechnungHtml(auftrag: any, firma: Record<string, string>): Promise<string> {
-  const fz = auftrag.fahrzeug ?? {}
-  const kd = auftrag.kunde ?? {}
-  const teile = (auftrag.ersatzteile ?? []) as any[]
-  const kleinunternehmer = firma.firma_kleinunternehmer === 'ja'
+async function buildRechnungHtml(detail: RechnungDetail): Promise<string> {
+  const fz = detail.fahrzeug ?? {}
+  const kd = detail.kunde ?? {}
+  const firma = detail.firma
+  const { rechnung, kleinunternehmer, ersatzteilePositionen, arbeitswertePositionen } = detail
 
-  const teileNetto = teile.reduce((s: number, t: any) => {
-    const ep = kleinunternehmer ? (t.einzelpreis ?? 0) : (t.einzelpreis ?? 0) / 1.19
-    return s + ep * (t.menge ?? 1)
-  }, 0)
-
-  const arbeitNetto: number = auftrag._arbeit_netto ?? 0
-  const sonstigesNetto: number = auftrag._sonstiges_netto ?? 0
-  const kleinteilNetto: number = auftrag._kleinteil_netto ?? 0
-  const gesamtNetto = teileNetto + arbeitNetto + sonstigesNetto + kleinteilNetto
-  const mwstBetrag = kleinunternehmer ? 0 : gesamtNetto * 0.19
-  const gesamtBrutto = gesamtNetto + mwstBetrag
-
-  const rechnungsDatum = auftrag.fertiggestellt_am ?? auftrag.aktualisiert_am ?? new Date().toISOString()
-  const zahlungsziel = new Date(new Date(rechnungsDatum).getTime() + 14 * 86_400_000)
-  const rechnungsJahr = new Date(rechnungsDatum).getFullYear()
-  const auftragNummer = (auftrag.auftrag_nr ?? '').replace(/^AU-/i, '')
-  const rechnungsNr = `RE-${auftragNummer}-${rechnungsJahr}`
+  const zahlungsziel = new Date(new Date(rechnung.erstellt_am).getTime() + 14 * 86_400_000)
 
   const giroCode = firma.firma_iban
     ? buildGiroCode({
         bic: firma.firma_bic,
         name: firma.firma_name || 'Werkstatt',
         iban: firma.firma_iban,
-        betrag: gesamtBrutto,
-        verwendungszweck: `Rechnung ${auftragNummer}`,
+        betrag: rechnung.betrag_brutto,
+        verwendungszweck: `Rechnung ${rechnung.rechnungs_nr}`,
       })
     : null
   const [giroQr, paypalQr, sumupQr, stripeQr] = await Promise.all([
@@ -75,19 +60,28 @@ async function buildRechnungHtml(auftrag: any, firma: Record<string, string>): P
     stripeQr && { src: stripeQr, label: 'Stripe',           hint: 'Karte / Apple Pay' },
   ].filter(Boolean) as { src: string; label: string; hint: string }[]
 
-  const teileRows = teile.map((t: any, i: number) => {
-    const ep = kleinunternehmer ? (t.einzelpreis ?? 0) : (t.einzelpreis ?? 0) / 1.19
-    const gp = ep * (t.menge ?? 1)
-    return `
+  const ersatzteileRows = ersatzteilePositionen.map((pos, i) => `
       <tr style="border-bottom:1px solid #f1f5f9;">
-        <td style="padding:5px 8px;font-size:11px;">${i + 2}</td>
-        <td style="padding:5px 8px;font-size:11px;">${t.bezeichnung}${t.lieferant ? ` (${t.lieferant})` : ''}</td>
-        <td style="padding:5px 8px;font-size:10px;font-family:monospace;">${t.teilenummer || '—'}</td>
-        <td style="padding:5px 8px;font-size:11px;text-align:right;">${t.menge}x</td>
-        <td style="padding:5px 8px;font-size:11px;text-align:right;">${fmtEuro(ep)}</td>
-        <td style="padding:5px 8px;font-size:11px;text-align:right;">${fmtEuro(gp)}</td>
-      </tr>`
-  }).join('')
+        <td style="padding:5px 8px;font-size:11px;">${i + 1}</td>
+        <td style="padding:5px 8px;font-size:11px;">${pos.beschreibung}</td>
+        <td style="padding:5px 8px;font-size:11px;text-align:right;">${pos.menge}x</td>
+        <td style="padding:5px 8px;font-size:11px;text-align:right;">${fmtEuro(pos.preis)}</td>
+        <td style="padding:5px 8px;font-size:11px;text-align:right;">${fmtEuro(pos.summe)}</td>
+      </tr>`).join('')
+
+  const arbeitswerteAlle = [
+    ...arbeitswertePositionen,
+    ...(detail.kleinteilNetto > 0 ? [{ beschreibung: 'Kleinteilpauschale (Schrauben, Dichtungen, Kleinmaterial)', menge: 1, preis: detail.kleinteilNetto, summe: detail.kleinteilNetto }] : []),
+    ...(detail.sonstigesNetto > 0 ? [{ beschreibung: detail.sonstigesBeschreibung || 'Sonstige Leistungen', menge: 1, preis: detail.sonstigesNetto, summe: detail.sonstigesNetto }] : []),
+  ]
+  const arbeitswerteRows = arbeitswerteAlle.map((pos, i) => `
+      <tr style="border-bottom:1px solid #f1f5f9;">
+        <td style="padding:5px 8px;font-size:11px;">${i + 1}</td>
+        <td style="padding:5px 8px;font-size:11px;">${pos.beschreibung}</td>
+        <td style="padding:5px 8px;font-size:11px;text-align:right;">${pos.menge}</td>
+        <td style="padding:5px 8px;font-size:11px;text-align:right;">${fmtEuro(pos.preis)}</td>
+        <td style="padding:5px 8px;font-size:11px;text-align:right;">${fmtEuro(pos.summe)}</td>
+      </tr>`).join('')
 
   const logoBlock = firma.firma_logo
     ? `<img src="${firma.firma_logo}" alt="${firma.firma_name || 'Logo'}" style="max-height:60px;max-width:200px;object-fit:contain;margin-bottom:4px;" />`
@@ -108,13 +102,9 @@ async function buildRechnungHtml(auftrag: any, firma: Record<string, string>): P
       </div>
     </div>` : ''
 
-  // Korrekte Positionsnummern (kein Duplikat wenn beide aktiv)
-  const kleinteilPos = teile.length + 2
-  const sonstigesPos = teile.length + 2 + (kleinteilNetto > 0 ? 1 : 0)
-
   return `<!DOCTYPE html>
 <html lang="de">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Rechnung ${rechnungsNr}</title></head>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Rechnung ${rechnung.rechnungs_nr}</title></head>
 <body style="margin:0;padding:0;background:#f8fafc;font-family:Arial,sans-serif;font-size:13px;color:#1a1a1a;">
 <div style="max-width:680px;margin:24px auto;background:white;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
 
@@ -130,8 +120,8 @@ async function buildRechnungHtml(auftrag: any, firma: Record<string, string>): P
     </div>
     <div style="text-align:right;">
       <div style="font-size:22px;font-weight:700;color:white;letter-spacing:-0.02em;">RECHNUNG</div>
-      <div style="font-size:12px;color:#94a3b8;margin-top:2px;">Nr. ${rechnungsNr}</div>
-      <div style="font-size:11px;color:#64748b;margin-top:2px;">Datum: ${fmt(rechnungsDatum)}</div>
+      <div style="font-size:12px;color:#94a3b8;margin-top:2px;">Nr. ${rechnung.rechnungs_nr}</div>
+      <div style="font-size:11px;color:#64748b;margin-top:2px;">Datum: ${fmt(rechnung.erstellt_am)}</div>
     </div>
   </div>
 
@@ -145,107 +135,100 @@ async function buildRechnungHtml(auftrag: any, firma: Record<string, string>): P
       <div style="flex:1;background:#f8fafc;border-radius:8px;padding:12px 16px;">
         <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#94a3b8;margin-bottom:6px;">Rechnungsempfänger</div>
         <div style="font-size:12px;line-height:1.7;">
-          ${kd.firma ? `<strong>${kd.firma}</strong><br>` : ''}
-          ${(kd.vorname || kd.nachname) ? `<strong>${kd.vorname ?? ''} ${kd.nachname ?? ''}</strong><br>` : 'Kein Kunde hinterlegt'}
-          ${kd.strasse ? kd.strasse + '<br>' : ''}
-          ${(kd.plz || kd.ort) ? `${kd.plz ?? ''} ${kd.ort ?? ''}<br>` : ''}
-          ${kd.telefon ? 'Tel.: ' + kd.telefon + '<br>' : ''}
-          ${kd.email ? kd.email : ''}
+          ${kd?.firma ? `<strong>${kd.firma}</strong><br>` : ''}
+          ${(kd?.vorname || kd?.nachname) ? `<strong>${kd?.vorname ?? ''} ${kd?.nachname ?? ''}</strong><br>` : 'Kein Kunde hinterlegt'}
+          ${kd?.strasse ? kd.strasse + '<br>' : ''}
+          ${(kd?.plz || kd?.ort) ? `${kd?.plz ?? ''} ${kd?.ort ?? ''}<br>` : ''}
+          ${kd?.telefon ? 'Tel.: ' + kd.telefon + '<br>' : ''}
+          ${kd?.email ? kd.email : ''}
         </div>
       </div>
       <div style="flex:1;background:#f8fafc;border-radius:8px;padding:12px 16px;">
         <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#94a3b8;margin-bottom:6px;">Fahrzeugdaten</div>
         <div style="font-size:12px;line-height:1.7;">
-          <strong>${fz.marke ?? ''} ${fz.modell ?? ''}</strong><br>
-          Kennzeichen: ${fz.kennzeichen || '—'}<br>
-          ${fz.fahrgestellnummer ? 'FIN: ' + fz.fahrgestellnummer + '<br>' : ''}
-          ${fz.kilometerstand ? fz.kilometerstand.toLocaleString('de-DE') + ' km' : ''}
+          <strong>${fz?.marke ?? ''} ${fz?.modell ?? ''}</strong><br>
+          Kennzeichen: ${fz?.kennzeichen || '—'}<br>
+          ${fz?.fin ? 'FIN: ' + fz.fin + '<br>' : ''}
+          ${fz?.kilometerstand ? fz.kilometerstand.toLocaleString('de-DE') + ' km' : ''}
         </div>
       </div>
     </div>
 
-    <!-- Positionen-Tabelle -->
-    <table style="width:100%;border-collapse:collapse;margin-bottom:8px;">
+    ${ersatzteilePositionen.length > 0 ? `
+    <!-- Ersatzteile -->
+    <div style="font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:0.05em;margin:16px 0 4px;">Ersatzteile</div>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:8px;border:1.5px solid #cbd5e1;border-radius:8px;overflow:hidden;">
       <thead>
-        <tr style="background:#1e293b;color:white;">
-          <th style="padding:7px 8px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;">Pos.</th>
-          <th style="padding:7px 8px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;">Beschreibung</th>
-          <th style="padding:7px 8px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;">Teile-Nr.</th>
-          <th style="padding:7px 8px;text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;">Menge</th>
-          <th style="padding:7px 8px;text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;">Einzel (netto)</th>
-          <th style="padding:7px 8px;text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;">Gesamt (netto)</th>
+        <tr style="background:#f1f5f9;">
+          <th style="padding:7px 8px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;color:#475569;">Pos.</th>
+          <th style="padding:7px 8px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;color:#475569;">Beschreibung</th>
+          <th style="padding:7px 8px;text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;color:#475569;">Menge</th>
+          <th style="padding:7px 8px;text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;color:#475569;">Einzel (netto)</th>
+          <th style="padding:7px 8px;text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;color:#475569;">Gesamt (netto)</th>
         </tr>
       </thead>
       <tbody>
-        <tr style="background:#f8fafc;">
-          <td colspan="6" style="padding:5px 8px;font-size:11px;font-weight:700;color:#475569;">Arbeitsleistung</td>
+        ${ersatzteileRows}
+        <tr style="background:#f8fafc;border-top:1.5px solid #cbd5e1;">
+          <td colspan="4" style="padding:6px 8px;font-size:11px;font-weight:700;text-align:right;">Summe</td>
+          <td style="padding:6px 8px;font-size:11px;font-weight:700;text-align:right;">${fmtEuro(detail.ersatzteileNetto)}</td>
         </tr>
-        <tr style="border-bottom:1px solid #f1f5f9;">
-          <td style="padding:5px 8px;font-size:11px;">1</td>
-          <td style="padding:5px 8px;font-size:11px;">
-            Reparatur- und Wartungsarbeiten<br>
-            <span style="font-size:10px;color:#64748b;">
-              ${auftrag._arbeit_stunden
-                ? `${auftrag._arbeit_stunden} Std. × ${auftrag._stundensatz} €/Std.`
-                : (auftrag.arbeiten || 'Gemäß Auftrag Nr. ' + auftrag.auftrag_nr)}
-            </span>
-          </td>
-          <td style="padding:5px 8px;font-size:10px;">—</td>
-          <td style="padding:5px 8px;font-size:11px;text-align:right;">${auftrag._arbeit_stunden ? auftrag._arbeit_stunden + ' h' : '1'}</td>
-          <td style="padding:5px 8px;font-size:11px;text-align:right;">${auftrag._arbeit_stunden ? fmtEuro(auftrag._stundensatz ?? 0) : fmtEuro(arbeitNetto)}</td>
-          <td style="padding:5px 8px;font-size:11px;text-align:right;">${fmtEuro(arbeitNetto)}</td>
+      </tbody>
+    </table>
+    ` : ''}
+
+    <!-- Arbeitswerte -->
+    <div style="font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:0.05em;margin:16px 0 4px;">Arbeitswerte</div>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:8px;border:1.5px solid #cbd5e1;border-radius:8px;overflow:hidden;">
+      <thead>
+        <tr style="background:#f1f5f9;">
+          <th style="padding:7px 8px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;color:#475569;">Pos.</th>
+          <th style="padding:7px 8px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;color:#475569;">Beschreibung</th>
+          <th style="padding:7px 8px;text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;color:#475569;">Menge</th>
+          <th style="padding:7px 8px;text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;color:#475569;">Einzel (netto)</th>
+          <th style="padding:7px 8px;text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;color:#475569;">Gesamt (netto)</th>
         </tr>
+      </thead>
+      <tbody>
+        ${arbeitswerteRows || '<tr><td colspan="5" style="padding:6px 8px;font-size:11px;color:#94a3b8;font-style:italic;">Keine Arbeitszeit erfasst</td></tr>'}
+        <tr style="background:#f8fafc;border-top:1.5px solid #cbd5e1;">
+          <td colspan="4" style="padding:6px 8px;font-size:11px;font-weight:700;text-align:right;">Summe</td>
+          <td style="padding:6px 8px;font-size:11px;font-weight:700;text-align:right;">${fmtEuro(detail.arbeitNetto + detail.kleinteilNetto + detail.sonstigesNetto)}</td>
+        </tr>
+      </tbody>
+    </table>
 
-        ${teile.length > 0 ? `
-          <tr style="background:#f8fafc;">
-            <td colspan="6" style="padding:5px 8px;font-size:11px;font-weight:700;color:#475569;">Ersatzteile &amp; Material</td>
-          </tr>
-          ${teileRows}
-        ` : ''}
-
-        ${kleinteilNetto > 0 ? `
-          <tr style="background:#f8fafc;"><td colspan="6" style="padding:5px 8px;font-size:11px;font-weight:700;color:#475569;">Kleinteilpauschale</td></tr>
-          <tr style="border-bottom:1px solid #f1f5f9;">
-            <td style="padding:5px 8px;font-size:11px;">${kleinteilPos}</td>
-            <td style="padding:5px 8px;font-size:11px;">Kleinteilpauschale (Schrauben, Dichtungen, Kleinmaterial)</td>
-            <td style="padding:5px 8px;">—</td><td style="padding:5px 8px;text-align:right;">1</td>
-            <td style="padding:5px 8px;font-size:11px;text-align:right;">${fmtEuro(kleinteilNetto)}</td>
-            <td style="padding:5px 8px;font-size:11px;text-align:right;">${fmtEuro(kleinteilNetto)}</td>
-          </tr>
-        ` : ''}
-
-        ${sonstigesNetto > 0 ? `
-          <tr style="background:#f8fafc;"><td colspan="6" style="padding:5px 8px;font-size:11px;font-weight:700;color:#475569;">Sonstiges</td></tr>
-          <tr style="border-bottom:1px solid #f1f5f9;">
-            <td style="padding:5px 8px;font-size:11px;">${sonstigesPos}</td>
-            <td style="padding:5px 8px;font-size:11px;">Sonstige Leistungen</td>
-            <td style="padding:5px 8px;">—</td><td style="padding:5px 8px;text-align:right;">1</td>
-            <td style="padding:5px 8px;font-size:11px;text-align:right;">${fmtEuro(sonstigesNetto)}</td>
-            <td style="padding:5px 8px;font-size:11px;text-align:right;">${fmtEuro(sonstigesNetto)}</td>
-          </tr>
-        ` : ''}
-
-        <!-- Summen -->
-        <tr><td colspan="6" style="height:8px;"></td></tr>
+    <!-- Gesamtsummen -->
+    <table style="width:100%;border-collapse:collapse;margin-bottom:8px;">
+      <tbody>
+        ${ersatzteilePositionen.length > 0 ? `
         <tr>
-          <td colspan="5" style="padding:5px 8px;font-size:12px;text-align:right;color:#475569;">Zwischensumme (netto):</td>
-          <td style="padding:5px 8px;font-size:12px;text-align:right;">${fmtEuro(gesamtNetto)}</td>
+          <td style="padding:5px 8px;font-size:12px;text-align:right;color:#475569;">Ersatzteile Summe:</td>
+          <td style="padding:5px 8px;font-size:12px;text-align:right;width:110px;">${fmtEuro(detail.ersatzteileNetto)}</td>
+        </tr>` : ''}
+        <tr>
+          <td style="padding:5px 8px;font-size:12px;text-align:right;color:#475569;">Arbeitsaufwand Summe:</td>
+          <td style="padding:5px 8px;font-size:12px;text-align:right;">${fmtEuro(detail.arbeitNetto + detail.kleinteilNetto + detail.sonstigesNetto)}</td>
+        </tr>
+        <tr>
+          <td style="padding:5px 8px;font-size:12px;text-align:right;color:#475569;">Netto-Gesamtbetrag:</td>
+          <td style="padding:5px 8px;font-size:12px;text-align:right;">${fmtEuro(rechnung.betrag_netto)}</td>
         </tr>
         ${!kleinunternehmer ? `
           <tr>
-            <td colspan="5" style="padding:5px 8px;font-size:12px;text-align:right;color:#475569;">zzgl. 19% MwSt.:</td>
-            <td style="padding:5px 8px;font-size:12px;text-align:right;">${fmtEuro(mwstBetrag)}</td>
+            <td style="padding:5px 8px;font-size:12px;text-align:right;color:#475569;">zzgl. 19% MwSt.:</td>
+            <td style="padding:5px 8px;font-size:12px;text-align:right;">${fmtEuro(rechnung.betrag_mwst)}</td>
           </tr>
           <tr style="background:#f8fafc;border-top:2px solid #1e293b;">
-            <td colspan="5" style="padding:7px 8px;font-size:14px;font-weight:700;text-align:right;">Gesamtbetrag (brutto):</td>
-            <td style="padding:7px 8px;font-size:14px;font-weight:700;text-align:right;color:#ea580c;">${fmtEuro(gesamtBrutto)}</td>
+            <td style="padding:7px 8px;font-size:14px;font-weight:700;text-align:right;">Gesamtbetrag (brutto):</td>
+            <td style="padding:7px 8px;font-size:14px;font-weight:700;text-align:right;color:#ea580c;">${fmtEuro(rechnung.betrag_brutto)}</td>
           </tr>
         ` : `
           <tr style="background:#f8fafc;border-top:2px solid #1e293b;">
-            <td colspan="5" style="padding:7px 8px;font-size:14px;font-weight:700;text-align:right;">Gesamtbetrag:</td>
-            <td style="padding:7px 8px;font-size:14px;font-weight:700;text-align:right;color:#ea580c;">${fmtEuro(gesamtBrutto)}</td>
+            <td style="padding:7px 8px;font-size:14px;font-weight:700;text-align:right;">Gesamtbetrag:</td>
+            <td style="padding:7px 8px;font-size:14px;font-weight:700;text-align:right;color:#ea580c;">${fmtEuro(rechnung.betrag_brutto)}</td>
           </tr>
-          <tr><td colspan="6" style="padding:5px 8px;font-size:10px;color:#64748b;font-style:italic;">Gemäß §19 UStG wird keine Umsatzsteuer berechnet (Kleinunternehmerregelung).</td></tr>
+          <tr><td colspan="2" style="padding:5px 8px;font-size:10px;color:#64748b;font-style:italic;">Gemäß §19 UStG wird keine Umsatzsteuer berechnet (Kleinunternehmerregelung).</td></tr>
         `}
       </tbody>
     </table>
@@ -257,7 +240,7 @@ async function buildRechnungHtml(auftrag: any, firma: Record<string, string>): P
         <div style="font-size:12px;line-height:1.7;">
           <strong style="color:#ea580c;">${zahlungsziel.toLocaleDateString('de-DE')}</strong><br>
           Zahlung per Überweisung oder bar.<br>
-          Bitte Rechnungsnummer <strong>${rechnungsNr}</strong> angeben.
+          Bitte Rechnungsnummer <strong>${rechnung.rechnungs_nr}</strong> angeben.
         </div>
       </div>
       <div style="flex:1;background:#f8fafc;border:1.5px solid #cbd5e1;border-radius:8px;padding:12px 16px;">
@@ -343,28 +326,90 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json()
   const {
-    // Manueller Versand: auftrag + firma Objekte vom Client
-    auftrag: auftragBody,
-    firma: firmaBody,
+    // Rechnungsversand: rechnungId + betriebId
+    rechnungId,
+    betriebId,
     an,
     nachricht,
-    // Automatischer Versand: nur auftrag_id + typ
+    // Fertig-Benachrichtigung: auftrag_id + typ
     auftrag_id,
     typ = 'rechnung', // 'rechnung' | 'fertig'
   } = body as {
-    auftrag?: any
-    firma?: Record<string, string>
+    rechnungId?: string
+    betriebId?: string
     an?: string
     nachricht?: string
     auftrag_id?: string
     typ?: 'rechnung' | 'fertig'
   }
 
-  // Firmakonfiguration: immer aus DB laden (aktuellste Werte)
-  const firma = await ladeFirmaConfig()
+  if (typ === 'fertig') {
+    // Fertig-Benachrichtigung: unverändertes Verhalten (globale Werkstatt-Einstellungen, auftrag_id)
+    const firma = await ladeFirmaConfig()
+    const resendKey = firma.resend_api_key || process.env.RESEND_API_KEY
+    if (!resendKey) {
+      return NextResponse.json(
+        { error: 'Resend API-Key fehlt. Bitte in Einstellungen → "Resend API-Key" eintragen oder als RESEND_API_KEY Umgebungsvariable setzen.' },
+        { status: 500 },
+      )
+    }
+    if (!auftrag_id) return NextResponse.json({ error: 'auftrag_id erforderlich' }, { status: 400 })
 
-  // API-Key: erst aus Einstellungen, dann aus Env
-  const resendKey = firma.resend_api_key || process.env.RESEND_API_KEY
+    const { data: auftrag } = await supabase
+      .from('auftraege')
+      .select('*, fahrzeug:fahrzeuge(*), kunde:kunden(*)')
+      .eq('id', auftrag_id)
+      .single()
+    if (!auftrag) return NextResponse.json({ error: 'Auftrag nicht gefunden' }, { status: 404 })
+
+    const empfaenger = an || auftrag.kunde?.email
+    if (!empfaenger) return NextResponse.json({ error: 'Keine E-Mail-Adresse vorhanden' }, { status: 400 })
+
+    const firmaName = firma.firma_name || 'Kfz-Werkstatt'
+    const fromEmail = firma.firma_absender_email || 'onboarding@resend.dev'
+    const fzName = `${auftrag.fahrzeug?.marke ?? ''} ${auftrag.fahrzeug?.modell ?? ''}`.trim()
+
+    const html = buildFertigHtml(auftrag, firma)
+    const subject = `Ihr ${fzName} ist abholbereit – ${firmaName}`
+
+    const resend = new Resend(resendKey)
+    const { error } = await resend.emails.send({ from: `${firmaName} <${fromEmail}>`, to: empfaenger, subject, html })
+    if (error) {
+      console.error('Resend error:', error)
+      return NextResponse.json({ error: (error as any).message ?? 'Sendefehler' }, { status: 500 })
+    }
+
+    await supabase.from('email_protokoll').insert({
+      betreff: subject,
+      absender: fromEmail,
+      inhalt: `An: ${empfaenger} | Fertig-Benachrichtigung`,
+      auftrag_id: auftrag.id ?? null,
+      verarbeitet: true,
+    })
+
+    return NextResponse.json({ ok: true, typ })
+  }
+
+  // Rechnungsversand
+  if (!rechnungId || !betriebId) {
+    return NextResponse.json({ error: 'rechnungId und betriebId erforderlich' }, { status: 400 })
+  }
+
+  const { data: betriebCheck } = await supabase
+    .from('betrieb_users')
+    .select('id')
+    .eq('betrieb_id', betriebId)
+    .eq('profile_id', user.id)
+    .maybeSingle()
+  if (!betriebCheck) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+  const detail = await resolveRechnungDetail(supabase, rechnungId, betriebId)
+  if (!detail) return NextResponse.json({ error: 'Rechnung nicht gefunden' }, { status: 404 })
+
+  const empfaenger = an || detail.kunde?.email
+  if (!empfaenger) return NextResponse.json({ error: 'Keine E-Mail-Adresse vorhanden' }, { status: 400 })
+
+  const resendKey = detail.firma.resend_api_key || process.env.RESEND_API_KEY
   if (!resendKey) {
     return NextResponse.json(
       { error: 'Resend API-Key fehlt. Bitte in Einstellungen → "Resend API-Key" eintragen oder als RESEND_API_KEY Umgebungsvariable setzen.' },
@@ -372,49 +417,17 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  let auftrag = auftragBody
-  let empfaenger = an
+  const firmaName = detail.firma.firma_name || 'Kfz-Werkstatt'
+  const fromEmail = detail.firma.firma_absender_email || 'onboarding@resend.dev'
 
-  // Server-seitiger Datenabruf wenn nur auftrag_id übergeben
-  if (auftrag_id && !auftrag) {
-    const { data } = await supabase
-      .from('auftraege')
-      .select('*, fahrzeug:fahrzeuge(*), kunde:kunden(*), ersatzteile(*)')
-      .eq('id', auftrag_id)
-      .single()
-    if (!data) return NextResponse.json({ error: 'Auftrag nicht gefunden' }, { status: 404 })
-    auftrag = data
-    // E-Mail-Adresse aus Kunden-Daten wenn nicht explizit angegeben
-    if (!empfaenger) empfaenger = data.kunde?.email
+  let html = await buildRechnungHtml(detail)
+  if (nachricht) {
+    html = html.replace(
+      'Sehr geehrte Damen und Herren,',
+      `${nachricht.replace(/\n/g, '<br>')}<br><br>Sehr geehrte Damen und Herren,`
+    )
   }
-
-  if (!auftrag) return NextResponse.json({ error: 'Kein Auftrag übergeben' }, { status: 400 })
-  if (!empfaenger) return NextResponse.json({ error: 'Keine E-Mail-Adresse vorhanden' }, { status: 400 })
-
-  const firmaName = firma.firma_name || 'Kfz-Werkstatt'
-  const fromEmail = firma.firma_absender_email || 'onboarding@resend.dev'
-
-  const rechnungsJahr = new Date(auftrag.fertiggestellt_am ?? auftrag.erstellt_am ?? new Date()).getFullYear()
-  const auftragNummer = (auftrag.auftrag_nr ?? '').replace(/^AU-/i, '')
-  const rechnungsNr = `RE-${auftragNummer}-${rechnungsJahr}`
-  const fzName = `${auftrag.fahrzeug?.marke ?? ''} ${auftrag.fahrzeug?.modell ?? ''}`.trim()
-
-  let html: string
-  let subject: string
-
-  if (typ === 'fertig') {
-    html = buildFertigHtml(auftrag, firma)
-    subject = `Ihr ${fzName} ist abholbereit – ${firmaName}`
-  } else {
-    html = await buildRechnungHtml(auftrag, firma)
-    if (nachricht) {
-      html = html.replace(
-        'Sehr geehrte Damen und Herren,',
-        `${nachricht.replace(/\n/g, '<br>')}<br><br>Sehr geehrte Damen und Herren,`
-      )
-    }
-    subject = `Ihre Rechnung ${rechnungsNr} von ${firmaName}`
-  }
+  const subject = `Ihre Rechnung ${detail.rechnung.rechnungs_nr} von ${firmaName}`
 
   const resend = new Resend(resendKey)
   const { error } = await resend.emails.send({
@@ -429,14 +442,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: (error as any).message ?? 'Sendefehler' }, { status: 500 })
   }
 
-  // Versand im E-Mail-Protokoll festhalten
   await supabase.from('email_protokoll').insert({
     betreff: subject,
     absender: fromEmail,
-    inhalt: `An: ${empfaenger} | ${typ === 'fertig' ? 'Fertig-Benachrichtigung' : `Rechnung ${rechnungsNr}`}`,
-    auftrag_id: auftrag.id ?? null,
+    inhalt: `An: ${empfaenger} | Rechnung ${detail.rechnung.rechnungs_nr}`,
+    auftrag_id: detail.rechnung.auftrag_id,
     verarbeitet: true,
   })
 
-  return NextResponse.json({ ok: true, rechnungsNr, typ })
+  return NextResponse.json({ ok: true, rechnungsNr: detail.rechnung.rechnungs_nr, typ })
 }

@@ -38,7 +38,7 @@ export function RechnungDetail({
       // Lade Kostenvoranschlag mit Positionen
       const { data: kv } = await supabase
         .from('kostenvoranschlaege')
-        .select('*, positionen:kostenvoranschlag_positionen(*)')
+        .select('*, positionen:kostenvoranschlag_position(*)')
         .eq('id', kostenvoranschlagId)
         .single()
 
@@ -74,17 +74,17 @@ export function RechnungDetail({
   }
 
   const arbeitszeiten = data.werkstattauftrag?.positionen || []
+  const ersatzteile_positionen = data.kostenvoranschlag?.positionen || []
   const ersatzteile_modus = data.kostenvoranschlag?.ersatzteile_modus || 'festpreis'
   const ersatzteile_festpreis = data.kostenvoranschlag?.ersatzteile_festpreis || 0
-  const arbeitszeiten_summe = arbeitszeiten.reduce((sum: number, pos: any) => sum + (pos.summe || 0), 0)
-  const ersatzteile_summe = modus === 'einzeln'
-    ? ersatzteile_positionen.reduce((sum: number, pos: any) => sum + (pos.preis || 0), 0)
+
+  const arbeitszeiten_summe = arbeitszeiten.reduce((sum: number, pos: any) => sum + (pos.gesamtpreis || 0), 0)
+  const ersatzteile_summe = ersatzteile_modus === 'einzeln'
+    ? ersatzteile_positionen.reduce((sum: number, pos: any) => sum + (pos.gesamtpreis || 0), 0)
     : ersatzteile_festpreis
   const netto = arbeitszeiten_summe + ersatzteile_summe
   const mwst = netto * 0.19
   const brutto = netto + mwst
-  const modus = ersatzteile_modus
-  const ersatzteile_positionen = data.kostenvoranschlag?.positionen || []
 
   const handlePrint = () => {
     window.print()
@@ -140,15 +140,15 @@ export function RechnungDetail({
                 <tr key={pos.id} className="border-b border-slate-200">
                   <td className="py-2 px-2">{pos.beschreibung}</td>
                   <td className="text-right py-2 px-2">{pos.menge} h</td>
-                  <td className="text-right py-2 px-2">{pos.preis.toFixed(2)} €</td>
-                  <td className="text-right py-2 px-2 font-medium">{(pos.summe || 0).toFixed(2)} €</td>
+                  <td className="text-right py-2 px-2">{(pos.einzelpreis || 0).toFixed(2)} €</td>
+                  <td className="text-right py-2 px-2 font-medium">{(pos.gesamtpreis || 0).toFixed(2)} €</td>
                 </tr>
               ))}
             </>
           )}
 
           {/* Ersatzteile - FESTPREIS MODUS */}
-          {modus === 'festpreis' && ersatzteile_summe > 0 && (
+          {ersatzteile_modus === 'festpreis' && ersatzteile_summe > 0 && (
             <tr className="border-b border-slate-200 bg-green-50">
               <td className="py-2 px-2 font-medium">⚙️ Ersatzteile (Festpreis)</td>
               <td className="text-right py-2 px-2"></td>
@@ -158,7 +158,7 @@ export function RechnungDetail({
           )}
 
           {/* Ersatzteile - EINZELN MODUS */}
-          {modus === 'einzeln' && ersatzteile_positionen.length > 0 && (
+          {ersatzteile_modus === 'einzeln' && ersatzteile_positionen.length > 0 && (
             <>
               <tr className="bg-green-50">
                 <td colSpan={4} className="py-2 px-2 font-medium">
@@ -168,9 +168,9 @@ export function RechnungDetail({
               {ersatzteile_positionen.map((pos: any) => (
                 <tr key={pos.id} className="border-b border-slate-200">
                   <td className="py-2 px-2">- {pos.beschreibung}</td>
-                  <td className="text-right py-2 px-2">1</td>
-                  <td className="text-right py-2 px-2">{pos.preis?.toFixed(2) || '0.00'} €</td>
-                  <td className="text-right py-2 px-2 font-medium">{pos.preis?.toFixed(2) || '0.00'} €</td>
+                  <td className="text-right py-2 px-2">{pos.menge || 1}</td>
+                  <td className="text-right py-2 px-2">{(pos.einzelpreis || 0).toFixed(2)} €</td>
+                  <td className="text-right py-2 px-2 font-medium">{(pos.gesamtpreis || 0).toFixed(2)} €</td>
                 </tr>
               ))}
               <tr className="font-bold bg-green-100">

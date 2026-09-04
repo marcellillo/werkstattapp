@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { generateVorvertragPDF } from '@/lib/pdf-generator-vorvertrag'
+import { resolveFirmaSettings } from '@/lib/firma-settings'
 
 export async function POST(req: NextRequest) {
   try {
@@ -10,31 +11,46 @@ export async function POST(req: NextRequest) {
 
     const { vorvertragId, betriebId } = await req.json()
 
+    // Validiere Input-Parameter
+    if (!vorvertragId || !betriebId) {
+      return NextResponse.json({ error: 'Invalid parameters' }, { status: 400 })
+    }
+
+    // Überprüfe, ob User dieser betriebId angehört
+    const { data: betriebCheck, error: checkError } = await supabase
+      .from('betrieb_users')
+      .select('id')
+      .eq('betrieb_id', betriebId)
+      .eq('profile_id', user.id)
+      .maybeSingle()
+
+    if (checkError) throw checkError
+    if (!betriebCheck) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
     // Hole Vorvertrag
-    const { data: vorvertrag } = await supabase
+    const { data: vorvertrag, error: vorvertragError } = await supabase
       .from('vorvertraege')
       .select('*')
       .eq('id', vorvertragId)
       .eq('betrieb_id', betriebId)
-      .single()
+      .maybeSingle()
 
+    if (vorvertragError) throw vorvertragError
     if (!vorvertrag) return NextResponse.json({ error: 'Vorvertrag nicht gefunden' }, { status: 404 })
 
-    // Hole Betrieb-Daten
-    const { data: betrieb } = await supabase
-      .from('betriebe')
-      .select('*')
-      .eq('id', betriebId)
-      .single()
+    const firma = await resolveFirmaSettings(supabase, betriebId)
 
     // Hole Fahrzeug-Daten
-    const { data: fahrzeug } = await supabase
+    const { data: fahrzeug, error: fahrzeugError } = await supabase
       .from('fahrzeuge')
       .select('*')
       .eq('id', vorvertrag.fahrzeug_id)
-      .single()
+      .maybeSingle()
 
-    if (!betrieb || !fahrzeug) throw new Error('Betrieb oder Fahrzeug nicht gefunden')
+    if (fahrzeugError) throw fahrzeugError
+    if (!fahrzeug) throw new Error('Fahrzeug nicht gefunden')
 
     // Generiere PDF
     const pdfBuffer = await generateVorvertragPDF({
@@ -60,13 +76,13 @@ export async function POST(req: NextRequest) {
       zahlungsfrist: vorvertrag.zahlungsfrist,
       uebergabedatum: vorvertrag.uebergabedatum,
       firmaDaten: {
-        name: betrieb.name,
-        strasse: betrieb.strasse || '',
-        plz: betrieb.plz || '',
-        ort: betrieb.ort || '',
-        telefon: betrieb.telefon,
-        email: betrieb.email,
-        ustId: betrieb.ust_id,
+        name: firma.firma_name || 'Kfz-Werkstatt',
+        strasse: firma.firma_strasse || '',
+        plz: firma.firma_plz || '',
+        ort: firma.firma_ort || '',
+        telefon: firma.firma_telefon,
+        email: firma.firma_email,
+        ustId: firma.firma_ust_id,
       },
     })
 

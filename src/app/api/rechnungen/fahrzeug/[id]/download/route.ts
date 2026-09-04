@@ -13,11 +13,24 @@ export async function GET(
     const rechnungId = (await params).id
     const supabase = await createClient()
 
-    // Rechnung laden
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const { data: userBetriebe } = await supabase
+      .from('betrieb_users')
+      .select('betrieb_id')
+      .eq('profile_id', user.id)
+
+    const betriebIds = (userBetriebe ?? []).map(b => b.betrieb_id)
+    if (betriebIds.length === 0) {
+      return NextResponse.json({ error: 'Kein Betrieb zugeordnet' }, { status: 403 })
+    }
+
+    // Rechnung laden (nur wenn sie zu einem Betrieb des Users gehört)
     const { data: rechnung, error: rechnungError } = await supabase
       .from('fahrzeug_rechnungen')
       .select(`
-        rechnungsnummer, auftrag_id,
+        rechnungsnummer, auftrag_id, betrieb_id,
         auftraege!inner(
           einnahmen, steuerart, verkauft_am, kaeufer_name,
           fahrzeug:fahrzeuge(
@@ -28,9 +41,11 @@ export async function GET(
         )
       `)
       .eq('id', rechnungId)
-      .single()
+      .in('betrieb_id', betriebIds)
+      .maybeSingle()
 
-    if (rechnungError || !rechnung) {
+    if (rechnungError) throw rechnungError
+    if (!rechnung) {
       return NextResponse.json(
         { error: 'Rechnung nicht gefunden' },
         { status: 404 }

@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { createClient } from '@/lib/supabase/client'
 
 interface ScannedPart {
   teilenummer?: string
@@ -21,6 +22,7 @@ interface ScanResult {
     lieferdatum?: string
     lieferant?: string
     bestellnummer?: string
+    vermuteteArbeit?: string
     confidence: number
   }
 }
@@ -28,15 +30,18 @@ interface ScanResult {
 interface LieferscheinScannerProps {
   betriebId: string
   kostenvoranschlag_id?: string
+  auftragId?: string
   onSuccess?: (result: ScanResult) => void
 }
 
-export function LieferscheinScanner({ betriebId, kostenvoranschlag_id, onSuccess }: LieferscheinScannerProps) {
+export function LieferscheinScanner({ betriebId, kostenvoranschlag_id, auftragId, onSuccess }: LieferscheinScannerProps) {
   const [isDragging, setIsDragging] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [preview, setPreview] = useState<string | null>(null)
   const [result, setResult] = useState<ScanResult | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [arbeitUebernommen, setArbeitUebernommen] = useState(false)
+  const [arbeitLaeuft, setArbeitLaeuft] = useState(false)
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault()
@@ -82,6 +87,7 @@ export function LieferscheinScanner({ betriebId, kostenvoranschlag_id, onSuccess
       const formData = new FormData()
       formData.append('file', file)
       formData.append('betriebId', betriebId)
+      if (kostenvoranschlag_id) formData.append('kostenvoranschlag_id', kostenvoranschlag_id)
 
       const res = await fetch('/api/lieferschein/scan', {
         method: 'POST',
@@ -106,11 +112,13 @@ export function LieferscheinScanner({ betriebId, kostenvoranschlag_id, onSuccess
                 teile: scanResult.unmatchedTeile,
               }),
             })
-            if (!addRes.ok) {
-              console.warn('Teile konnten nicht zum Kostenvoranschlag hinzugefügt werden')
+            if (addRes.ok) {
+              console.log('✅ Teile erfolgreich eingefügt')
+            } else {
+              console.warn('⚠️ Teile konnten nicht eingefügt werden')
             }
           } catch (e) {
-            console.warn('Fehler beim Hinzufügen der Teile:', e)
+            console.warn('Fehler beim Hinzufügen:', e)
           }
         }
         onSuccess?.(scanResult)
@@ -121,6 +129,35 @@ export function LieferscheinScanner({ betriebId, kostenvoranschlag_id, onSuccess
       setError(err.message || 'Fehler beim Scannen')
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const uebernehmeArbeit = async () => {
+    const vorschlag = result?.details?.vermuteteArbeit
+    if (!vorschlag || !auftragId) return
+    setArbeitLaeuft(true)
+    try {
+      const supabase = createClient()
+      const { data: auftrag } = await supabase
+        .from('auftraege')
+        .select('arbeiten')
+        .eq('id', auftragId)
+        .maybeSingle()
+
+      const bisherige = (auftrag?.arbeiten || '').trim()
+      const neuerText = bisherige ? `${bisherige}\n${vorschlag}` : vorschlag
+
+      const { error } = await supabase
+        .from('auftraege')
+        .update({ arbeiten: neuerText })
+        .eq('id', auftragId)
+
+      if (error) throw error
+      setArbeitUebernommen(true)
+    } catch (e: any) {
+      alert(`Fehler beim Übernehmen: ${e.message}`)
+    } finally {
+      setArbeitLaeuft(false)
     }
   }
 
@@ -154,6 +191,29 @@ export function LieferscheinScanner({ betriebId, kostenvoranschlag_id, onSuccess
                 {result.details.bestellnummer && <p>🏷️ Bestellnr: {result.details.bestellnummer}</p>}
                 {result.details.lieferdatum && <p>📅 Lieferdatum: {result.details.lieferdatum}</p>}
                 <p>✅ Erkennungssicherheit: {(result.details.confidence * 100).toFixed(0)}%</p>
+              </div>
+            )}
+
+            {result.details?.vermuteteArbeit && (
+              <div className="bg-purple-50 border border-purple-200 p-3 rounded space-y-2">
+                <p className="text-sm font-semibold text-purple-900">🔧 Vermutete Arbeit (aus Teilen abgeleitet):</p>
+                <p className="text-sm text-purple-800">{result.details.vermuteteArbeit}</p>
+                {auftragId ? (
+                  arbeitUebernommen ? (
+                    <p className="text-sm text-green-700 font-medium">✅ In Arbeiten-Feld übernommen</p>
+                  ) : (
+                    <Button
+                      onClick={uebernehmeArbeit}
+                      disabled={arbeitLaeuft}
+                      size="sm"
+                      className="bg-purple-600 hover:bg-purple-700"
+                    >
+                      {arbeitLaeuft ? 'Wird übernommen...' : 'In Arbeiten übernehmen'}
+                    </Button>
+                  )
+                ) : (
+                  <p className="text-xs text-purple-600 italic">Bitte manuell ins Arbeiten-Feld übertragen.</p>
+                )}
               </div>
             )}
 

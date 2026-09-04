@@ -342,6 +342,8 @@ CREATE POLICY "betrieb_insert" ON auftrag_fotos FOR INSERT
 -- Betrieb Isolation Policies for KUNDEN_RECHNUNGEN
 -- ============================================================================
 
+DROP POLICY IF EXISTS "Authenticated users" ON kunden_rechnungen;
+
 CREATE POLICY "betrieb_select" ON kunden_rechnungen FOR SELECT
   USING (
     betrieb_id IN (

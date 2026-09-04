@@ -20,6 +20,7 @@ import { SupplierInvoices } from './supplier-invoices'
 import { KostenvoranschlagSection } from './kostenvoranschlag-section'
 import { WerkstattauftragSection } from './werkstattauftrag-section'
 import { RechnungSection } from './rechnung-section'
+import { LieferscheinQuickScan } from '@/components/lieferschein-quick-scan'
 
 interface Props {
   auftrag: Auftrag
@@ -27,7 +28,7 @@ interface Props {
   historie: any[]
   googleBewertungUrl?: string
   standardSteuerart?: 'differenz' | 'regel' | 'ausfuhr'
-  betriebId?: string
+  betriebId: string
 }
 
 const STATUS_ORDER_FREMD: FahrzeugStatus[] = [
@@ -85,6 +86,7 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
   const [kiLaden, setKiLaden] = useState(false)
   const [kiError, setKiError] = useState<string | null>(null)
   const [showKiVorschlaege, setShowKiVorschlaege] = useState(false)
+  const [kvRefreshSignal, setKvRefreshSignal] = useState(0)
   const [fertigEmailStatus, setFertigEmailStatus] = useState<'idle' | 'senden' | 'ok' | 'fehler'>('idle')
   const [storniereBestaetigung, setStorniereBestaetigung] = useState(false)
   const [stornieren, setStornieren] = useState(false)
@@ -230,6 +232,7 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           arbeiten,
+          betriebId,
           fahrzeug: fz ? { marke: fz.marke, modell: fz.modell, baujahr: fz.baujahr, fahrgestellnummer: fz.fahrgestellnummer } : null,
         }),
       })
@@ -256,18 +259,60 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
 
   async function kiTeileUebernehmen() {
     const ausgewaehlt = kiVorschlaege.filter((_, i) => kiAusgewaehlt.has(i))
-    for (const v of ausgewaehlt) {
-      const { data } = await supabase.from('ersatzteile').insert({
-        auftrag_id: auftrag.id,
-        bezeichnung: v.bezeichnung,
-        menge: 1,
-        einzelpreis: v.preisschaetzung ?? null,
-        status: 'nicht_bestellt',
-      }).select().single()
-      if (data) setTeile(prev => [...prev, data as Ersatzteil])
+    if (ausgewaehlt.length === 0) return
+    try {
+      // Offenen (noch nicht abgerechneten) Kostenvoranschlag für diesen Auftrag finden ...
+      const { data: offenerKv } = await supabase
+        .from('kostenvoranschlaege')
+        .select('id')
+        .eq('auftrag_id', auftrag.id)
+        .eq('betrieb_id', betriebId)
+        .is('rechnung_id', null)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      let kostenvoranschlagId = offenerKv?.id as string | undefined
+
+      // ... oder anlegen, falls noch keiner existiert
+      if (!kostenvoranschlagId) {
+        const createRes = await fetch('/api/kostenvoranschlag/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            auftragId: auftrag.id,
+            betriebId,
+            fahrzeugId: (auftrag.fahrzeug as any)?.id,
+            typ: 'werkstatt',
+          }),
+        })
+        const createData = await createRes.json()
+        if (!createRes.ok) throw new Error(createData.error || 'Kostenvoranschlag konnte nicht erstellt werden')
+        kostenvoranschlagId = createData.kostenvoranschlag.id
+      }
+
+      const res = await fetch('/api/kostenvoranschlag/add-teile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          kostenvoranschlag_id: kostenvoranschlagId,
+          betrieb_id: betriebId,
+          teile: ausgewaehlt.map(v => ({
+            beschreibung: v.bezeichnung,
+            menge: 1,
+            preis: v.preisschaetzung ?? undefined,
+          })),
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Teile konnten nicht übernommen werden')
+
+      setKvRefreshSignal(s => s + 1)
+      setShowKiVorschlaege(false)
+      setKiVorschlaege([])
+    } catch (e: any) {
+      alert(`Fehler beim Übernehmen: ${e.message}`)
     }
-    setShowKiVorschlaege(false)
-    setKiVorschlaege([])
   }
 
   async function saveArbeiten() {
@@ -998,7 +1043,7 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
 
       <div className="flex flex-col lg:flex-row lg:items-start gap-6">
         {/* Left column */}
-        <div className="flex-1 space-y-4">
+        <div className="flex-1 min-w-0 space-y-4">
           {/* Vehicle Info Card */}
           <Card>
             <CardHeader className="pb-3">
@@ -1452,6 +1497,13 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
                         PV
                       </button>
                     )}
+                    {/* PartsFinder Link - öffnet neue Tab (kein Deep-Link/Login-Autofill möglich, da login-pflichtig) */}
+                    <button
+                      onClick={() => window.open('https://www.partsfinder.de/login', '_blank', 'noopener,noreferrer')}
+                      className="flex-1 min-w-[100px] bg-slate-600 hover:bg-slate-700 text-white py-2 px-3 rounded-lg text-sm font-medium text-center transition-colors cursor-pointer"
+                    >
+                      PartsFinder
+                    </button>
                     {/* Lokal als bestellt - speichert mit status='bestellt' */}
                     <button
                       onClick={handleAddTeilUndBestellen}
@@ -1928,6 +1980,21 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
         </div>
       </div>
 
+      {/* Lieferschein Scanner */}
+      {betriebId && (
+        <Card className="border-slate-200 mt-6">
+          <CardContent className="p-6">
+            <LieferscheinQuickScan
+              auftragId={auftrag.id}
+              betriebId={betriebId}
+              onSuccess={() => {
+                console.log('✅ Lieferschein gescannt und Teile eingefügt')
+              }}
+            />
+          </CardContent>
+        </Card>
+      )}
+
       {/* Lieferanten-Rechnungen */}
       <Card className="border-slate-200 mt-6">
         <CardContent className="p-6">
@@ -1942,7 +2009,7 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
       <div className="space-y-6 mt-6">
         {betriebId && (
           <>
-            <KostenvoranschlagSection auftragId={auftrag.id} betriebId={betriebId} fahrzeugId={(auftrag.fahrzeug as any)?.id} />
+            <KostenvoranschlagSection auftragId={auftrag.id} betriebId={betriebId} fahrzeugId={(auftrag.fahrzeug as any)?.id} refreshSignal={kvRefreshSignal} />
             <WerkstattauftragSection auftragId={auftrag.id} betriebId={betriebId} fahrzeugId={(auftrag.fahrzeug as any)?.id} />
             <RechnungSection auftragId={auftrag.id} betriebId={betriebId} fahrzeugId={(auftrag.fahrzeug as any)?.id} />
           </>

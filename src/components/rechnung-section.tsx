@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { createClient } from '@/lib/supabase/client'
 import {
   Select,
   SelectContent,
@@ -24,6 +25,7 @@ interface RechnungSectionProps {
   auftragId: string
   fahrzeugId: string
   betriebId: string
+  kostenvoranschlagId?: string
   rechnungen?: Rechnung[]
   kundenId?: string
   onRechnungCreated?: () => void
@@ -33,6 +35,7 @@ export function RechnungSection({
   auftragId,
   fahrzeugId,
   betriebId,
+  kostenvoranschlagId,
   rechnungen = [],
   kundenId,
   onRechnungCreated,
@@ -41,13 +44,33 @@ export function RechnungSection({
   const [selectedType, setSelectedType] = useState<'werkstatt' | 'verkauf'>('werkstatt')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [loadedKvId, setLoadedKvId] = useState<string | undefined>(kostenvoranschlagId)
+
+  // Lade den letzten Kostenvoranschlag wenn nicht vorhanden
+  useEffect(() => {
+    if (!kostenvoranschlagId) {
+      const loadLatestKv = async () => {
+        try {
+          const supabase = await createClient()
+          const { data: kvs } = await supabase
+            .from('kostenvoranschlaege')
+            .select('id')
+            .eq('auftrag_id', auftragId)
+            .order('created_at', { ascending: false })
+            .limit(1)
+
+          if (kvs?.length > 0) {
+            setLoadedKvId(kvs[0].id)
+          }
+        } catch (err) {
+          console.warn('Fehler beim Laden des Kostenvoranschlags:', err)
+        }
+      }
+      loadLatestKv()
+    }
+  }, [auftragId, kostenvoranschlagId])
 
   const handleCreateRechnung = async () => {
-    if (!kundenId) {
-      setError('Kunden-ID erforderlich')
-      return
-    }
-
     setIsLoading(true)
     setError(null)
 
@@ -58,10 +81,9 @@ export function RechnungSection({
         body: JSON.stringify({
           auftrag_id: auftragId,
           fahrzeug_id: fahrzeugId,
-          kunde_id: kundenId,
           betrieb_id: betriebId,
+          kostenvoranschlag_id: loadedKvId,
           typ: selectedType,
-          status: 'entwurf',
         }),
       })
 

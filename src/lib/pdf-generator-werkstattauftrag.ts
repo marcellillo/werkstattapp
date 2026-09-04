@@ -1,4 +1,4 @@
-import PDFDocument from 'pdfkit'
+import { generatePDF } from '@/lib/pdf-generator'
 
 export interface WerkstattauftragPDF {
   nummer: string
@@ -14,6 +14,10 @@ export interface WerkstattauftragPDF {
     baujahr?: string
     farbe?: string
     kilometerstand?: number
+    motortyp?: string
+    hubraum?: string
+    leistungKw?: number
+    naechsteHu?: string
   }
 
   // Kunde
@@ -23,16 +27,10 @@ export interface WerkstattauftragPDF {
   kundenOrt: string
   kundenTelefon?: string
 
-  // Arbeiten & Teile
+  // Arbeiten & Teile (bewusst ohne Preise — interner Arbeitsauftrag für den Mechaniker)
   arbeiten?: string
   bemerkungen?: string
-  ersatzteile: Array<{
-    teilenummer?: string
-    beschreibung: string
-    menge: number
-    einzelpreis: number
-    status: string
-  }>
+  teile: Array<{ beschreibung: string; menge: number }>
 
   // Firma
   firmaDaten: {
@@ -42,135 +40,83 @@ export interface WerkstattauftragPDF {
     ort: string
     telefon?: string
     email?: string
-    ustId?: string
+    logo?: string
   }
 
   status: string
-  faelligkeitsDatum?: string
+}
+
+const statusLabels: Record<string, string> = {
+  neu: 'Neu',
+  in_bearbeitung: 'In Bearbeitung',
+  fertig: 'Fertig',
+  abgeschlossen: 'Abgeschlossen',
+}
+
+function fmtKw(kw?: number): string {
+  if (!kw) return '-'
+  const ps = Math.round(kw * 1.35962)
+  return `${kw} kW (${ps} PS)`
 }
 
 export async function generateWerkstattauftragPDF(daten: WerkstattauftragPDF): Promise<Buffer> {
-  return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({
-      size: 'A4',
-      margin: 40,
-    })
+  const teileRowsHtml = daten.teile.length > 0
+    ? daten.teile
+        .map(
+          teil => `
+            <tr>
+              <td>${escapeHtml(teil.beschreibung)}</td>
+              <td style="text-align:center;">${teil.menge}</td>
+            </tr>`
+        )
+        .join('')
+    : `<tr><td colspan="2" style="text-align:center; color:#888;">Keine Teile erfasst</td></tr>`
 
-    const chunks: Buffer[] = []
-    doc.on('data', chunk => chunks.push(chunk))
-    doc.on('end', () => resolve(Buffer.concat(chunks)))
-    doc.on('error', reject)
+  const arbeitenHtml = daten.arbeiten
+    ? escapeHtml(daten.arbeiten).replace(/\n/g, '<br/>')
+    : '<span style="color:#888;">Keine Arbeitsbeschreibung hinterlegt</span>'
 
-    // Header
-    doc.fontSize(16).font('Helvetica-Bold').text(daten.firmaDaten.name, { align: 'left' })
-    doc.fontSize(10).font('Helvetica')
-      .text(`${daten.firmaDaten.strasse}, ${daten.firmaDaten.plz} ${daten.firmaDaten.ort}`)
-    if (daten.firmaDaten.telefon) doc.text(`Tel: ${daten.firmaDaten.telefon}`)
-    if (daten.firmaDaten.email) doc.text(`Email: ${daten.firmaDaten.email}`)
+  const ortZeile = [daten.firmaDaten.plz, daten.firmaDaten.ort].filter(Boolean).join(' ')
+  const betriebAdresse = [daten.firmaDaten.strasse, ortZeile].filter(Boolean).join(', ')
 
-    doc.moveTo(40, 120).lineTo(555, 120).stroke()
+  const data = {
+    logoBase64: daten.firmaDaten.logo || '',
+    betriebName: daten.firmaDaten.name,
+    betriebAdresse,
+    betriebTel: daten.firmaDaten.telefon ? `Tel: ${daten.firmaDaten.telefon}` : '',
 
-    // Titel
-    doc.fontSize(18).font('Helvetica-Bold').text('WERKSTATTAUFTRAG', { align: 'center' })
+    auftragNummer: daten.nummer,
+    datum: daten.datum,
+    status: statusLabels[daten.status] || daten.status,
 
-    // Auftragsinfo
-    doc.fontSize(10).font('Helvetica')
-    doc.text(`Auftragsummer: ${daten.nummer}`, 50, 150)
-    doc.text(`Datum: ${daten.datum}`, 50, 165)
-    doc.text(`Status: ${daten.status}`, 50, 180)
-    if (daten.faelligkeitsDatum) doc.text(`Fällig bis: ${daten.faelligkeitsDatum}`, 50, 195)
+    fahrzeugMarke: daten.fahrzeug.marke,
+    fahrzeugModell: daten.fahrzeug.modell,
+    fahrzeugKennzeichen: daten.fahrzeug.kennzeichen || '-',
+    fahrzeugFin: daten.fahrzeug.fin || '-',
+    fahrzeugBaujahr: daten.fahrzeug.baujahr || '-',
+    fahrzeugFarbe: daten.fahrzeug.farbe || '-',
+    fahrzeugKm: daten.fahrzeug.kilometerstand ? `${daten.fahrzeug.kilometerstand.toLocaleString('de-DE')} km` : '-',
+    fahrzeugMotor: daten.fahrzeug.motortyp || '-',
+    fahrzeugHubraum: daten.fahrzeug.hubraum || '-',
+    fahrzeugLeistung: fmtKw(daten.fahrzeug.leistungKw),
+    fahrzeugHu: daten.fahrzeug.naechsteHu || '-',
 
-    // Kundeninfo
-    doc.fontSize(11).font('Helvetica-Bold').text('Kundeninfo:', 50, 220)
-    doc.fontSize(10).font('Helvetica')
-    doc.text(daten.kundenName, 50, 240)
-    doc.text(`${daten.kundenStrasse}`, 50, 255)
-    doc.text(`${daten.kundenPlz} ${daten.kundenOrt}`, 50, 270)
-    if (daten.kundenTelefon) doc.text(`Tel: ${daten.kundenTelefon}`, 50, 285)
+    kundeName: daten.kundenName,
+    kundeAdresse: daten.kundenStrasse,
+    kundeOrt: `${daten.kundenPlz} ${daten.kundenOrt}`,
+    kundeTel: daten.kundenTelefon || '-',
 
-    // Fahrzeuginfo
-    doc.fontSize(11).font('Helvetica-Bold').text('Fahrzeuginfo:', 350, 220)
-    doc.fontSize(10).font('Helvetica')
-    doc.text(`${daten.fahrzeug.marke} ${daten.fahrzeug.modell}`, 350, 240)
-    doc.text(`Kennzeichen: ${daten.fahrzeug.kennzeichen || '-'}`, 350, 255)
-    doc.text(`FIN: ${daten.fahrzeug.fin}`, 350, 270)
-    if (daten.fahrzeug.baujahr) doc.text(`Baujahr: ${daten.fahrzeug.baujahr}`, 350, 285)
-    if (daten.fahrzeug.kilometerstand) doc.text(`KM: ${daten.fahrzeug.kilometerstand.toLocaleString('de-DE')}`, 350, 300)
+    arbeitenHtml,
+    teileRowsHtml,
+    bemerkungen: daten.bemerkungen || '',
+  }
 
-    let yPos = 320
+  return generatePDF('werkstattauftrag', data)
+}
 
-    // Arbeiten
-    if (daten.arbeiten) {
-      doc.fontSize(11).font('Helvetica-Bold').text('Zu durchführende Arbeiten:', 50, yPos)
-      yPos += 20
-      doc.fontSize(10).font('Helvetica')
-        .text(daten.arbeiten, 50, yPos, { width: 505, align: 'left' })
-      yPos += 60
-    }
-
-    // Ersatzteile
-    if (daten.ersatzteile && daten.ersatzteile.length > 0) {
-      doc.fontSize(11).font('Helvetica-Bold').text('Benötigte Ersatzteile:', 50, yPos)
-      yPos += 20
-
-      // Tabellen-Header
-      const colX = [50, 120, 300, 420, 480]
-      doc.fontSize(9).font('Helvetica-Bold')
-      doc.text('Menge', colX[0], yPos)
-      doc.text('Teilenummer', colX[1], yPos)
-      doc.text('Beschreibung', colX[2], yPos)
-      doc.text('Einzelpreis', colX[3], yPos)
-      doc.text('Status', colX[4], yPos)
-
-      doc.moveTo(50, yPos + 12).lineTo(555, yPos + 12).stroke()
-      yPos += 25
-
-      doc.font('Helvetica').fontSize(8)
-      daten.ersatzteile.forEach(teil => {
-        if (yPos > 700) {
-          doc.addPage()
-          yPos = 40
-        }
-
-        doc.text(teil.menge.toString(), colX[0], yPos)
-        doc.text(teil.teilenummer || '-', colX[1], yPos, { width: 80, ellipsis: true })
-        doc.text(teil.beschreibung, colX[2], yPos, { width: 120, ellipsis: true })
-        doc.text(`€${teil.einzelpreis.toFixed(2)}`, colX[3], yPos, { align: 'right' })
-        doc.text(teil.status, colX[4], yPos, { align: 'right' })
-
-        yPos += 15
-      })
-
-      yPos += 10
-      doc.moveTo(50, yPos).lineTo(555, yPos).stroke()
-      yPos += 20
-    }
-
-    // Bemerkungen
-    if (daten.bemerkungen) {
-      doc.fontSize(11).font('Helvetica-Bold').text('Bemerkungen:', 50, yPos)
-      yPos += 15
-      doc.fontSize(9).font('Helvetica')
-        .text(daten.bemerkungen, 50, yPos, { width: 505 })
-      yPos += 40
-    }
-
-    // Footer
-    yPos += 20
-    doc.moveTo(50, yPos).lineTo(555, yPos).stroke()
-    yPos += 15
-
-    doc.fontSize(9).font('Helvetica')
-      .text('Kundensignatur: ___________________', 50, yPos)
-    doc.text('Werkstatt: ___________________', 350, yPos)
-
-    // Footer-Info
-    doc.fontSize(7).font('Helvetica')
-      .text('Vielen Dank für Ihr Vertrauen!', 50, 750, { align: 'center' })
-    if (daten.firmaDaten.ustId) {
-      doc.text(`USt-ID: ${daten.firmaDaten.ustId}`, 50, 765, { align: 'center' })
-    }
-
-    doc.end()
-  })
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
 }

@@ -1,11 +1,11 @@
 ﻿{
-  "version": "0.0.1",
-  "configurations": [
-    {
-      "name": "werkstatt-app",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
-      "port": 3000
-    }
-  ]
+    "version":  "0.0.1",
+    "configurations":  [
+                           {
+                               "port":  3000,
+                               "runtimeExecutable":  "npm",
+                               "name":  "werkstatt-app",
+                               "runtimeArgs":  ["run", "dev"]
+                           }
+                       ]
 }

@@ -10,15 +10,16 @@ interface Props {
   auftragId: string
   betriebId: string
   fahrzeugId: string
+  refreshSignal?: number
 }
 
-export function KostenvoranschlagSection({ auftragId, betriebId, fahrzeugId }: Props) {
+export function KostenvoranschlagSection({ auftragId, betriebId, fahrzeugId, refreshSignal }: Props) {
   const [kostenvoranschlaege, setKostenvoranschlaege] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     loadKostenvoranschlaege()
-  }, [fahrzeugId])
+  }, [auftragId, refreshSignal])
 
   const loadKostenvoranschlaege = async () => {
     try {
@@ -27,7 +28,7 @@ export function KostenvoranschlagSection({ auftragId, betriebId, fahrzeugId }: P
         .from('kostenvoranschlaege')
         .select('*')
         .eq('betrieb_id', betriebId)
-        .eq('fahrzeug_id', fahrzeugId)
+        .eq('auftrag_id', auftragId)
         .order('created_at', { ascending: false })
 
       if (error) throw error

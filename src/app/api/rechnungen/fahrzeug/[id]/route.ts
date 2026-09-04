@@ -22,13 +22,38 @@ export async function PUT(
 
     const supabase = await createClient()
 
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const { data: userBetriebe } = await supabase
+      .from('betrieb_users')
+      .select('betrieb_id')
+      .eq('profile_id', user.id)
+
+    const betriebIds = (userBetriebe ?? []).map(b => b.betrieb_id)
+    if (betriebIds.length === 0) {
+      return NextResponse.json({ error: 'Kein Betrieb zugeordnet' }, { status: 403 })
+    }
+
+    // Prüfe, ob die Rechnung zu einem Betrieb des Users gehört
+    const { data: rechnungCheck } = await supabase
+      .from('fahrzeug_rechnungen')
+      .select('id')
+      .eq('id', rechnungId)
+      .in('betrieb_id', betriebIds)
+      .maybeSingle()
+
+    if (!rechnungCheck) {
+      return NextResponse.json({ error: 'Rechnung nicht gefunden' }, { status: 404 })
+    }
+
     // Prüfe ob Nummer bereits existiert (außer dieser Rechnung)
     const { data: existing } = await supabase
       .from('fahrzeug_rechnungen')
       .select('id')
       .eq('rechnungsnummer', rechnungsnummer)
       .neq('id', rechnungId)
-      .single()
+      .maybeSingle()
 
     if (existing) {
       return NextResponse.json(
@@ -43,9 +68,9 @@ export async function PUT(
       .update({ rechnungsnummer })
       .eq('id', rechnungId)
       .select()
-      .single()
+      .maybeSingle()
 
-    if (error) {
+    if (error || !data) {
       return NextResponse.json(
         { error: 'Fehler beim Aktualisieren' },
         { status: 500 }

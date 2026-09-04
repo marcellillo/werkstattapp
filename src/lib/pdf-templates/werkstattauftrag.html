@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Werkstattauftrag</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 11px;
+            color: #333;
+            line-height: 1.4;
+        }
+        .container {
+            max-width: 210mm;
+            min-height: 297mm;
+            margin: 0 auto;
+            padding: 20px;
+            background: white;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #333;
+            padding-bottom: 10px;
+        }
+        .company-info h1 {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+        .company-info p {
+            font-size: 10px;
+            margin: 2px 0;
+        }
+        .doc-title {
+            text-align: right;
+            font-size: 18px;
+            font-weight: bold;
+            color: #0066cc;
+        }
+        .doc-info {
+            text-align: right;
+            font-size: 10px;
+            margin-top: 5px;
+        }
+        .info-section {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 15px;
+        }
+        .info-box {
+            flex: 1;
+            border: 1px solid #ddd;
+            padding: 10px;
+        }
+        .info-box h3 {
+            font-size: 10px;
+            font-weight: bold;
+            margin-bottom: 5px;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 3px;
+        }
+        .info-box p {
+            font-size: 10px;
+            margin: 2px 0;
+        }
+        .section-title {
+            margin-top: 18px;
+            margin-bottom: 8px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .arbeiten-box {
+            border: 1px solid #ddd;
+            background: #fafafa;
+            padding: 12px;
+            font-size: 11px;
+            min-height: 40px;
+            white-space: pre-wrap;
+        }
+        .parts-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 8px 0 15px;
+        }
+        .parts-table thead {
+            background-color: #f0f0f0;
+        }
+        .parts-table th {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+            font-weight: bold;
+            font-size: 10px;
+        }
+        .parts-table td {
+            border: 1px solid #ddd;
+            padding: 6px;
+            font-size: 10px;
+        }
+        .parts-table tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        .signatures {
+            margin-top: 40px;
+            display: flex;
+            justify-content: space-between;
+            gap: 40px;
+        }
+        .signature-line {
+            flex: 1;
+            border-top: 1px solid #333;
+            padding-top: 5px;
+            font-size: 9px;
+            text-align: center;
+        }
+        .footer {
+            margin-top: 30px;
+            border-top: 1px solid #ddd;
+            padding-top: 10px;
+            font-size: 9px;
+            text-align: center;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="company-info">
+                {{#logoBase64}}
+                <div style="margin-bottom: 10px;">
+                    <img src="{{logoBase64}}" alt="Logo" style="max-height: 50px; max-width: 200px; object-fit: contain;" />
+                </div>
+                {{/logoBase64}}
+                <h1>{{betriebName}}</h1>
+                {{#betriebAdresse}}<p>{{betriebAdresse}}</p>{{/betriebAdresse}}
+                {{#betriebTel}}<p>{{betriebTel}}</p>{{/betriebTel}}
+            </div>
+            <div>
+                <div class="doc-title">WERKSTATTAUFTRAG</div>
+                <div class="doc-info">
+                    <p>Auftrag #{{auftragNummer}}</p>
+                    <p>Datum: {{datum}}</p>
+                    <p>Status: {{status}}</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="info-section">
+            <div class="info-box">
+                <h3>Fahrzeug</h3>
+                <p><strong>{{fahrzeugMarke}} {{fahrzeugModell}}</strong></p>
+                <p>Kennzeichen: {{fahrzeugKennzeichen}}</p>
+                <p>Fahrgestellnr: {{fahrzeugFin}}</p>
+                <p>Baujahr: {{fahrzeugBaujahr}}</p>
+                <p>Farbe: {{fahrzeugFarbe}}</p>
+                <p>Kilometerstand: {{fahrzeugKm}}</p>
+                <p>Motor: {{fahrzeugMotor}}</p>
+                <p>Hubraum: {{fahrzeugHubraum}}</p>
+                <p>Leistung: {{fahrzeugLeistung}}</p>
+                <p>Nächste HU: {{fahrzeugHu}}</p>
+            </div>
+            <div class="info-box">
+                <h3>Kunde</h3>
+                <p><strong>{{kundeName}}</strong></p>
+                <p>{{kundeAdresse}}</p>
+                <p>{{kundeOrt}}</p>
+                <p>Tel: {{kundeTel}}</p>
+            </div>
+        </div>
+
+        <div class="section-title">Zu durchführende Arbeiten</div>
+        <div class="arbeiten-box">{{arbeitenHtml}}</div>
+
+        <div class="section-title">Benötigte Teile</div>
+        <table class="parts-table">
+            <thead>
+                <tr>
+                    <th style="width: 80%;">Bezeichnung</th>
+                    <th style="width: 20%;">Menge</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{teileRowsHtml}}
+            </tbody>
+        </table>
+
+        {{#bemerkungen}}
+        <div class="section-title">Bemerkungen</div>
+        <div class="arbeiten-box">{{bemerkungen}}</div>
+        {{/bemerkungen}}
+
+        <div class="signatures">
+            <div class="signature-line">Kundensignatur</div>
+            <div class="signature-line">Werkstatt</div>
+        </div>
+
+        <div class="footer">
+            <p>Dieses Dokument wurde automatisch generiert.</p>
+        </div>
+    </div>
+</body>
+</html>

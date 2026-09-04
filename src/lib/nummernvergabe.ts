@@ -91,18 +91,16 @@ export async function generateRechnungsNummer(
   const year = new Date().getFullYear().toString().slice(-2)
 
   const { data: lastRechnung } = await supabase
-    .from('rechnungen')
-    .select('nummer')
-    .eq('betrieb_id', betriebId)
-    .eq('typ', typ)
-    .ilike('nummer', `${prefix}-${year}%`)
-    .order('created_at', { ascending: false })
+    .from('kunden_rechnungen')
+    .select('rechnungs_nr')
+    .ilike('rechnungs_nr', `${prefix}-${year}%`)
+    .order('erstellt_am', { ascending: false })
     .limit(1)
     .maybeSingle()
 
   let nextNum = 1
-  if (lastRechnung?.nummer) {
-    const match = lastRechnung.nummer.match(/(\d{4})$/)
+  if (lastRechnung?.rechnungs_nr) {
+    const match = lastRechnung.rechnungs_nr.match(/(\d{4})$/)
     if (match) nextNum = parseInt(match[1]) + 1
   }
 

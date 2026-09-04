@@ -30,6 +30,10 @@ export async function POST(req: NextRequest) {
     const token = crypto.randomBytes(32).toString('hex')
     const inviteLink = `${process.env.NEXT_PUBLIC_APP_URL}/register?token=${token}`
 
+    // Set expiration to 7 days from now
+    const expiresAt = new Date()
+    expiresAt.setDate(expiresAt.getDate() + 7)
+
     // Create invitation
     const { data, error } = await supabase.from('user_invitations').insert({
       betrieb_id: betriebId,
@@ -37,6 +41,8 @@ export async function POST(req: NextRequest) {
       token,
       rolle,
       erstellt_von: user.id,
+      abgelaufen_am: expiresAt.toISOString(),
+      status: 'pending',
     }).select().single()
 
     if (error) throw error

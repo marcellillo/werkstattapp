@@ -31,6 +31,9 @@ interface Config {
   firma_iban: string
   firma_bic: string
   firma_bank: string
+  firma_geschaeftsfuehrer: string
+  firma_hrb: string
+  firma_amtsgericht: string
   firma_stundensatz: string
   firma_kleinunternehmer: string
   firma_logo: string
@@ -255,6 +258,9 @@ export function EinstellungenContent({ initialConfig, betriebName, betriebId }: 
                   { key: 'firma_iban',           label: 'IBAN',               placeholder: 'DE89 3704 0044 0532 0130 00', full: true },
                   { key: 'firma_bic',            label: 'BIC',                placeholder: 'COBADEFFXXX' },
                   { key: 'firma_bank',           label: 'Bank',               placeholder: 'Commerzbank' },
+                  { key: 'firma_geschaeftsfuehrer', label: 'Geschäftsführung', placeholder: 'Max Mustermann', full: true },
+                  { key: 'firma_hrb',            label: 'HRB-Nummer',         placeholder: '212562' },
+                  { key: 'firma_amtsgericht',    label: 'Amtsgericht',        placeholder: 'Braunschweig' },
                   { key: 'firma_stundensatz',    label: 'Stundensatz (€)',    placeholder: '95' },
                 ] as {key: keyof Config, label: string, placeholder: string, full?: boolean}[]).map(f => (
                   <div key={f.key} className={f.full ? 'sm:col-span-2' : ''}>

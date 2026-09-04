@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { ChevronDown, Plus, Trash2, CheckCircle, Clock } from 'lucide-react'
+import { ChevronDown, Plus, Trash2, CheckCircle, Clock, Printer } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { createClient } from '@/lib/supabase/client'
 
@@ -15,11 +15,57 @@ export function WerkstattauftragItem({ werkstattauftrag, betriebId, onDelete }: 
   const [positionen, setPositionen] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [status, setStatus] = useState(werkstattauftrag.status || 'neu')
+  const [printing, setPrinting] = useState(false)
   const [newPos, setNewPos] = useState({
     beschreibung: '',
     stunden: 1,
     stundensatz: 0,
   })
+
+  const handlePrint = async () => {
+    setPrinting(true)
+    try {
+      if (werkstattauftrag.auftrag_id) {
+        const supabase = await createClient()
+        const { data: auftrag } = await supabase
+          .from('auftraege')
+          .select('kunde:kunden(vorname, nachname)')
+          .eq('id', werkstattauftrag.auftrag_id)
+          .maybeSingle()
+
+        const kunde = (auftrag as any)?.kunde
+        const hatKunde = kunde && (kunde.vorname?.trim() || kunde.nachname?.trim())
+        if (!hatKunde) {
+          const weiter = confirm('Für diesen Auftrag ist noch kein Kunde hinterlegt. Trotzdem als PDF herunterladen?')
+          if (!weiter) {
+            setPrinting(false)
+            return
+          }
+        }
+      }
+
+      const response = await fetch('/api/werkstattauftrag/pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ werkstattauftragId: werkstattauftrag.id, betriebId }),
+      })
+      if (!response.ok) throw new Error('PDF-Export fehlgeschlagen')
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `Werkstattauftrag_${werkstattauftrag.id.slice(0, 8)}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+    } catch (error) {
+      console.error('[Werkstattauftrag PDF] Error:', error)
+      alert('PDF-Export fehlgeschlagen')
+    } finally {
+      setPrinting(false)
+    }
+  }
 
   useEffect(() => {
     if (expanded && positionen.length === 0) {
@@ -78,10 +124,11 @@ export function WerkstattauftragItem({ werkstattauftrag, betriebId, onDelete }: 
         .from('werkstattauftrag_positionen')
         .insert({
           werkstattauftrag_id: werkstattauftrag.id,
+          betrieb_id: betriebId,
           beschreibung: newPos.beschreibung,
           menge: newPos.stunden,
-          preis: newPos.stundensatz,
-          summe,
+          einzelpreis: newPos.stundensatz,
+          gesamtpreis: summe,
         })
         .select()
 
@@ -113,11 +160,12 @@ export function WerkstattauftragItem({ werkstattauftrag, betriebId, onDelete }: 
     }
   }
 
+  const totalsNetto = positionen.reduce((sum, p) => sum + (p.gesamtpreis || 0), 0)
   const totals = {
-    netto: positionen.reduce((sum, p) => sum + (p.summe || 0), 0),
+    netto: totalsNetto,
+    mwst: totalsNetto * 0.19,
+    brutto: totalsNetto + totalsNetto * 0.19,
   }
-  totals.mwst = totals.netto * 0.19
-  totals.brutto = totals.netto + totals.mwst
 
   const statusColors = {
     neu: 'bg-blue-100 text-blue-800',
@@ -128,11 +176,11 @@ export function WerkstattauftragItem({ werkstattauftrag, betriebId, onDelete }: 
 
   return (
     <div className="border rounded-lg overflow-hidden">
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center justify-between p-4 bg-slate-50 hover:bg-slate-100 transition"
-      >
-        <div className="flex items-center gap-3 flex-1">
+      <div className="w-full flex items-center justify-between p-4 bg-slate-50 hover:bg-slate-100 transition">
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="flex items-center gap-3 flex-1 text-left"
+        >
           <ChevronDown className={`w-5 h-5 transition ${expanded ? 'rotate-180' : ''}`} />
           <div className="text-left">
             <p className="font-medium">Werkstattauftrag {werkstattauftrag.id.slice(0, 8)}</p>
@@ -143,8 +191,18 @@ export function WerkstattauftragItem({ werkstattauftrag, betriebId, onDelete }: 
               {status === 'abgeschlossen' && 'Abgeschlossen'}
             </p>
           </div>
-        </div>
-        <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+        </button>
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={handlePrint}
+            disabled={printing}
+            className="text-slate-600 hover:text-slate-800"
+            title="Werkstattauftrag drucken"
+          >
+            <Printer className="w-4 h-4" />
+          </Button>
           <Button
             size="sm"
             variant="ghost"
@@ -154,7 +212,7 @@ export function WerkstattauftragItem({ werkstattauftrag, betriebId, onDelete }: 
             <Trash2 className="w-4 h-4" />
           </Button>
         </div>
-      </button>
+      </div>
 
       {expanded && (
         <div className="border-t p-4 space-y-4">
@@ -220,8 +278,8 @@ export function WerkstattauftragItem({ werkstattauftrag, betriebId, onDelete }: 
                         <tr key={pos.id} className="border-b hover:bg-slate-50">
                           <td className="py-2 px-2">{pos.beschreibung}</td>
                           <td className="text-right py-2 px-2">{pos.menge} h</td>
-                          <td className="text-right py-2 px-2">{pos.preis.toFixed(2)} €</td>
-                          <td className="text-right py-2 px-2 font-medium text-blue-600">{(pos.summe || 0).toFixed(2)} €</td>
+                          <td className="text-right py-2 px-2">{(pos.einzelpreis || 0).toFixed(2)} €</td>
+                          <td className="text-right py-2 px-2 font-medium text-blue-600">{(pos.gesamtpreis || 0).toFixed(2)} €</td>
                           <td className="text-center py-2 px-2">
                             <button
                               onClick={() => handleDeletePosition(pos.id)}

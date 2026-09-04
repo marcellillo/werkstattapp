@@ -11,6 +11,7 @@ export async function POST(req: NextRequest) {
     const formData = await req.formData()
     const file = formData.get('file') as File
     const betriebId = formData.get('betriebId') as string
+    const kostenvoranschlagId = formData.get('kostenvoranschlag_id') as string | null
 
     if (!file) return NextResponse.json({ error: 'Keine Datei hochgeladen' }, { status: 400 })
     if (!betriebId) return NextResponse.json({ error: 'betriebId erforderlich' }, { status: 400 })
@@ -18,12 +19,50 @@ export async function POST(req: NextRequest) {
     // Konvertiere File zu Base64
     const buffer = await file.arrayBuffer()
     const base64 = Buffer.from(buffer).toString('base64')
+    const mimeType = file.type || 'image/jpeg'
 
     // Scanne Lieferschein
-    const scanResult = await scanLieferschein('', base64)
+    console.log('[API] Calling scanLieferschein with base64 length:', base64.length)
+    const scanResult = await scanLieferschein('', base64, mimeType)
+    console.log('[API] scanResult:', JSON.stringify(scanResult, null, 2))
+
+    // Datei immer archivieren (auch bei fehlgeschlagenem Scan), damit man sieht,
+    // was schon hochgeladen wurde und nichts versehentlich doppelt scannt.
+    const timestamp = Date.now()
+    const ext = mimeType.includes('png') ? 'png' : mimeType.includes('webp') ? 'webp' : 'jpg'
+    const safeFileName = `${timestamp}.${ext}`
+    const storagePath = `${betriebId}/${safeFileName}`
+
+    let dateiUrl: string | null = null
+    try {
+      const { error: uploadError } = await supabase.storage
+        .from('supplier-invoice')
+        .upload(storagePath, buffer, {
+          contentType: mimeType,
+          upsert: false,
+        })
+      if (uploadError) {
+        console.warn('[Lieferschein Storage] Upload error:', uploadError.message)
+      } else {
+        const { data: urlData } = supabase.storage.from('supplier-invoice').getPublicUrl(storagePath)
+        dateiUrl = urlData.publicUrl
+      }
+    } catch (storageError: any) {
+      console.warn('[Lieferschein Storage] Upload exception:', storageError.message)
+    }
 
     if (!scanResult.erfolg) {
-      console.error('[API] Scan failed:', {
+      if (dateiUrl) {
+        await supabase.from('lieferschein_uploads').insert({
+          betrieb_id: betriebId,
+          kostenvoranschlag_id: kostenvoranschlagId || null,
+          datei_url: dateiUrl,
+          dateiname: file.name,
+          erfolg: false,
+          fehlermeldung: scanResult.fehler || 'Lieferschein konnte nicht erkannt werden',
+        })
+      }
+      console.error('[API] Scan FAILED:', {
         fehler: scanResult.fehler,
         confidence: scanResult.confidence,
         teilCount: scanResult.teile.length,
@@ -34,28 +73,6 @@ export async function POST(req: NextRequest) {
         teile: [],
         confidence: scanResult.confidence,
       })
-    }
-
-    // Speichere Lieferschein-Datei im Storage (optional, für Archivierung)
-    const timestamp = Date.now()
-    const safeFileName = `${timestamp}.jpg`
-    const storagePath = `${betriebId}/${safeFileName}`
-
-    try {
-      const { data, error } = await supabase.storage
-        .from('supplier-invoice')
-        .upload(storagePath, buffer, {
-          contentType: 'image/jpeg',
-          upsert: false,
-        })
-      if (error) {
-        console.warn('[Lieferschein Storage] Upload error:', error.message)
-      } else {
-        console.log('[Lieferschein Storage] Upload successful:', data)
-      }
-    } catch (storageError: any) {
-      console.warn('[Lieferschein Storage] Upload exception:', storageError.message)
-      // Nicht-blockierend: Scan funktioniert auch ohne Speicherung
     }
 
     // Versuche Teile zu bestehenden Bestellungen zuzuordnen
@@ -94,6 +111,21 @@ export async function POST(req: NextRequest) {
     // Ungematche Teile für manuelle Zuordnung
     const unmatchedTeile = scanResult.teile.filter(t => !matched.has(t))
 
+    if (dateiUrl) {
+      await supabase.from('lieferschein_uploads').insert({
+        betrieb_id: betriebId,
+        kostenvoranschlag_id: kostenvoranschlagId || null,
+        datei_url: dateiUrl,
+        dateiname: file.name,
+        lieferant: scanResult.lieferant || null,
+        bestellnummer: scanResult.bestellnummer || null,
+        lieferdatum: scanResult.lieferdatum || null,
+        vermutete_arbeit: scanResult.vermuteteArbeit || null,
+        teile_anzahl: scanResult.teile.length,
+        erfolg: true,
+      })
+    }
+
     return NextResponse.json({
       erfolg: true,
       scannedTeile: scanResult.teile.length,
@@ -103,6 +135,7 @@ export async function POST(req: NextRequest) {
         lieferdatum: scanResult.lieferdatum,
         lieferant: scanResult.lieferant,
         bestellnummer: scanResult.bestellnummer,
+        vermuteteArbeit: scanResult.vermuteteArbeit,
         confidence: scanResult.confidence,
       },
     })
