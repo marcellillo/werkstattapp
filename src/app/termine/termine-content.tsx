@@ -312,17 +312,31 @@ function BestaetigenModal({ termin, onClose }: { termin: any; onClose: () => voi
   const uhrzeit = termin.uhrzeit ? termin.uhrzeit.slice(0, 5) + ' Uhr' : ''
   const leistung = termin.titel.split(' – ')[0] ?? termin.titel
 
-  const waText = encodeURIComponent(
-    `Hallo${kundenName ? ' ' + kundenName.split(' ')[0] : ''},\n\nIhr Termin bei Helios Automobile GmbH ist bestätigt ✅\n\n📅 ${datum}${uhrzeit ? ' · ' + uhrzeit : ''}\n🔧 ${leistung}\n\nBei Fragen erreichen Sie uns unter 05351 / 59913-14.\n\nBis bald!\nIhr Helios-Team`
-  )
+  // Online-Buchungen ohne feste Uhrzeit sind reine Kostenvoranschlag-Anfragen –
+  // dafür gibt es (noch) keinen bestätigten Termin, nur eine Eingangsbestätigung.
+  const isKostenvoranschlag = !termin.uhrzeit
+
+  const waText = isKostenvoranschlag
+    ? encodeURIComponent(
+        `Hallo${kundenName ? ' ' + kundenName.split(' ')[0] : ''},\n\nvielen Dank für Ihre Kostenvoranschlag-Anfrage bei Helios Automobile GmbH ✅\n\n🔧 ${leistung}\n\nWir prüfen Ihre Anfrage und melden uns in Kürze mit einem individuellen Angebot.\n\nBei Fragen erreichen Sie uns unter 05351 / 59913-14.\n\nViele Grüße\nIhr Helios-Team`
+      )
+    : encodeURIComponent(
+        `Hallo${kundenName ? ' ' + kundenName.split(' ')[0] : ''},\n\nIhr Termin bei Helios Automobile GmbH ist bestätigt ✅\n\n📅 ${datum}${uhrzeit ? ' · ' + uhrzeit : ''}\n🔧 ${leistung}\n\nBei Fragen erreichen Sie uns unter 05351 / 59913-14.\n\nBis bald!\nIhr Helios-Team`
+      )
   const waLink = telefon
     ? `https://wa.me/${telefon.replace(/[\s\-+]/g, '').replace(/^0/, '49')}?text=${waText}`
     : null
 
-  const mailSubject = encodeURIComponent('Ihr Termin ist bestätigt – Helios Automobile GmbH')
-  const mailBody = encodeURIComponent(
-    `Sehr geehrte/r ${kundenName},\n\nIhr Termin bei uns ist bestätigt:\n\n📅 ${datum}${uhrzeit ? ' · ' + uhrzeit : ''}\n🔧 ${leistung}\n\nAdresse: Emmastraße 23, 38350 Helmstedt\n\nBei Fragen: 05351 / 59913-14 oder info@heliosautomobile.de\n\nMit freundlichen Grüßen\nIhr Helios Automobile GmbH Team`
-  )
+  const mailSubject = isKostenvoranschlag
+    ? encodeURIComponent('Ihre Kostenvoranschlag-Anfrage – Helios Automobile GmbH')
+    : encodeURIComponent('Ihr Termin ist bestätigt – Helios Automobile GmbH')
+  const mailBody = isKostenvoranschlag
+    ? encodeURIComponent(
+        `Sehr geehrte/r ${kundenName},\n\nvielen Dank für Ihre Kostenvoranschlag-Anfrage:\n\n🔧 ${leistung}\n\nWir prüfen Ihre Anfrage und melden uns in Kürze mit einem individuellen Angebot.\n\nAdresse: Marientalerstraße 83, 38350 Helmstedt\n\nBei Fragen: 05351 / 59913-14 oder info@heliosautomobile.de\n\nMit freundlichen Grüßen\nIhr Helios Automobile GmbH Team`
+      )
+    : encodeURIComponent(
+        `Sehr geehrte/r ${kundenName},\n\nIhr Termin bei uns ist bestätigt:\n\n📅 ${datum}${uhrzeit ? ' · ' + uhrzeit : ''}\n🔧 ${leistung}\n\nAdresse: Marientalerstraße 83, 38350 Helmstedt\n\nBei Fragen: 05351 / 59913-14 oder info@heliosautomobile.de\n\nMit freundlichen Grüßen\nIhr Helios Automobile GmbH Team`
+      )
   const mailLink = email ? `mailto:${email}?subject=${mailSubject}&body=${mailBody}` : null
 
   return (
@@ -334,7 +348,7 @@ function BestaetigenModal({ termin, onClose }: { termin: any; onClose: () => voi
               <CheckCircle className="w-5 h-5 text-green-600" />
             </div>
             <div>
-              <h3 className="font-semibold text-gray-900">Termin bestätigt!</h3>
+              <h3 className="font-semibold text-gray-900">{isKostenvoranschlag ? 'Anfrage bestätigt!' : 'Termin bestätigt!'}</h3>
               <p className="text-sm text-gray-500">Kunden jetzt benachrichtigen?</p>
             </div>
           </div>
@@ -345,7 +359,11 @@ function BestaetigenModal({ termin, onClose }: { termin: any; onClose: () => voi
 
         <div className="bg-gray-50 rounded-xl p-3 text-sm space-y-1">
           {kundenName && <p className="font-medium text-gray-800">{kundenName}</p>}
-          <p className="text-gray-600">{datum}{uhrzeit ? ' · ' + uhrzeit : ''}</p>
+          {isKostenvoranschlag ? (
+            <p className="text-gray-600">Kostenvoranschlag-Anfrage</p>
+          ) : (
+            <p className="text-gray-600">{datum}{uhrzeit ? ' · ' + uhrzeit : ''}</p>
+          )}
           <p className="text-gray-600">{leistung}</p>
           {telefon && <p className="text-gray-500">📞 {telefon}</p>}
           {email && <p className="text-gray-500">✉️ {email}</p>}
@@ -355,7 +373,7 @@ function BestaetigenModal({ termin, onClose }: { termin: any; onClose: () => voi
           {waLink ? (
             <a href={waLink} target="_blank" rel="noopener noreferrer" onClick={onClose}
               className="flex items-center justify-center gap-2 w-full py-3 bg-green-500 hover:bg-green-600 text-white rounded-xl text-sm font-semibold transition-colors">
-              <MessageCircle className="w-4 h-4" /> Per WhatsApp bestätigen
+              <MessageCircle className="w-4 h-4" /> {isKostenvoranschlag ? 'Per WhatsApp Eingang bestätigen' : 'Per WhatsApp bestätigen'}
             </a>
           ) : (
             <div className="flex items-center justify-center gap-2 w-full py-3 bg-gray-100 text-gray-400 rounded-xl text-sm cursor-not-allowed">
@@ -366,7 +384,7 @@ function BestaetigenModal({ termin, onClose }: { termin: any; onClose: () => voi
           {mailLink ? (
             <a href={mailLink} onClick={onClose}
               className="flex items-center justify-center gap-2 w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold transition-colors">
-              <Mail className="w-4 h-4" /> Per E-Mail bestätigen
+              <Mail className="w-4 h-4" /> {isKostenvoranschlag ? 'Per E-Mail Eingang bestätigen' : 'Per E-Mail bestätigen'}
             </a>
           ) : (
             <div className="flex items-center justify-center gap-2 w-full py-3 bg-gray-100 text-gray-400 rounded-xl text-sm cursor-not-allowed">
