@@ -35,6 +35,41 @@ function parseBeschreibung(desc: string): Record<string, string> {
   return result
 }
 
+// Fahrzeugschein-Foto einer Online-Anfrage: der Speicherpfad in Supabase Storage wird
+// vom /api/buchen Endpunkt als Zeile in "notizen" abgelegt (kein eigenes DB-Feld nötig).
+function extractFahrzeugscheinPfad(notizen?: string | null): { pfad: string | null; rest: string } {
+  if (!notizen) return { pfad: null, rest: '' }
+  const match = notizen.match(/Fahrzeugschein-Pfad:\s*(\S+)/)
+  if (!match) return { pfad: null, rest: notizen }
+  const rest = notizen.replace(match[0], '').trim()
+  return { pfad: match[1], rest }
+}
+
+// Button, der einen zeitlich begrenzten Link zum in Supabase Storage hinterlegten
+// Fahrzeugschein-Foto holt und in einem neuen Tab öffnet.
+function FahrzeugscheinButton({ pfad }: { pfad: string }) {
+  const [loading, setLoading] = useState(false)
+  const open = async () => {
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/fahrzeugschein-url?path=${encodeURIComponent(pfad)}`)
+      const data = await res.json()
+      if (data.url) window.open(data.url, '_blank', 'noopener,noreferrer')
+      else alert('Fahrzeugschein konnte nicht geladen werden.')
+    } catch {
+      alert('Fahrzeugschein konnte nicht geladen werden.')
+    } finally {
+      setLoading(false)
+    }
+  }
+  return (
+    <button type="button" onClick={open} disabled={loading}
+      className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 underline disabled:opacity-50">
+      📄 {loading ? 'Lädt…' : 'Fahrzeugschein ansehen'}
+    </button>
+  )
+}
+
 export function TermineContent({ termine: initialTermine, kunden, fahrzeuge, hebebuehnen }: {
   termine: any[]; kunden: any[]; fahrzeuge: any[]; hebebuehnen: any[]
 }) {
@@ -127,6 +162,7 @@ export function TermineContent({ termine: initialTermine, kunden, fahrzeuge, heb
           <div className="space-y-2">
             {offeneOnlineBuchungen.map(t => {
               const info = parseBeschreibung(t.beschreibung ?? '')
+              const { pfad: fahrzeugscheinPfad } = extractFahrzeugscheinPfad(t.notizen)
               return (
                 <div key={t.id} className="bg-white rounded-lg border border-blue-200 p-3 flex flex-col sm:flex-row sm:items-center gap-3">
                   <div className="flex-1">
@@ -139,6 +175,9 @@ export function TermineContent({ termine: initialTermine, kunden, fahrzeuge, heb
                     )}
                     {info['E-Mail'] && (
                       <p className="text-xs text-gray-600">✉️ {info['E-Mail']}</p>
+                    )}
+                    {fahrzeugscheinPfad && (
+                      <div className="mt-1"><FahrzeugscheinButton pfad={fahrzeugscheinPfad} /></div>
                     )}
                   </div>
                   <div className="flex gap-2 flex-shrink-0">
@@ -410,6 +449,7 @@ function TerminCard({ termin, onStatus, onDelete }: {
   const statusCfg = STATUS_CONFIG[termin.status as TerminStatus] ?? STATUS_CONFIG.offen
   const isPast = termin.datum < today
   const isOnline = termin.quelle === 'website'
+  const { pfad: fahrzeugscheinPfad, rest: notizenRest } = extractFahrzeugscheinPfad(termin.notizen)
 
   return (
     <div className={cn('bg-white border rounded-xl overflow-hidden transition-shadow hover:shadow-sm',
@@ -455,7 +495,8 @@ function TerminCard({ termin, onStatus, onDelete }: {
           {termin.beschreibung && (
             <p className="text-sm text-gray-600 whitespace-pre-line">{termin.beschreibung}</p>
           )}
-          {termin.notizen && <p className="text-sm text-gray-600">{termin.notizen}</p>}
+          {notizenRest && <p className="text-sm text-gray-600">{notizenRest}</p>}
+          {fahrzeugscheinPfad && <FahrzeugscheinButton pfad={fahrzeugscheinPfad} />}
           <div className="flex flex-wrap gap-2">
             {(['offen', 'bestaetigt', 'erledigt', 'abgesagt'] as TerminStatus[]).map(s => (
               <button key={s} onClick={() => onStatus(termin.id, s)}

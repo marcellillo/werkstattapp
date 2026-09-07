@@ -49,10 +49,34 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400, headers })
   }
 
-  const { vorname, nachname, telefon, email, kennzeichen, marke_modell, leistung, datum, uhrzeit, nachricht } = body
+  const { vorname, nachname, telefon, email, kennzeichen, marke_modell, leistung, datum, uhrzeit, nachricht, fahrzeugschein_foto, fahrzeugschein_dateiname } = body
 
   if (!vorname || !nachname || !telefon || !leistung || !datum) {
     return NextResponse.json({ error: 'Pflichtfelder fehlen' }, { status: 400, headers })
+  }
+
+  // ── Fahrzeugschein-Foto aus der Online-Anfrage dauerhaft in Supabase Storage sichern ──
+  // (nutzt denselben privaten "fahrzeugbrief"-Bucket wie die manuell hochgeladenen
+  // Fahrzeugbriefe; der Service-Role-Client umgeht Storage-Policies, kein Setup nötig)
+  let fahrzeugscheinPfad: string | null = null
+  if (typeof fahrzeugschein_foto === 'string') {
+    try {
+      const match = fahrzeugschein_foto.match(/^data:(image\/[a-zA-Z0-9+.-]+);base64,(.+)$/)
+      if (match) {
+        const mime = match[1]
+        const buffer = Buffer.from(match[2], 'base64')
+        const ext = mime.split('/')[1] || 'jpg'
+        const safeName = String(fahrzeugschein_dateiname || `fahrzeugschein.${ext}`).replace(/[^a-zA-Z0-9._-]/g, '_')
+        const path = `online-anfragen/${Date.now()}-${safeName}`
+        const { error: uploadError } = await supabase.storage
+          .from('fahrzeugbrief')
+          .upload(path, buffer, { contentType: mime, upsert: false })
+        if (!uploadError) fahrzeugscheinPfad = path
+        else console.error('Fahrzeugschein-Upload error:', uploadError)
+      }
+    } catch (e) {
+      console.error('Fahrzeugschein-Upload exception:', e)
+    }
   }
 
   const titel = `${leistung} – ${vorname} ${nachname}`
@@ -132,6 +156,9 @@ export async function POST(req: NextRequest) {
       const hinweis = fehlendeDaten.length
         ? `\n\n⚠️ Noch zu erfragen: ${fehlendeDaten.join(', ')}`
         : ''
+      const fahrzeugscheinHinweis = fahrzeugscheinPfad
+        ? `\n\n📄 Fahrzeugschein-Foto vorhanden (siehe Termine → Online-Buchung)`
+        : ''
 
       const { error: auftragError } = await supabase.from('auftraege').insert({
         betrieb_id: defaultBetriebId,
@@ -141,7 +168,7 @@ export async function POST(req: NextRequest) {
         status: 'angenommen',
         arbeiten: leistung,
         geplante_fertigstellung: datum,
-        bemerkungen: `Online-Buchung vom ${datum}${uhrzeit ? ' ' + uhrzeit + ' Uhr' : ''}${nachricht ? '\nKundenwunsch: ' + nachricht : ''}${hinweis}`,
+        bemerkungen: `Online-Buchung vom ${datum}${uhrzeit ? ' ' + uhrzeit + ' Uhr' : ''}${nachricht ? '\nKundenwunsch: ' + nachricht : ''}${hinweis}${fahrzeugscheinHinweis}`,
       })
       if (auftragError) console.error('Auftrag insert error:', auftragError)
     }
@@ -160,7 +187,7 @@ export async function POST(req: NextRequest) {
     quelle: 'website',
     status: 'offen',
     kunden_id: kundeId,
-    notizen: `Online-Buchung von der Website`,
+    notizen: `Online-Buchung von der Website${fahrzeugscheinPfad ? '\nFahrzeugschein-Pfad: ' + fahrzeugscheinPfad : ''}`,
   })
 
   if (error) {
