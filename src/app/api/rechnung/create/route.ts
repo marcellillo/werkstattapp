@@ -10,8 +10,9 @@ export async function POST(req: NextRequest) {
 
     const {
       auftragId, betriebId, fahrzeugId, kostenvoranschlagIds, werkstattauftragIds,
-      kleinteilpauschaleBetrag, sonstigesBeschreibung, sonstigesBetrag,
+      kleinteilpauschaleBetrag, sonstigesBeschreibung, sonstigesBetrag, anzeigeModus,
     } = await req.json()
+    const anzeigeModusWert = anzeigeModus === 'pauschal' ? 'pauschal' : 'detailliert'
 
     console.log('[Rechnung] Input:', { auftragId, betriebId, fahrzeugId, kostenvoranschlagIds, werkstattauftragIds })
 
@@ -136,6 +137,7 @@ export async function POST(req: NextRequest) {
         kleinteilpauschale_betrag: kleinteilBetrag > 0 ? kleinteilBetrag : null,
         sonstiges_beschreibung: sonstigesBetragZahl > 0 ? (sonstigesBeschreibung || 'Sonstige Leistungen') : null,
         sonstiges_betrag: sonstigesBetragZahl > 0 ? sonstigesBetragZahl : null,
+        anzeige_modus: anzeigeModusWert,
         status: 'offen',
       })
       .select()

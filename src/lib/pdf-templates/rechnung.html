@@ -108,17 +108,12 @@
             <div class="section-titel">Arbeitswerte</div>
             <table>
                 <thead>
-                    <tr>
-                        <th>Bezeichnung</th>
-                        <th class="ta-right">Menge</th>
-                        <th class="ta-right">Einzelpreis</th>
-                        <th class="ta-right">Summe (netto)</th>
-                    </tr>
+                    {{arbeitswerteHeaderHtml}}
                 </thead>
                 <tbody>
                     {{arbeitswerteRowsHtml}}
                     <tr class="section-summe">
-                        <td colspan="3" style="text-align:right;">Summe</td>
+                        <td colspan="{{arbeitswerteSummeColspan}}" style="text-align:right;">Summe</td>
                         <td class="ta-right">{{arbeitswerteSumme}} €</td>
                     </tr>
                 </tbody>

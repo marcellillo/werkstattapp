@@ -7,8 +7,11 @@ function fmt(n: number) {
   return n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-function rowsHtml(positionen: RechnungPosition[]): string {
-  return positionen.map(pos => `
+function rowsHtml(positionen: RechnungPosition[], istPauschal: boolean): string {
+  return positionen.map(pos => istPauschal ? `
+    <tr>
+      <td>${pos.beschreibung}</td>
+    </tr>` : `
     <tr>
       <td>${pos.beschreibung}</td>
       <td class="ta-right">${pos.menge}</td>
@@ -45,6 +48,7 @@ export async function POST(req: NextRequest) {
     if (!detail) return NextResponse.json({ error: 'Rechnung nicht gefunden' }, { status: 404 })
 
     const { rechnung, kunde, fahrzeug, firma, kleinunternehmer, ersatzteilePositionen, arbeitswertePositionen } = detail
+    const istPauschal = rechnung.anzeige_modus === 'pauschal'
 
     const arbeitswerteAlle: RechnungPosition[] = [
       ...arbeitswertePositionen,
@@ -62,22 +66,27 @@ export async function POST(req: NextRequest) {
       }] : []),
     ]
 
+    const positionsHeaderHtml = istPauschal
+      ? `<tr><th>Artikelbezeichnung</th></tr>`
+      : `<tr>
+              <th>Artikelbezeichnung</th>
+              <th class="ta-right">Menge</th>
+              <th class="ta-right">Preis (netto)</th>
+              <th class="ta-right">Summe (netto)</th>
+            </tr>`
+    const summenzeileColspan = istPauschal ? 1 : 3
+
     const ersatzteileSectionHtml = ersatzteilePositionen.length > 0 ? `
       <div class="section-box">
         <div class="section-titel">Ersatzteile</div>
         <table>
           <thead>
-            <tr>
-              <th>Artikelbezeichnung</th>
-              <th class="ta-right">Menge</th>
-              <th class="ta-right">Preis (netto)</th>
-              <th class="ta-right">Summe (netto)</th>
-            </tr>
+            ${positionsHeaderHtml}
           </thead>
           <tbody>
-            ${rowsHtml(ersatzteilePositionen)}
+            ${rowsHtml(ersatzteilePositionen, istPauschal)}
             <tr class="section-summe">
-              <td colspan="3" style="text-align:right;">Summe</td>
+              <td colspan="${summenzeileColspan}" style="text-align:right;">Summe</td>
               <td class="ta-right">${fmt(detail.ersatzteileNetto)} €</td>
             </tr>
           </tbody>
@@ -130,7 +139,9 @@ export async function POST(req: NextRequest) {
       fahrzeugKennzeichen: fahrzeug?.kennzeichen || '—',
       fahrzeugFin: fahrzeug?.fin || '—',
       ersatzteileSectionHtml,
-      arbeitswerteRowsHtml: rowsHtml(arbeitswerteAlle),
+      arbeitswerteHeaderHtml: positionsHeaderHtml,
+      arbeitswerteRowsHtml: rowsHtml(arbeitswerteAlle, istPauschal),
+      arbeitswerteSummeColspan: summenzeileColspan,
       arbeitswerteSumme: fmt(detail.arbeitNetto + detail.kleinteilNetto + detail.sonstigesNetto),
       ersatzteileSummenzeileHtml,
       summeNetto: fmt(rechnung.betrag_netto),

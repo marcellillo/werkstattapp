@@ -34,6 +34,7 @@ async function buildRechnungHtml(detail: RechnungDetail): Promise<string> {
   const kd = detail.kunde ?? {}
   const firma = detail.firma
   const { rechnung, kleinunternehmer, ersatzteilePositionen, arbeitswertePositionen } = detail
+  const istPauschal = rechnung.anzeige_modus === 'pauschal'
 
   const zahlungsziel = new Date(new Date(rechnung.erstellt_am).getTime() + 14 * 86_400_000)
 
@@ -60,7 +61,11 @@ async function buildRechnungHtml(detail: RechnungDetail): Promise<string> {
     stripeQr && { src: stripeQr, label: 'Stripe',           hint: 'Karte / Apple Pay' },
   ].filter(Boolean) as { src: string; label: string; hint: string }[]
 
-  const ersatzteileRows = ersatzteilePositionen.map((pos, i) => `
+  const ersatzteileRows = ersatzteilePositionen.map((pos, i) => istPauschal ? `
+      <tr style="border-bottom:1px solid #f1f5f9;">
+        <td style="padding:5px 8px;font-size:11px;">${i + 1}</td>
+        <td style="padding:5px 8px;font-size:11px;">${pos.beschreibung}</td>
+      </tr>` : `
       <tr style="border-bottom:1px solid #f1f5f9;">
         <td style="padding:5px 8px;font-size:11px;">${i + 1}</td>
         <td style="padding:5px 8px;font-size:11px;">${pos.beschreibung}</td>
@@ -74,7 +79,11 @@ async function buildRechnungHtml(detail: RechnungDetail): Promise<string> {
     ...(detail.kleinteilNetto > 0 ? [{ beschreibung: 'Kleinteilpauschale (Schrauben, Dichtungen, Kleinmaterial)', menge: 1, preis: detail.kleinteilNetto, summe: detail.kleinteilNetto }] : []),
     ...(detail.sonstigesNetto > 0 ? [{ beschreibung: detail.sonstigesBeschreibung || 'Sonstige Leistungen', menge: 1, preis: detail.sonstigesNetto, summe: detail.sonstigesNetto }] : []),
   ]
-  const arbeitswerteRows = arbeitswerteAlle.map((pos, i) => `
+  const arbeitswerteRows = arbeitswerteAlle.map((pos, i) => istPauschal ? `
+      <tr style="border-bottom:1px solid #f1f5f9;">
+        <td style="padding:5px 8px;font-size:11px;">${i + 1}</td>
+        <td style="padding:5px 8px;font-size:11px;">${pos.beschreibung}</td>
+      </tr>` : `
       <tr style="border-bottom:1px solid #f1f5f9;">
         <td style="padding:5px 8px;font-size:11px;">${i + 1}</td>
         <td style="padding:5px 8px;font-size:11px;">${pos.beschreibung}</td>
@@ -82,6 +91,20 @@ async function buildRechnungHtml(detail: RechnungDetail): Promise<string> {
         <td style="padding:5px 8px;font-size:11px;text-align:right;">${fmtEuro(pos.preis)}</td>
         <td style="padding:5px 8px;font-size:11px;text-align:right;">${fmtEuro(pos.summe)}</td>
       </tr>`).join('')
+
+  const positionsHeaderHtml = istPauschal ? `
+        <tr style="background:#f1f5f9;">
+          <th style="padding:7px 8px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;color:#475569;">Pos.</th>
+          <th style="padding:7px 8px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;color:#475569;">Beschreibung</th>
+        </tr>` : `
+        <tr style="background:#f1f5f9;">
+          <th style="padding:7px 8px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;color:#475569;">Pos.</th>
+          <th style="padding:7px 8px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;color:#475569;">Beschreibung</th>
+          <th style="padding:7px 8px;text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;color:#475569;">Menge</th>
+          <th style="padding:7px 8px;text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;color:#475569;">Einzel (netto)</th>
+          <th style="padding:7px 8px;text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;color:#475569;">Gesamt (netto)</th>
+        </tr>`
+  const summenzeileColspan = istPauschal ? 1 : 4
 
   const logoBlock = firma.firma_logo
     ? `<img src="${firma.firma_logo}" alt="${firma.firma_name || 'Logo'}" style="max-height:60px;max-width:200px;object-fit:contain;margin-bottom:4px;" />`
@@ -158,19 +181,11 @@ async function buildRechnungHtml(detail: RechnungDetail): Promise<string> {
     <!-- Ersatzteile -->
     <div style="font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:0.05em;margin:16px 0 4px;">Ersatzteile</div>
     <table style="width:100%;border-collapse:collapse;margin-bottom:8px;border:1.5px solid #cbd5e1;border-radius:8px;overflow:hidden;">
-      <thead>
-        <tr style="background:#f1f5f9;">
-          <th style="padding:7px 8px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;color:#475569;">Pos.</th>
-          <th style="padding:7px 8px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;color:#475569;">Beschreibung</th>
-          <th style="padding:7px 8px;text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;color:#475569;">Menge</th>
-          <th style="padding:7px 8px;text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;color:#475569;">Einzel (netto)</th>
-          <th style="padding:7px 8px;text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;color:#475569;">Gesamt (netto)</th>
-        </tr>
-      </thead>
+      <thead>${positionsHeaderHtml}</thead>
       <tbody>
         ${ersatzteileRows}
         <tr style="background:#f8fafc;border-top:1.5px solid #cbd5e1;">
-          <td colspan="4" style="padding:6px 8px;font-size:11px;font-weight:700;text-align:right;">Summe</td>
+          <td colspan="${summenzeileColspan}" style="padding:6px 8px;font-size:11px;font-weight:700;text-align:right;">Summe</td>
           <td style="padding:6px 8px;font-size:11px;font-weight:700;text-align:right;">${fmtEuro(detail.ersatzteileNetto)}</td>
         </tr>
       </tbody>
@@ -180,19 +195,11 @@ async function buildRechnungHtml(detail: RechnungDetail): Promise<string> {
     <!-- Arbeitswerte -->
     <div style="font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:0.05em;margin:16px 0 4px;">Arbeitswerte</div>
     <table style="width:100%;border-collapse:collapse;margin-bottom:8px;border:1.5px solid #cbd5e1;border-radius:8px;overflow:hidden;">
-      <thead>
-        <tr style="background:#f1f5f9;">
-          <th style="padding:7px 8px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;color:#475569;">Pos.</th>
-          <th style="padding:7px 8px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;color:#475569;">Beschreibung</th>
-          <th style="padding:7px 8px;text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;color:#475569;">Menge</th>
-          <th style="padding:7px 8px;text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;color:#475569;">Einzel (netto)</th>
-          <th style="padding:7px 8px;text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;color:#475569;">Gesamt (netto)</th>
-        </tr>
-      </thead>
+      <thead>${positionsHeaderHtml}</thead>
       <tbody>
-        ${arbeitswerteRows || '<tr><td colspan="5" style="padding:6px 8px;font-size:11px;color:#94a3b8;font-style:italic;">Keine Arbeitszeit erfasst</td></tr>'}
+        ${arbeitswerteRows || `<tr><td colspan="${istPauschal ? 2 : 5}" style="padding:6px 8px;font-size:11px;color:#94a3b8;font-style:italic;">Keine Arbeitszeit erfasst</td></tr>`}
         <tr style="background:#f8fafc;border-top:1.5px solid #cbd5e1;">
-          <td colspan="4" style="padding:6px 8px;font-size:11px;font-weight:700;text-align:right;">Summe</td>
+          <td colspan="${summenzeileColspan}" style="padding:6px 8px;font-size:11px;font-weight:700;text-align:right;">Summe</td>
           <td style="padding:6px 8px;font-size:11px;font-weight:700;text-align:right;">${fmtEuro(detail.arbeitNetto + detail.kleinteilNetto + detail.sonstigesNetto)}</td>
         </tr>
       </tbody>

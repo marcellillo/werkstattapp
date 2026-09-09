@@ -18,6 +18,7 @@ export interface RechnungDetail {
     betrag_mwst: number
     betrag_brutto: number
     auftrag_id: string | null
+    anzeige_modus: 'detailliert' | 'pauschal'
   }
   auftragNr: string
   kunde: any
@@ -156,6 +157,7 @@ export async function resolveRechnungDetail(
       betrag_mwst: rechnung.betrag_mwst || 0,
       betrag_brutto: rechnung.betrag_brutto || 0,
       auftrag_id: rechnung.auftrag_id || null,
+      anzeige_modus: rechnung.anzeige_modus === 'pauschal' ? 'pauschal' : 'detailliert',
     },
     auftragNr: auftrag?.auftrag_nr || '',
     kunde,

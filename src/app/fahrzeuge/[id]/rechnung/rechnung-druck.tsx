@@ -140,6 +140,15 @@ export function RechnungDruck({ rechnungId, betriebId, firma: firmaHint }: { rec
     if (detail) window.print()
   }, [detail])
 
+  // Eigener Seitentitel statt des generischen App-Titels, u.a. damit der
+  // vom Browser beim Drucken/„Als PDF speichern" eingefügte Kopf-/Fußzeilentext
+  // (Titel + URL) wenigstens den richtigen Firmennamen zeigt. Die URL selbst
+  // kann eine Webseite nicht unterdrücken — das lässt sich nur im Druckdialog
+  // unter "Kopf- und Fußzeilen" abschalten.
+  useEffect(() => {
+    if (detail) document.title = `Rechnung ${detail.rechnung.rechnungs_nr} – ${detail.firma.firma_name || 'Kfz-Werkstatt'}`
+  }, [detail])
+
   // Hooks müssen unabhängig vom Ladezustand in gleicher Reihenfolge aufgerufen werden
   const firmaSafe = detail?.firma
   const giroCode = firmaSafe?.firma_iban
@@ -165,6 +174,7 @@ export function RechnungDruck({ rechnungId, betriebId, firma: firmaHint }: { rec
 
   const { rechnung, kunde: kd, fahrzeug: fz, firma, kleinunternehmer, ersatzteilePositionen, arbeitswertePositionen } = detail
   const mwstSatz = kleinunternehmer ? 0 : 19
+  const istPauschal = rechnung.anzeige_modus === 'pauschal'
 
   const zahlungsziel = new Date(new Date(rechnung.erstellt_am).getTime() + 14 * 86_400_000)
 
@@ -326,22 +336,22 @@ export function RechnungDruck({ rechnungId, betriebId, firma: firmaHint }: { rec
               <thead>
                 <tr>
                   <th>Artikelbezeichnung</th>
-                  <th className="ta-right">Menge</th>
-                  <th className="ta-right">Preis (netto)</th>
-                  <th className="ta-right">Summe (netto)</th>
+                  {!istPauschal && <th className="ta-right">Menge</th>}
+                  {!istPauschal && <th className="ta-right">Preis (netto)</th>}
+                  {!istPauschal && <th className="ta-right">Summe (netto)</th>}
                 </tr>
               </thead>
               <tbody>
                 {ersatzteilePositionen.map((pos, i) => (
                   <tr key={i}>
                     <td>{pos.beschreibung}</td>
-                    <td className="ta-right">{pos.menge}x</td>
-                    <td className="ta-right">{fmtEuro(pos.preis)}</td>
-                    <td className="ta-right">{fmtEuro(pos.summe)}</td>
+                    {!istPauschal && <td className="ta-right">{pos.menge}x</td>}
+                    {!istPauschal && <td className="ta-right">{fmtEuro(pos.preis)}</td>}
+                    {!istPauschal && <td className="ta-right">{fmtEuro(pos.summe)}</td>}
                   </tr>
                 ))}
                 <tr className="section-summe">
-                  <td colSpan={3} style={{textAlign: 'right'}}>Summe</td>
+                  <td colSpan={istPauschal ? 1 : 3} style={{textAlign: 'right'}}>Summe</td>
                   <td className="ta-right">{fmtEuro(detail.ersatzteileNetto)}</td>
                 </tr>
               </tbody>
@@ -356,42 +366,42 @@ export function RechnungDruck({ rechnungId, betriebId, firma: firmaHint }: { rec
             <thead>
               <tr>
                 <th>Bezeichnung</th>
-                <th className="ta-right">Menge</th>
-                <th className="ta-right">Einzelpreis</th>
-                <th className="ta-right">Summe (netto)</th>
+                {!istPauschal && <th className="ta-right">Menge</th>}
+                {!istPauschal && <th className="ta-right">Einzelpreis</th>}
+                {!istPauschal && <th className="ta-right">Summe (netto)</th>}
               </tr>
             </thead>
             <tbody>
               {arbeitswertePositionen.length === 0 && detail.kleinteilNetto <= 0 && detail.sonstigesNetto <= 0 ? (
-                <tr><td colSpan={4} style={{color: '#94a3b8', fontStyle: 'italic'}}>Keine Arbeitszeit erfasst</td></tr>
+                <tr><td colSpan={istPauschal ? 1 : 4} style={{color: '#94a3b8', fontStyle: 'italic'}}>Keine Arbeitszeit erfasst</td></tr>
               ) : (
                 arbeitswertePositionen.map((pos, i) => (
                   <tr key={i}>
                     <td>{pos.beschreibung}</td>
-                    <td className="ta-right">{pos.menge}</td>
-                    <td className="ta-right">{fmtEuro(pos.preis)}</td>
-                    <td className="ta-right">{fmtEuro(pos.summe)}</td>
+                    {!istPauschal && <td className="ta-right">{pos.menge}</td>}
+                    {!istPauschal && <td className="ta-right">{fmtEuro(pos.preis)}</td>}
+                    {!istPauschal && <td className="ta-right">{fmtEuro(pos.summe)}</td>}
                   </tr>
                 ))
               )}
               {detail.kleinteilNetto > 0 && (
                 <tr>
                   <td>Kleinteilpauschale (Schrauben, Dichtungen, Kleinmaterial)</td>
-                  <td className="ta-right">1</td>
-                  <td className="ta-right">{fmtEuro(detail.kleinteilNetto)}</td>
-                  <td className="ta-right">{fmtEuro(detail.kleinteilNetto)}</td>
+                  {!istPauschal && <td className="ta-right">1</td>}
+                  {!istPauschal && <td className="ta-right">{fmtEuro(detail.kleinteilNetto)}</td>}
+                  {!istPauschal && <td className="ta-right">{fmtEuro(detail.kleinteilNetto)}</td>}
                 </tr>
               )}
               {detail.sonstigesNetto > 0 && (
                 <tr>
                   <td>{detail.sonstigesBeschreibung || 'Sonstige Leistungen'}</td>
-                  <td className="ta-right">1</td>
-                  <td className="ta-right">{fmtEuro(detail.sonstigesNetto)}</td>
-                  <td className="ta-right">{fmtEuro(detail.sonstigesNetto)}</td>
+                  {!istPauschal && <td className="ta-right">1</td>}
+                  {!istPauschal && <td className="ta-right">{fmtEuro(detail.sonstigesNetto)}</td>}
+                  {!istPauschal && <td className="ta-right">{fmtEuro(detail.sonstigesNetto)}</td>}
                 </tr>
               )}
               <tr className="section-summe">
-                <td colSpan={3} style={{textAlign: 'right'}}>Summe</td>
+                <td colSpan={istPauschal ? 1 : 3} style={{textAlign: 'right'}}>Summe</td>
                 <td className="ta-right">{fmtEuro(detail.arbeitNetto + detail.kleinteilNetto + detail.sonstigesNetto)}</td>
               </tr>
             </tbody>

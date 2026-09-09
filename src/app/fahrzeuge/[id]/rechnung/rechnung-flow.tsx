@@ -30,6 +30,8 @@ export function RechnungFlow({ auftrag, firma, betriebId }: Props) {
   const [selectedKvIds, setSelectedKvIds] = useState<Set<string>>(new Set())
   const [selectedWaIds, setSelectedWaIds] = useState<Set<string>>(new Set())
 
+  const [anzeigeModus, setAnzeigeModus] = useState<'detailliert' | 'pauschal'>('detailliert')
+
   const [kleinteilAktiv, setKleinteilAktiv] = useState(false)
   const [kleinteilModus, setKleinteilModus] = useState<'prozent' | 'fest'>('fest')
   const [kleinteilProzent, setKleinteilProzent] = useState('10')
@@ -246,6 +248,7 @@ export function RechnungFlow({ auftrag, firma, betriebId }: Props) {
           kleinteilpauschaleBetrag: kleinteilNetto > 0 ? kleinteilNetto : undefined,
           sonstigesBeschreibung: sonstigesNetto > 0 ? (sonstigesBeschreibung || undefined) : undefined,
           sonstigesBetrag: sonstigesNetto > 0 ? sonstigesNetto : undefined,
+          anzeigeModus,
         }),
       })
       const data = await res.json()
@@ -424,6 +427,25 @@ export function RechnungFlow({ auftrag, firma, betriebId }: Props) {
                   step="0.01"
                   className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
                 />
+              </div>
+            </div>
+
+            {/* Anzeige-Modus */}
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+              <div className="flex items-center gap-2 px-4 py-3 bg-gray-50 border-b border-gray-100">
+                <span className="text-sm font-semibold text-gray-700">Darstellung</span>
+              </div>
+              <div className="p-4 flex gap-2">
+                <button type="button" onClick={() => setAnzeigeModus('detailliert')}
+                  className={cn('flex-1 py-2.5 rounded-lg text-sm font-medium border transition-colors text-left px-3',
+                    anzeigeModus === 'detailliert' ? 'bg-blue-50 border-blue-400 text-blue-700' : 'bg-white border-gray-200 text-gray-600')}>
+                  Detailliert<br /><span className="text-xs font-normal opacity-70">mit Einzelpreisen je Position</span>
+                </button>
+                <button type="button" onClick={() => setAnzeigeModus('pauschal')}
+                  className={cn('flex-1 py-2.5 rounded-lg text-sm font-medium border transition-colors text-left px-3',
+                    anzeigeModus === 'pauschal' ? 'bg-blue-50 border-blue-400 text-blue-700' : 'bg-white border-gray-200 text-gray-600')}>
+                  Pauschal<br /><span className="text-xs font-normal opacity-70">nur Bezeichnungen, ohne Einzelpreise</span>
+                </button>
               </div>
             </div>
 
