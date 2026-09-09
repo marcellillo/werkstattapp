@@ -137,16 +137,16 @@ export function RechnungDruck({ rechnungId, betriebId, firma: firmaHint }: { rec
   }, [rechnungId, betriebId])
 
   useEffect(() => {
-    if (detail) window.print()
-  }, [detail])
-
-  // Eigener Seitentitel statt des generischen App-Titels, u.a. damit der
-  // vom Browser beim Drucken/„Als PDF speichern" eingefügte Kopf-/Fußzeilentext
-  // (Titel + URL) wenigstens den richtigen Firmennamen zeigt. Die URL selbst
-  // kann eine Webseite nicht unterdrücken — das lässt sich nur im Druckdialog
-  // unter "Kopf- und Fußzeilen" abschalten.
-  useEffect(() => {
-    if (detail) document.title = `Rechnung ${detail.rechnung.rechnungs_nr} – ${detail.firma.firma_name || 'Kfz-Werkstatt'}`
+    if (!detail) return
+    // Eigener Seitentitel statt des generischen App-Titels, u.a. damit der vom
+    // Browser beim Drucken/„Als PDF speichern" eingefügte Kopf-/Fußzeilentext
+    // (Titel + URL/Datum) wenigstens den richtigen Firmennamen zeigt. Muss vor
+    // window.print() gesetzt werden, sonst greift der Browser noch auf den
+    // alten Titel zu. Die URL/Datumszeile selbst kann eine Webseite nicht
+    // unterdrücken — das lässt sich nur im Druckdialog unter "Kopf- und
+    // Fußzeilen" abschalten.
+    document.title = `Rechnung ${detail.rechnung.rechnungs_nr} – ${detail.firma.firma_name || 'Kfz-Werkstatt'}`
+    window.print()
   }, [detail])
 
   // Hooks müssen unabhängig vom Ladezustand in gleicher Reihenfolge aufgerufen werden
