@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Plus, Printer, Trash2, Archive, ChevronDown } from 'lucide-react'
@@ -11,19 +12,9 @@ interface Props {
   fahrzeugId?: string
 }
 
-interface OffenerPosten {
-  id: string
-  nummer: string
-  summe: number
-}
-
-export function RechnungSection({ auftragId, betriebId, fahrzeugId }: Props) {
+export function RechnungSection({ auftragId, betriebId }: Props) {
   const [rechnungen, setRechnungen] = useState<any[]>([])
-  const [offeneKvs, setOffeneKvs] = useState<OffenerPosten[]>([])
-  const [offeneWas, setOffeneWas] = useState<OffenerPosten[]>([])
-  const [selectedKvIds, setSelectedKvIds] = useState<Set<string>>(new Set())
-  const [selectedWaIds, setSelectedWaIds] = useState<Set<string>>(new Set())
-  const [loading, setLoading] = useState(false)
+  const [offenePostenAnzahl, setOffenePostenAnzahl] = useState(0)
   const [dataLoading, setDataLoading] = useState(false)
   const [printingId, setPrintingId] = useState<string | null>(null)
   const [loeschenId, setLoeschenId] = useState<string | null>(null)
@@ -35,12 +26,16 @@ export function RechnungSection({ auftragId, betriebId, fahrzeugId }: Props) {
     loadData()
   }, [auftragId])
 
+  // Die Auswahl-/Erstell-Logik (inkl. automatischer Übernahme von Ersatzteilen und
+  // Werkstattauftrag) lebt nur noch an einer Stelle: /fahrzeuge/[id]/rechnung
+  // (rechnung-flow.tsx). Hier wird nur noch die Historie gezeigt und dorthin verlinkt,
+  // damit beide Wege zur Rechnung nicht mehr auseinanderdriften können.
   const loadData = async () => {
     setDataLoading(true)
     try {
       const supabase = await createClient()
 
-      const [{ data: rechnungenData }, { data: kvRows }, { data: waRows }] = await Promise.all([
+      const [{ data: rechnungenData }, { count: kvCount }, { count: waCount }] = await Promise.all([
         supabase
           .from('kunden_rechnungen')
           .select('*')
@@ -49,99 +44,24 @@ export function RechnungSection({ auftragId, betriebId, fahrzeugId }: Props) {
           .order('erstellt_am', { ascending: false }),
         supabase
           .from('kostenvoranschlaege')
-          .select('id, nummer, ersatzteile_modus, ersatzteile_festpreis, positionen:kostenvoranschlag_position(gesamtpreis)')
+          .select('id', { count: 'exact', head: true })
           .eq('auftrag_id', auftragId)
           .eq('betrieb_id', betriebId)
-          .is('rechnung_id', null)
-          .order('created_at', { ascending: false }),
+          .is('rechnung_id', null),
         supabase
           .from('werkstattauftraege')
-          .select('id, nummer, positionen:werkstattauftrag_positionen(gesamtpreis)')
+          .select('id', { count: 'exact', head: true })
           .eq('auftrag_id', auftragId)
           .eq('betrieb_id', betriebId)
-          .is('rechnung_id', null)
-          .order('created_at', { ascending: false }),
+          .is('rechnung_id', null),
       ])
 
-      const kvs: OffenerPosten[] = (kvRows || []).map((kv: any) => ({
-        id: kv.id,
-        nummer: kv.nummer,
-        summe: kv.ersatzteile_modus === 'festpreis'
-          ? (kv.ersatzteile_festpreis || 0)
-          : (kv.positionen || []).reduce((s: number, p: any) => s + (p.gesamtpreis || 0), 0),
-      }))
-      const was: OffenerPosten[] = (waRows || []).map((wa: any) => ({
-        id: wa.id,
-        nummer: wa.nummer,
-        summe: (wa.positionen || []).reduce((s: number, p: any) => s + (p.gesamtpreis || 0), 0),
-      }))
-
       setRechnungen(rechnungenData || [])
-      setOffeneKvs(kvs)
-      setOffeneWas(was)
-      // Standardmäßig alle offenen Posten vorauswählen
-      setSelectedKvIds(new Set(kvs.map(k => k.id)))
-      setSelectedWaIds(new Set(was.map(w => w.id)))
+      setOffenePostenAnzahl((kvCount || 0) + (waCount || 0))
     } catch (error) {
       console.error('[Rechnung Load] Error:', error)
     } finally {
       setDataLoading(false)
-    }
-  }
-
-  const toggleKv = (id: string) => {
-    setSelectedKvIds(prev => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-  }
-
-  const toggleWa = (id: string) => {
-    setSelectedWaIds(prev => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-  }
-
-  const auswahlSumme =
-    offeneKvs.filter(k => selectedKvIds.has(k.id)).reduce((s, k) => s + k.summe, 0) +
-    offeneWas.filter(w => selectedWaIds.has(w.id)).reduce((s, w) => s + w.summe, 0)
-
-  const handleCreate = async () => {
-    if (selectedKvIds.size === 0 && selectedWaIds.size === 0) {
-      alert('Bitte mindestens einen Kostenvoranschlag oder Werkstattauftrag auswählen')
-      return
-    }
-    setLoading(true)
-    try {
-      const response = await fetch('/api/rechnung/create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          auftragId,
-          betriebId,
-          fahrzeugId,
-          kostenvoranschlagIds: Array.from(selectedKvIds),
-          werkstattauftragIds: Array.from(selectedWaIds),
-        }),
-      })
-      const data = await response.json()
-      if (!response.ok) {
-        alert(`Fehler: ${data.error}`)
-        return
-      }
-      if (data.erfolg) {
-        await loadData()
-      }
-    } catch (error) {
-      console.error('[Rechnung Create] Error:', error)
-      alert('Fehler beim Erstellen der Rechnung')
-    } finally {
-      setLoading(false)
     }
   }
 
@@ -213,7 +133,6 @@ export function RechnungSection({ auftragId, betriebId, fahrzeugId }: Props) {
 
   const aktiveRechnungen = rechnungen.filter(r => r.status !== 'storniert')
   const stornierteRechnungen = rechnungen.filter(r => r.status === 'storniert')
-  const hatOffenePosten = offeneKvs.length > 0 || offeneWas.length > 0
 
   return (
     <Card>
@@ -342,65 +261,25 @@ export function RechnungSection({ auftragId, betriebId, fahrzeugId }: Props) {
           </div>
         )}
 
-        {/* Offene Posten zur Auswahl */}
+        {/* CTA zur Rechnungserstellung — eine einzige Implementierung unter /rechnung */}
         {dataLoading ? (
           <p className="text-sm text-slate-500">Wird geladen...</p>
-        ) : hatOffenePosten ? (
-          <div className="border border-slate-200 rounded-lg p-4 space-y-3">
-            <p className="text-sm font-medium text-slate-700">Noch nicht abgerechnet – für neue Rechnung auswählen:</p>
-
-            {offeneKvs.length > 0 && (
-              <div className="space-y-1.5">
-                <p className="text-xs font-medium text-slate-500 uppercase">Kostenvoranschläge</p>
-                {offeneKvs.map(kv => (
-                  <label key={kv.id} className="flex items-center justify-between p-2 bg-slate-50 rounded cursor-pointer hover:bg-slate-100">
-                    <span className="flex items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={selectedKvIds.has(kv.id)}
-                        onChange={() => toggleKv(kv.id)}
-                        className="w-4 h-4"
-                      />
-                      {kv.nummer}
-                    </span>
-                    <span className="text-sm font-medium">{kv.summe.toFixed(2)} €</span>
-                  </label>
-                ))}
-              </div>
-            )}
-
-            {offeneWas.length > 0 && (
-              <div className="space-y-1.5">
-                <p className="text-xs font-medium text-slate-500 uppercase">Werkstattaufträge</p>
-                {offeneWas.map(wa => (
-                  <label key={wa.id} className="flex items-center justify-between p-2 bg-slate-50 rounded cursor-pointer hover:bg-slate-100">
-                    <span className="flex items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={selectedWaIds.has(wa.id)}
-                        onChange={() => toggleWa(wa.id)}
-                        className="w-4 h-4"
-                      />
-                      {wa.nummer}
-                    </span>
-                    <span className="text-sm font-medium">{wa.summe.toFixed(2)} €</span>
-                  </label>
-                ))}
-              </div>
-            )}
-
-            <div className="flex items-center justify-between pt-2 border-t">
-              <span className="text-sm text-slate-600">Ausgewählt (netto): <strong>{auswahlSumme.toFixed(2)} €</strong></span>
-              <Button onClick={handleCreate} disabled={loading} className="bg-blue-600 hover:bg-blue-700">
-                <Plus className="w-4 h-4 mr-2" />
-                {loading ? 'Wird erstellt...' : 'Rechnung erstellen'}
-              </Button>
-            </div>
-          </div>
-        ) : rechnungen.length === 0 ? (
-          <p className="text-slate-500 text-center py-8">Keine Kostenvoranschläge oder Werkstattaufträge zum Abrechnen vorhanden</p>
         ) : (
-          <p className="text-sm text-slate-500 text-center py-2">Alle Positionen dieses Auftrags sind bereits abgerechnet</p>
+          <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+            <p className="text-sm text-slate-600">
+              {offenePostenAnzahl > 0
+                ? `${offenePostenAnzahl} offene Position${offenePostenAnzahl !== 1 ? 'en' : ''} noch nicht abgerechnet`
+                : rechnungen.length === 0
+                  ? 'Noch keine Rechnung für diesen Auftrag'
+                  : 'Alle Positionen sind bereits abgerechnet'}
+            </p>
+            <Link href={`/fahrzeuge/${auftragId}/rechnung`}>
+              <Button className="bg-blue-600 hover:bg-blue-700">
+                <Plus className="w-4 h-4 mr-2" />
+                {offenePostenAnzahl > 0 ? 'Rechnung erstellen' : 'Zur Rechnungserstellung'}
+              </Button>
+            </Link>
+          </div>
         )}
       </CardContent>
     </Card>
