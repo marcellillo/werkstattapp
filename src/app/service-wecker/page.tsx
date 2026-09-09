@@ -15,9 +15,9 @@ export default async function ServiceWeckerPage() {
   const { data: fahrzeugeRaw } = await supabase
     .from('fahrzeuge')
     .select(`
-      id, kennzeichen, marke, modell, baujahr, kilometerstand,
+      id, betrieb_id, kennzeichen, marke, modell, baujahr, kilometerstand,
       naechster_service_datum,
-      kunde_id,
+      kunden_id,
       kunde:kunden(id, vorname, nachname, telefon, email)
     `)
     .eq('betrieb_id', betriebId)

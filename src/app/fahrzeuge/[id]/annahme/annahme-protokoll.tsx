@@ -177,10 +177,12 @@ export function AnnahmeProtokoll({ auftrag, firma }: Props) {
       const { error: upErr } = await sb.storage.from('auftrag-fotos').upload(path, file)
       if (upErr) continue
       const { data: { publicUrl } } = sb.storage.from('auftrag-fotos').getPublicUrl(path)
-      const { data: row } = await sb.from('auftrag_fotos').insert({
+      const { data: row, error } = await sb.from('auftrag_fotos').insert({
+        betrieb_id: auftrag.betrieb_id,
         auftrag_id: auftrag.id, url: publicUrl, storage_path: path, kategorie: 'annahme',
         beschreibung: pendingBeschreibung || null,
       }).select('id, url, storage_path, beschreibung').single()
+      if (error) { console.error('Annahme-Foto-Insert fehlgeschlagen:', error); continue }
       if (row) setFotos(prev => [...prev, row as AnnahmeFoto])
     }
     pendingPreviews.forEach(u => URL.revokeObjectURL(u))

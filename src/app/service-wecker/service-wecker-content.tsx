@@ -115,15 +115,22 @@ export function ServiceWeckerContent({ fahrzeuge: initialFahrzeuge }: { fahrzeug
   async function handleTerminErstellen(f: any) {
     if (!f.naechster_service_datum) return
     setCreatingTermin(f.id)
-    await supabase.from('termine').insert({
+    const { error } = await supabase.from('termine').insert({
+      betrieb_id: f.betrieb_id,
       titel: `Service ${f.kennzeichen}`,
       datum: f.naechster_service_datum,
       typ: 'werkstatt',
-      status: 'geplant',
+      status: 'offen',
       fahrzeug_id: f.id,
-      kunde_id: f.kunde_id ?? null,
+      kunden_id: f.kunden_id ?? null,
       beschreibung: `Nächster Service fällig am ${formatDate(f.naechster_service_datum)}`,
     })
+    if (error) {
+      console.error('Service-Termin anlegen fehlgeschlagen:', error)
+      alert(`Termin konnte nicht angelegt werden: ${error.message}`)
+      setCreatingTermin(null)
+      return
+    }
     setTerminErstelltIds(prev => new Set([...prev, f.id]))
     setAnfragenId(null)
     setCreatingTermin(null)

@@ -118,7 +118,7 @@ export async function POST(req: NextRequest) {
     // Kunde über den Auftrag ermitteln
     const { data: auftrag } = await supabase
       .from('auftraege')
-      .select('kunde_id')
+      .select('kunden_id')
       .eq('id', auftragId)
       .maybeSingle()
 
@@ -128,7 +128,7 @@ export async function POST(req: NextRequest) {
       .insert({
         rechnungs_nr: rechnungsNummer,
         auftrag_id: auftragId,
-        kunde_id: auftrag?.kunde_id || null,
+        kunde_id: auftrag?.kunden_id || null,
         fahrzeug_id: fahrzeugId || null,
         betrieb_id: betriebId,
         betrag_netto: summeNetto,

@@ -564,6 +564,7 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
   async function handleAddTeil() {
     if (!newTeil.bezeichnung.trim()) return
     const insert = {
+      betrieb_id: betriebId,
       auftrag_id: auftrag.id,
       bezeichnung: newTeil.bezeichnung,
       teilenummer: newTeil.teilenummer || null,
@@ -572,7 +573,8 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
       einzelpreis: newTeil.einzelpreis ? parseFloat(newTeil.einzelpreis) : null,
       status: 'nicht_bestellt' as TeilStatus,
     }
-    const { data } = await supabase.from('ersatzteile').insert(insert).select().single()
+    const { data, error } = await supabase.from('ersatzteile').insert(insert).select().single()
+    if (error) { console.error('Ersatzteil-Insert fehlgeschlagen:', error); alert(`Teil konnte nicht gespeichert werden: ${error.message}`); return }
     if (data) {
       setTeile(prev => [...prev, data as Ersatzteil])
       setNewTeil({ bezeichnung: '', teilenummer: '', lieferant: '', menge: 1, einzelpreis: '' })
@@ -585,6 +587,7 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
     if (!newTeil.bezeichnung.trim()) return
     try {
       const insert = {
+        betrieb_id: betriebId,
         auftrag_id: auftrag.id,
         bezeichnung: newTeil.bezeichnung.trim(),
         teilenummer: newTeil.teilenummer || null,
@@ -602,8 +605,9 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
         setSuchbegriff('')
         setShowAddTeil(false)
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Fehler beim Speichern des bestellten Teils:', err)
+      alert(`Teil konnte nicht gespeichert werden: ${err.message ?? err}`)
     }
   }
 

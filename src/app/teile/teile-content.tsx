@@ -10,6 +10,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { cn, formatDate } from '@/lib/utils'
 import { type TeilStatus, TEIL_STATUS_LABEL, TEIL_STATUS_COLOR } from '@/types/database'
 import { createClient } from '@/lib/supabase/client'
+import { useBetrieb } from '@/lib/betrieb-context'
 
 type Tab = 'aktiv' | 'geplant' | 'bestellt' | 'auf_lager' | 'archiv'
 
@@ -93,6 +94,7 @@ function ArtikelPanel({
   onDeleted: (id: string) => void
 }) {
   const supabase = createClient()
+  const { currentBetriebId } = useBetrieb()
   const [bezeichnung, setBezeichnung] = useState('')
   const [artikelnummer, setArtikelnummer] = useState('')
   const [kategorie, setKategorie] = useState('Allgemein')
@@ -137,6 +139,7 @@ function ArtikelPanel({
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
     if (!bezeichnung.trim()) { setError('Bezeichnung ist erforderlich'); return }
+    if (!isEdit && !currentBetriebId) { setError('Kein Betrieb geladen — bitte Seite neu laden.'); return }
     setSaving(true); setError('')
     const payload = {
       bezeichnung: bezeichnung.trim(),
@@ -152,10 +155,12 @@ function ArtikelPanel({
     }
     try {
       if (isEdit) {
-        const { data } = await supabase.from('lager_artikel').update(payload).eq('id', artikel.id).select().single()
+        const { data, error } = await supabase.from('lager_artikel').update(payload).eq('id', artikel.id).select().single()
+        if (error) throw error
         onSaved(data, false)
       } else {
-        const { data } = await supabase.from('lager_artikel').insert(payload).select().single()
+        const { data, error } = await supabase.from('lager_artikel').insert({ ...payload, betrieb_id: currentBetriebId }).select().single()
+        if (error) throw error
         onSaved(data, true)
       }
       onClose()

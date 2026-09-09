@@ -84,15 +84,22 @@ export function TuevWeckerContent({ fahrzeuge: initialFahrzeuge }: { fahrzeuge: 
 
   async function handleTerminErstellen(f: any) {
     setCreatingTermin(f.id)
-    await supabase.from('termine').insert({
+    const { error } = await supabase.from('termine').insert({
+      betrieb_id: f.betrieb_id,
       titel: `TÜV-Vorbereitung ${f.kennzeichen}`,
       datum: f.naechste_hauptuntersuchung,
       typ: 'tuev',
-      status: 'geplant',
+      status: 'offen',
       fahrzeug_id: f.id,
-      kunde_id: f.kunde_id ?? null,
+      kunden_id: f.kunden_id ?? null,
       beschreibung: `HU/TÜV fällig am ${formatDate(f.naechste_hauptuntersuchung)}`,
     })
+    if (error) {
+      console.error('TÜV-Termin anlegen fehlgeschlagen:', error)
+      alert(`Termin konnte nicht angelegt werden: ${error.message}`)
+      setCreatingTermin(null)
+      return
+    }
     setTerminErstelltIds(prev => new Set([...prev, f.id]))
     setAnfragenId(null)
     setCreatingTermin(null)

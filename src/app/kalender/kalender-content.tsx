@@ -10,6 +10,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { cn, formatDate } from '@/lib/utils'
 import { FAHRZEUG_STATUS_LABEL, FAHRZEUG_STATUS_COLOR, type FahrzeugStatus } from '@/types/database'
 import { createClient } from '@/lib/supabase/client'
+import { useBetrieb } from '@/lib/betrieb-context'
 
 type ViewMode = 'monat' | 'woche' | 'tag'
 
@@ -162,6 +163,7 @@ function TerminPanel({
   onSaved: (termin: any) => void
 }) {
   const supabase = createClient()
+  const { currentBetriebId } = useBetrieb()
   const today = new Date().toISOString().split('T')[0]
 
   const [titel, setTitel] = useState('')
@@ -184,7 +186,7 @@ function TerminPanel({
   const [error, setError] = useState('')
 
   const kundeFahrzeuge = useMemo(
-    () => fahrzeuge.filter(f => f.kunde_id === selectedKundeId),
+    () => fahrzeuge.filter(f => f.kunden_id === selectedKundeId),
     [fahrzeuge, selectedKundeId],
   )
 
@@ -201,6 +203,7 @@ function TerminPanel({
     e.preventDefault()
     if (!titel.trim()) { setError('Titel ist erforderlich'); return }
     if (!datum) { setError('Datum ist erforderlich'); return }
+    if (!currentBetriebId) { setError('Kein Betrieb geladen — bitte Seite neu laden.'); return }
     setSaving(true); setError('')
 
     try {
@@ -210,7 +213,7 @@ function TerminPanel({
       if (showNeukunde && neuNachname.trim()) {
         const { data: neuerKunde, error: kErr } = await supabase
           .from('kunden')
-          .insert({ vorname: neuVorname.trim(), nachname: neuNachname.trim(), telefon: neuTelefon.trim() || null, email: neuEmail.trim() || null })
+          .insert({ betrieb_id: currentBetriebId, vorname: neuVorname.trim(), nachname: neuNachname.trim(), telefon: neuTelefon.trim() || null, email: neuEmail.trim() || null })
           .select('id')
           .single()
         if (kErr) throw kErr
@@ -220,14 +223,15 @@ function TerminPanel({
       const { data: neu, error: tErr } = await supabase
         .from('termine')
         .insert({
+          betrieb_id: currentBetriebId,
           titel: titel.trim(),
           datum,
           uhrzeit: uhrzeit || null,
           dauer_minuten: dauer ? parseInt(dauer) : null,
           typ,
-          status: 'geplant',
+          status: 'offen',
           beschreibung: beschreibung.trim() || null,
-          kunde_id: kundeId || null,
+          kunden_id: kundeId || null,
           fahrzeug_id: selectedFahrzeugId || null,
         })
         .select('id, titel, datum, uhrzeit, dauer_minuten, typ, status, beschreibung, fahrzeug:fahrzeuge(marke, modell, kennzeichen), kunde:kunden(vorname, nachname)')

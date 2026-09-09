@@ -2,6 +2,7 @@
 import { useState, useRef } from 'react'
 import { Camera, Upload, Trash2, X, ZoomIn, Plus, ImageIcon } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { useBetrieb } from '@/lib/betrieb-context'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
@@ -28,30 +29,36 @@ interface Props {
 
 export function FotosContent({ auftragId, initialFotos }: Props) {
   const supabase = createClient()
+  const { currentBetriebId } = useBetrieb()
   const [fotos, setFotos] = useState<Foto[]>(initialFotos)
   const [uploading, setUploading] = useState(false)
   const [aktivKategorie, setAktivKategorie] = useState<Foto['kategorie']>('annahme')
   const [lightbox, setLightbox] = useState<Foto | null>(null)
   const [beschreibung, setBeschreibung] = useState('')
+  const [uploadFehler, setUploadFehler] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
   const cameraRef = useRef<HTMLInputElement>(null)
 
   async function handleFiles(files: FileList | null) {
     if (!files || files.length === 0) return
+    if (!currentBetriebId) { setUploadFehler('Kein Betrieb geladen — bitte Seite neu laden.'); return }
     setUploading(true)
+    setUploadFehler('')
     for (const file of Array.from(files)) {
       const ext = file.name.split('.').pop() ?? 'jpg'
       const path = `${auftragId}/${aktivKategorie}/${Date.now()}.${ext}`
       const { error: upErr } = await supabase.storage.from('auftrag-fotos').upload(path, file)
-      if (upErr) { console.error(upErr); continue }
+      if (upErr) { console.error(upErr); setUploadFehler(upErr.message); continue }
       const { data: { publicUrl } } = supabase.storage.from('auftrag-fotos').getPublicUrl(path)
-      const { data: row } = await supabase.from('auftrag_fotos').insert({
+      const { data: row, error } = await supabase.from('auftrag_fotos').insert({
+        betrieb_id: currentBetriebId,
         auftrag_id: auftragId,
         storage_path: path,
         url: publicUrl,
         kategorie: aktivKategorie,
         beschreibung: beschreibung || null,
       }).select().single()
+      if (error) { console.error('Foto-Insert fehlgeschlagen:', error); setUploadFehler(error.message); continue }
       if (row) setFotos(prev => [...prev, row as Foto])
     }
     setBeschreibung('')
@@ -117,6 +124,7 @@ export function FotosContent({ auftragId, initialFotos }: Props) {
             </Button>
           </div>
           {uploading && <p className="text-xs text-orange-600 text-center">Wird hochgeladen…</p>}
+          {uploadFehler && <p className="text-xs text-red-600 text-center">{uploadFehler}</p>}
         </CardContent>
       </Card>
 

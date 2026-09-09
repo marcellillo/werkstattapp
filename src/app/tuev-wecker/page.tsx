@@ -13,7 +13,7 @@ export default async function TuevWeckerPage() {
 
   const { data: fahrzeugeRaw } = await supabase
     .from('fahrzeuge')
-    .select('id, kennzeichen, marke, modell, naechste_hauptuntersuchung, tuev_erinnerung, kunde_id, kunde:kunden(id, vorname, nachname, telefon, email)')
+    .select('id, betrieb_id, kennzeichen, marke, modell, naechste_hauptuntersuchung, tuev_erinnerung, kunden_id, kunde:kunden(id, vorname, nachname, telefon, email)')
     .eq('betrieb_id', betriebId)
     .not('naechste_hauptuntersuchung', 'is', null)
     .neq('tuev_erinnerung', false)
