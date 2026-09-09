@@ -15,6 +15,10 @@ interface OffenerPosten {
   id: string
   nummer: string
   summe: number
+  auto?: boolean
+  positionId?: string
+  stunden?: number
+  satz?: number
 }
 
 export function RechnungFlow({ auftrag, firma, betriebId }: Props) {
@@ -68,11 +72,47 @@ export function RechnungFlow({ auftrag, firma, betriebId }: Props) {
           ? (kv.ersatzteile_festpreis || 0)
           : (kv.positionen || []).reduce((s: number, p: any) => s + (p.gesamtpreis || 0), 0),
       }))
-      const was: OffenerPosten[] = (waRows || []).map((wa: any) => ({
+      let was: OffenerPosten[] = (waRows || []).map((wa: any) => ({
         id: wa.id,
         nummer: wa.nummer,
         summe: (wa.positionen || []).reduce((s: number, p: any) => s + (p.gesamtpreis || 0), 0),
       }))
+
+      // Kein Werkstattauftrag vorhanden, aber vereinbarte Arbeiten am Auftrag hinterlegt:
+      // automatisch einen mit einer Startposition (1 Std. zum hinterlegten Stundensatz)
+      // anlegen, statt den Nutzer vor der Rechnung extra daran erinnern zu müssen.
+      if (was.length === 0 && auftrag.arbeiten?.trim()) {
+        const stundensatz = parseFloat(firma.firma_stundensatz) || 0
+        try {
+          const createRes = await fetch('/api/werkstattauftrag/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ auftragId: auftrag.id, betriebId, fahrzeugId: auftrag.fahrzeug?.id }),
+          })
+          const createData = await createRes.json()
+          if (createRes.ok && createData.werkstattauftrag) {
+            const { data: pos } = await supabase.from('werkstattauftrag_positionen').insert({
+              werkstattauftrag_id: createData.werkstattauftrag.id,
+              betrieb_id: betriebId,
+              beschreibung: auftrag.arbeiten,
+              menge: 1,
+              einzelpreis: stundensatz,
+              gesamtpreis: stundensatz,
+            }).select().single()
+            was = [{
+              id: createData.werkstattauftrag.id,
+              nummer: createData.werkstattauftrag.nummer,
+              summe: pos?.gesamtpreis ?? stundensatz,
+              auto: true,
+              positionId: pos?.id,
+              stunden: 1,
+              satz: stundensatz,
+            }]
+          }
+        } catch (autoError) {
+          console.error('[RechnungFlow] Automatisches Anlegen des Werkstattauftrags fehlgeschlagen:', autoError)
+        }
+      }
 
       setOffeneKvs(kvs)
       setOffeneWas(was)
@@ -98,6 +138,17 @@ export function RechnungFlow({ auftrag, firma, betriebId }: Props) {
       if (next.has(id)) next.delete(id); else next.add(id)
       return next
     })
+  }
+
+  const updateAutoPosition = async (wa: OffenerPosten, patch: { stunden?: number; satz?: number }) => {
+    if (!wa.positionId) return
+    const stunden = patch.stunden ?? wa.stunden ?? 0
+    const satz = patch.satz ?? wa.satz ?? 0
+    if (stunden < 0 || satz < 0) return
+    const gesamtpreis = stunden * satz
+    setOffeneWas(prev => prev.map(w => w.id === wa.id ? { ...w, stunden, satz, summe: gesamtpreis } : w))
+    const supabase = createClient()
+    await supabase.from('werkstattauftrag_positionen').update({ menge: stunden, einzelpreis: satz, gesamtpreis }).eq('id', wa.positionId)
   }
 
   const ersatzteileNetto = offeneKvs.filter(k => selectedKvIds.has(k.id)).reduce((s, k) => s + k.summe, 0)
@@ -205,13 +256,29 @@ export function RechnungFlow({ auftrag, firma, betriebId }: Props) {
               ) : (
                 <div className="divide-y divide-gray-50">
                   {offeneWas.map(wa => (
-                    <label key={wa.id} className="flex items-center justify-between px-4 py-2.5 text-sm cursor-pointer hover:bg-gray-50">
-                      <span className="flex items-center gap-2">
-                        <input type="checkbox" checked={selectedWaIds.has(wa.id)} onChange={() => toggleWa(wa.id)} className="w-4 h-4" />
-                        {wa.nummer}
-                      </span>
-                      <span className="font-medium text-gray-700 tabular-nums">{wa.summe.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €</span>
-                    </label>
+                    <div key={wa.id} className="px-4 py-2.5">
+                      <label className="flex items-center justify-between text-sm cursor-pointer">
+                        <span className="flex items-center gap-2">
+                          <input type="checkbox" checked={selectedWaIds.has(wa.id)} onChange={() => toggleWa(wa.id)} className="w-4 h-4" />
+                          {wa.nummer}
+                          {wa.auto && <span className="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">automatisch aus Auftrag übernommen</span>}
+                        </span>
+                        <span className="font-medium text-gray-700 tabular-nums">{wa.summe.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €</span>
+                      </label>
+                      {wa.auto && (
+                        <div className="flex items-center gap-2 mt-1.5 pl-6">
+                          <label className="text-xs text-gray-500">Stunden:</label>
+                          <input type="number" value={wa.stunden ?? 1} min="0" step="0.25"
+                            onChange={e => updateAutoPosition(wa, { stunden: parseFloat(e.target.value) || 0 })}
+                            className="w-16 px-2 py-1 border border-gray-200 rounded-lg text-xs" />
+                          <label className="text-xs text-gray-500">€/Std:</label>
+                          <input type="number" value={wa.satz ?? 0} min="0" step="1"
+                            onChange={e => updateAutoPosition(wa, { satz: parseFloat(e.target.value) || 0 })}
+                            className="w-20 px-2 py-1 border border-gray-200 rounded-lg text-xs" />
+                          {!wa.satz && <span className="text-xs text-amber-600">Stundensatz fehlt — bitte eintragen oder unter Einstellungen hinterlegen</span>}
+                        </div>
+                      )}
+                    </div>
                   ))}
                   <div className="flex items-center justify-between px-4 py-2.5 bg-gray-50 text-sm font-semibold">
                     <span className="text-gray-600">Arbeitszeit ausgewählt (netto)</span>
