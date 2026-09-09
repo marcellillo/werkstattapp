@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { cn, formatDate } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { useEffect } from 'react'
+import { useBetrieb } from '@/lib/betrieb-context'
 import type { TerminTyp, TerminStatus } from '@/types/database'
 
 const TYP_CONFIG: Record<TerminTyp, { label: string; icon: typeof Calendar; color: string; bg: string }> = {
@@ -77,9 +78,11 @@ export function TermineContent({ termine: initialTermine, kunden, fahrzeuge, heb
   const [showForm, setShowForm] = useState(false)
   const [filter, setFilter] = useState<'alle' | TerminTyp>('alle')
   const [saving, setSaving] = useState(false)
+  const [formError, setFormError] = useState('')
   const [bestaetigenModal, setBestaetigenModal] = useState<any>(null)
   const supabase = createClient()
   const searchParams = useSearchParams()
+  const { currentBetriebId } = useBetrieb()
 
   useEffect(() => {
     if (searchParams.get('neu') === '1') setShowForm(true)
@@ -91,6 +94,33 @@ export function TermineContent({ termine: initialTermine, kunden, fahrzeuge, heb
     kunden_id: '', fahrzeug_id: '', hebebuehne_id: '', notizen: '', quelle: 'manuell'
   })
 
+  // Kunde inline anlegen statt aus bestehenden zu wählen
+  const [newKunde, setNewKunde] = useState(false)
+  const [kVorname, setKVorname] = useState('')
+  const [kNachname, setKNachname] = useState('')
+  const [kFirma, setKFirma] = useState('')
+  const [kTelefon, setKTelefon] = useState('')
+  const [kMobil, setKMobil] = useState('')
+  const [kundenSuche, setKundenSuche] = useState('')
+  const [kundenDropdown, setKundenDropdown] = useState(false)
+  const kundenGefiltert = kunden.filter(k =>
+    !kundenSuche || `${k.vorname ?? ''} ${k.nachname ?? ''} ${k.firma ?? ''}`.toLowerCase().includes(kundenSuche.toLowerCase())
+  )
+
+  // Fahrzeug inline anlegen (einfach: kein Fahrzeugschein-Scanner, nur die Basisfelder)
+  const [newFahrzeug, setNewFahrzeug] = useState(false)
+  const [fKennzeichen, setFKennzeichen] = useState('')
+  const [fMarke, setFMarke] = useState('')
+  const [fModell, setFModell] = useState('')
+
+  function resetForm() {
+    setForm({ titel: '', beschreibung: '', datum: today, uhrzeit: '09:00', dauer_minuten: 60, typ: 'werkstatt', kunden_id: '', fahrzeug_id: '', hebebuehne_id: '', notizen: '', quelle: 'manuell' })
+    setNewKunde(false); setKVorname(''); setKNachname(''); setKFirma(''); setKTelefon(''); setKMobil('')
+    setKundenSuche(''); setKundenDropdown(false)
+    setNewFahrzeug(false); setFKennzeichen(''); setFMarke(''); setFModell('')
+    setFormError('')
+  }
+
   const filtered = termine.filter(t => filter === 'alle' || t.typ === filter)
   const upcoming = filtered.filter(t => t.datum >= today && t.status !== 'abgesagt')
   const past = filtered.filter(t => t.datum < today || t.status === 'erledigt' || t.status === 'abgesagt')
@@ -100,16 +130,42 @@ export function TermineContent({ termine: initialTermine, kunden, fahrzeuge, heb
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault()
+    setFormError('')
     if (!form.titel || !form.datum) return
+    if (!currentBetriebId) { setFormError('Kein Betrieb geladen — bitte Seite neu laden.'); return }
     setSaving(true)
-    const { data } = await supabase.from('termine').insert({
+
+    let finalKundenId = form.kunden_id || null
+    if (newKunde && kNachname) {
+      const { data: neuerKunde, error: kundenError } = await supabase.from('kunden').insert({
+        betrieb_id: currentBetriebId,
+        vorname: kVorname || null, nachname: kNachname,
+        firma: kFirma || null, telefon: kTelefon || null, mobil: kMobil || null,
+      }).select().single()
+      if (kundenError) { console.error('Kunde anlegen fehlgeschlagen:', kundenError); setFormError(`Kunde konnte nicht angelegt werden: ${kundenError.message}`); setSaving(false); return }
+      finalKundenId = neuerKunde?.id ?? null
+    }
+
+    let finalFahrzeugId = form.fahrzeug_id || null
+    if (newFahrzeug && fKennzeichen && fMarke && fModell) {
+      const { data: neuesFahrzeug, error: fahrzeugError } = await supabase.from('fahrzeuge').insert({
+        betrieb_id: currentBetriebId, kunden_id: finalKundenId, fahrzeug_typ: 'fremd',
+        marke: fMarke, modell: fModell, kennzeichen: fKennzeichen.toUpperCase(),
+      }).select().single()
+      if (fahrzeugError) { console.error('Fahrzeug anlegen fehlgeschlagen:', fahrzeugError); setFormError(`Fahrzeug konnte nicht angelegt werden: ${fahrzeugError.message}`); setSaving(false); return }
+      finalFahrzeugId = neuesFahrzeug?.id ?? null
+    }
+
+    const { data, error } = await supabase.from('termine').insert({
+      betrieb_id: currentBetriebId,
       titel: form.titel, beschreibung: form.beschreibung || null, datum: form.datum,
       uhrzeit: form.uhrzeit || null, dauer_minuten: form.dauer_minuten, typ: form.typ,
-      kunden_id: form.kunden_id || null, fahrzeug_id: form.fahrzeug_id || null,
+      kunden_id: finalKundenId, fahrzeug_id: finalFahrzeugId,
       hebebuehne_id: form.hebebuehne_id || null,
       notizen: form.notizen || null, quelle: form.quelle, status: 'offen',
     }).select('*, kunde:kunden(*), fahrzeug:fahrzeuge(*), hebebuehne:hebebuehnen(id,bezeichnung,nummer)').single()
-    if (data) { setTermine(p => [...p, data].sort((a, b) => a.datum.localeCompare(b.datum))); setShowForm(false) }
+    if (error) { console.error('Termin anlegen fehlgeschlagen:', error); setFormError(`Termin konnte nicht angelegt werden: ${error.message}`) }
+    if (data) { setTermine(p => [...p, data].sort((a, b) => a.datum.localeCompare(b.datum))); setShowForm(false); resetForm() }
     setSaving(false)
   }
 
@@ -245,21 +301,85 @@ export function TermineContent({ termine: initialTermine, kunden, fahrzeuge, heb
                   <input type="number" value={form.dauer_minuten} min={15} step={15} onChange={e => setForm(p => ({ ...p, dauer_minuten: parseInt(e.target.value) }))}
                     className="w-full px-3 py-3 sm:py-2 border border-gray-200 rounded-xl sm:rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
                 </div>
-                <div>
-                  <label className="text-xs text-gray-800 mb-1 block">Kunde</label>
-                  <select value={form.kunden_id} onChange={e => setForm(p => ({ ...p, kunden_id: e.target.value }))}
-                    className="w-full px-3 py-3 sm:py-2 border border-gray-200 rounded-xl sm:rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
-                    <option value="">— Kein Kunde —</option>
-                    {kunden.map(k => <option key={k.id} value={k.id}>{k.vorname} {k.nachname}{k.firma ? ` (${k.firma})` : ''}</option>)}
-                  </select>
+                <div className="sm:col-span-2">
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs text-gray-800 block">Kunde</label>
+                    <button type="button" onClick={() => setNewKunde(v => !v)}
+                      className="text-xs text-orange-600 hover:text-orange-700 flex items-center gap-1">
+                      <Plus className="w-3.5 h-3.5" />
+                      {newKunde ? 'Bestehenden wählen' : 'Neuen anlegen'}
+                    </button>
+                  </div>
+                  {newKunde ? (
+                    <div className="grid grid-cols-2 gap-2">
+                      <input value={kVorname} onChange={e => setKVorname(e.target.value)} placeholder="Vorname"
+                        className="w-full px-3 py-3 sm:py-2 border border-gray-200 rounded-xl sm:rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
+                      <input value={kNachname} onChange={e => setKNachname(e.target.value)} placeholder="Nachname *"
+                        className="w-full px-3 py-3 sm:py-2 border border-gray-200 rounded-xl sm:rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
+                      <input value={kFirma} onChange={e => setKFirma(e.target.value)} placeholder="Firma (optional)"
+                        className="col-span-2 w-full px-3 py-3 sm:py-2 border border-gray-200 rounded-xl sm:rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
+                      <input value={kTelefon} onChange={e => setKTelefon(e.target.value)} placeholder="Telefon"
+                        className="w-full px-3 py-3 sm:py-2 border border-gray-200 rounded-xl sm:rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
+                      <input value={kMobil} onChange={e => setKMobil(e.target.value)} placeholder="Mobil"
+                        className="w-full px-3 py-3 sm:py-2 border border-gray-200 rounded-xl sm:rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
+                    </div>
+                  ) : (
+                    <div className="relative">
+                      <input
+                        value={kundenSuche}
+                        onChange={e => { setKundenSuche(e.target.value); setForm(p => ({ ...p, kunden_id: '' })); setKundenDropdown(true) }}
+                        onFocus={() => setKundenDropdown(true)}
+                        placeholder="Kunde suchen (Name oder Firma)…"
+                        className="w-full px-3 py-3 sm:py-2 border border-gray-200 rounded-xl sm:rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
+                      {kundenDropdown && !form.kunden_id && (
+                        <>
+                          <div className="fixed inset-0 z-10" onClick={() => setKundenDropdown(false)} />
+                          <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                            {kundenGefiltert.length === 0 ? (
+                              <p className="px-3 py-3 text-sm text-gray-400">Kein Kunde gefunden — oben „Neuen anlegen"</p>
+                            ) : kundenGefiltert.map(k => (
+                              <button type="button" key={k.id}
+                                onClick={() => {
+                                  setForm(p => ({ ...p, kunden_id: k.id }))
+                                  setKundenSuche(`${k.vorname ?? ''} ${k.nachname ?? ''}`.trim() + (k.firma ? ` (${k.firma})` : ''))
+                                  setKundenDropdown(false)
+                                }}
+                                className="w-full text-left px-3 py-2.5 text-sm hover:bg-orange-50 border-b border-gray-50 last:border-0 transition-colors">
+                                <span className="text-gray-900">{k.vorname} {k.nachname}</span>
+                                {k.firma && <span className="text-gray-400"> · {k.firma}</span>}
+                              </button>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
-                <div>
-                  <label className="text-xs text-gray-800 mb-1 block">Fahrzeug</label>
-                  <select value={form.fahrzeug_id} onChange={e => setForm(p => ({ ...p, fahrzeug_id: e.target.value }))}
-                    className="w-full px-3 py-3 sm:py-2 border border-gray-200 rounded-xl sm:rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
-                    <option value="">— Kein Fahrzeug —</option>
-                    {fahrzeuge.map(f => <option key={f.id} value={f.id}>{f.marke} {f.modell} · {f.kennzeichen}</option>)}
-                  </select>
+                <div className="sm:col-span-2">
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs text-gray-800 block">Fahrzeug</label>
+                    <button type="button" onClick={() => setNewFahrzeug(v => !v)}
+                      className="text-xs text-orange-600 hover:text-orange-700 flex items-center gap-1">
+                      <Plus className="w-3.5 h-3.5" />
+                      {newFahrzeug ? 'Bestehendes wählen' : 'Neues anlegen'}
+                    </button>
+                  </div>
+                  {newFahrzeug ? (
+                    <div className="grid grid-cols-3 gap-2">
+                      <input value={fKennzeichen} onChange={e => setFKennzeichen(e.target.value)} placeholder="Kennzeichen *"
+                        className="w-full px-3 py-3 sm:py-2 border border-gray-200 rounded-xl sm:rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
+                      <input value={fMarke} onChange={e => setFMarke(e.target.value)} placeholder="Marke *"
+                        className="w-full px-3 py-3 sm:py-2 border border-gray-200 rounded-xl sm:rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
+                      <input value={fModell} onChange={e => setFModell(e.target.value)} placeholder="Modell *"
+                        className="w-full px-3 py-3 sm:py-2 border border-gray-200 rounded-xl sm:rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
+                    </div>
+                  ) : (
+                    <select value={form.fahrzeug_id} onChange={e => setForm(p => ({ ...p, fahrzeug_id: e.target.value }))}
+                      className="w-full px-3 py-3 sm:py-2 border border-gray-200 rounded-xl sm:rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+                      <option value="">— Kein Fahrzeug —</option>
+                      {fahrzeuge.map(f => <option key={f.id} value={f.id}>{f.marke} {f.modell} · {f.kennzeichen}</option>)}
+                    </select>
+                  )}
                 </div>
                 {form.typ === 'tuev' && (
                   <div className="sm:col-span-2">
@@ -282,11 +402,14 @@ export function TermineContent({ termine: initialTermine, kunden, fahrzeuge, heb
                     className="w-full px-3 py-3 sm:py-2 border border-gray-200 rounded-xl sm:rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-orange-400" />
                 </div>
               </div>
+              {formError && (
+                <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{formError}</div>
+              )}
               <div className="flex gap-2">
                 <Button type="submit" disabled={saving} className="bg-orange-600 hover:bg-orange-700 text-white">
                   {saving ? 'Speichern...' : 'Termin anlegen'}
                 </Button>
-                <Button type="button" variant="ghost" onClick={() => setShowForm(false)}>Abbrechen</Button>
+                <Button type="button" variant="ghost" onClick={() => { setShowForm(false); resetForm() }}>Abbrechen</Button>
               </div>
             </form>
           </CardContent>

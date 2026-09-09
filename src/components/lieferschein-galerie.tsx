@@ -11,6 +11,7 @@ interface LieferscheinUpload {
   lieferant: string | null
   bestellnummer: string | null
   lieferdatum: string | null
+  dokument_typ: 'lieferschein' | 'rechnung'
   teile_anzahl: number
   erfolg: boolean
   fehlermeldung: string | null
@@ -19,27 +20,28 @@ interface LieferscheinUpload {
 
 interface Props {
   kostenvoranschlagId?: string
+  auftragId?: string
   refreshSignal?: number
 }
 
-export function LieferscheinGalerie({ kostenvoranschlagId, refreshSignal }: Props) {
+const TYP_LABEL: Record<string, string> = { lieferschein: '📦 Lieferschein', rechnung: '🧾 Rechnung' }
+
+export function LieferscheinGalerie({ kostenvoranschlagId, auftragId, refreshSignal }: Props) {
   const [uploads, setUploads] = useState<LieferscheinUpload[]>([])
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    if (!kostenvoranschlagId) return
+    if (!kostenvoranschlagId && !auftragId) return
     loadUploads()
-  }, [kostenvoranschlagId, refreshSignal])
+  }, [kostenvoranschlagId, auftragId, refreshSignal])
 
   const loadUploads = async () => {
     setLoading(true)
     try {
       const supabase = createClient()
-      const { data, error } = await supabase
-        .from('lieferschein_uploads')
-        .select('*')
-        .eq('kostenvoranschlag_id', kostenvoranschlagId)
-        .order('erstellt_am', { ascending: false })
+      let query = supabase.from('lieferschein_uploads').select('*')
+      query = kostenvoranschlagId ? query.eq('kostenvoranschlag_id', kostenvoranschlagId) : query.eq('auftrag_id', auftragId as string)
+      const { data, error } = await query.order('erstellt_am', { ascending: false })
 
       if (error) throw error
       setUploads(data || [])
@@ -61,13 +63,13 @@ export function LieferscheinGalerie({ kostenvoranschlagId, refreshSignal }: Prop
     }
   }
 
-  if (!kostenvoranschlagId) return null
+  if (!kostenvoranschlagId && !auftragId) return null
   if (!loading && uploads.length === 0) return null
 
   return (
     <div className="mb-4">
       <p className="text-sm font-medium text-slate-700 mb-2">
-        📎 Bereits hochgeladene Lieferscheine {uploads.length > 0 && `(${uploads.length})`}
+        📎 Bereits hochgeladene Dokumente {uploads.length > 0 && `(${uploads.length})`}
       </p>
       {loading ? (
         <p className="text-sm text-slate-500">Wird geladen...</p>
@@ -95,6 +97,7 @@ export function LieferscheinGalerie({ kostenvoranschlagId, refreshSignal }: Prop
                   )}
                   {u.lieferant || u.dateiname || 'Lieferschein'}
                 </p>
+                <p className="text-slate-500 truncate">{TYP_LABEL[u.dokument_typ] ?? TYP_LABEL.lieferschein}</p>
                 <p className="text-slate-500 truncate">
                   {u.erfolg ? `${u.teile_anzahl} Teile` : 'Nicht erkannt'} · {new Date(u.erstellt_am).toLocaleDateString('de-DE')}
                 </p>

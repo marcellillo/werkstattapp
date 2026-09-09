@@ -21,6 +21,7 @@ import { KostenvoranschlagSection } from './kostenvoranschlag-section'
 import { WerkstattauftragSection } from './werkstattauftrag-section'
 import { RechnungSection } from './rechnung-section'
 import { LieferscheinQuickScan } from '@/components/lieferschein-quick-scan'
+import { LieferscheinGalerie } from '@/components/lieferschein-galerie'
 
 interface Props {
   auftrag: Auftrag
@@ -61,6 +62,7 @@ interface KiTeilVorschlag {
 
 export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie, googleBewertungUrl = '', standardSteuerart = 'differenz', betriebId }: Props) {
   const [auftrag, setAuftrag] = useState(initialAuftrag)
+  const [dokumenteRefresh, setDokumenteRefresh] = useState(0)
   const [teile, setTeile] = useState<Ersatzteil[]>((initialAuftrag.ersatzteile as Ersatzteil[]) ?? [])
   const [saving, setSaving] = useState(false)
   const [newTeil, setNewTeil] = useState({ bezeichnung: '', teilenummer: '', lieferant: '', menge: 1, einzelpreis: '' })
@@ -1980,15 +1982,17 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
         </div>
       </div>
 
-      {/* Lieferschein Scanner */}
+      {/* Lieferschein / Rechnung Scanner */}
       {betriebId && (
         <Card className="border-slate-200 mt-6">
           <CardContent className="p-6">
+            <LieferscheinGalerie auftragId={auftrag.id} refreshSignal={dokumenteRefresh} />
             <LieferscheinQuickScan
               auftragId={auftrag.id}
               betriebId={betriebId}
               onSuccess={() => {
-                console.log('✅ Lieferschein gescannt und Teile eingefügt')
+                console.log('✅ Dokument gescannt und archiviert')
+                setDokumenteRefresh(r => r + 1)
               }}
             />
           </CardContent>

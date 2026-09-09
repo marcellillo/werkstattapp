@@ -1,6 +1,6 @@
 'use client'
 import Link from 'next/link'
-import { ArrowLeft, Download, Car, User, Wrench, Package, Camera, FileText, Receipt, CheckCircle, Clock, AlertTriangle, Fuel, Gauge } from 'lucide-react'
+import { ArrowLeft, Download, Car, User, Wrench, Package, Camera, FileText, Receipt, CheckCircle, Clock, AlertTriangle, Fuel, Gauge, Paperclip } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 const STATUS_LABEL: Record<string, string> = {
@@ -31,14 +31,17 @@ function fmtEuro(n?: number | null) {
   return n.toLocaleString('de-DE', { minimumFractionDigits: 2 }) + ' €'
 }
 
+const DOKUMENT_TYP_LABEL: Record<string, string> = { lieferschein: '📦 Lieferschein', rechnung: '🧾 Rechnung' }
+
 interface Props {
   auftrag: any
   fotos: any[]
   rechnung: any
   firma: Record<string, string>
+  dokumente?: any[]
 }
 
-export function AuftragsMappe({ auftrag, fotos, rechnung, firma }: Props) {
+export function AuftragsMappe({ auftrag, fotos, rechnung, firma, dokumente = [] }: Props) {
   const fz = auftrag.fahrzeug
   const kunde = auftrag.kunde
   const teile: any[] = auftrag.ersatzteile ?? []
@@ -194,6 +197,29 @@ export function AuftragsMappe({ auftrag, fotos, rechnung, firma }: Props) {
                     {TEIL_STATUS_LABEL[t.status] ?? t.status}
                   </span>
                 </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* ── Lieferscheine & Rechnungen (Lieferanten-Belege) ── */}
+        {dokumente.length > 0 && (
+          <section className="border rounded-xl p-4">
+            <h2 className="flex items-center gap-2 font-semibold text-gray-800 mb-3 pb-2 border-b">
+              <Paperclip className="w-4 h-4 text-blue-500" />Lieferscheine &amp; Rechnungen
+              <span className="text-xs font-normal text-gray-400 ml-auto">{dokumente.length} Dokument{dokumente.length !== 1 ? 'e' : ''}</span>
+            </h2>
+            <div className="space-y-2">
+              {dokumente.map((d: any) => (
+                <a key={d.id} href={d.datei_url} target="_blank" rel="noopener noreferrer"
+                  className="flex items-center justify-between text-sm py-1.5 border-b border-gray-50 last:border-0 hover:bg-gray-50">
+                  <div className="flex-1">
+                    <span className="font-medium text-gray-800">{d.lieferant || d.dateiname || 'Dokument'}</span>
+                    <span className="text-xs text-gray-400 ml-2">{DOKUMENT_TYP_LABEL[d.dokument_typ] ?? DOKUMENT_TYP_LABEL.lieferschein}</span>
+                    {d.lieferdatum && <div className="text-xs text-gray-500">{d.lieferdatum}</div>}
+                  </div>
+                  <span className="text-xs text-blue-600 flex-shrink-0">Ansehen →</span>
+                </a>
               ))}
             </div>
           </section>

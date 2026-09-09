@@ -15,6 +15,7 @@ export function LieferscheinQuickScan({ auftragId, betriebId, onSuccess }: Props
   const [isLoading, setIsLoading] = useState(false)
   const [result, setResult] = useState<any | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [dokumentTyp, setDokumentTyp] = useState<'lieferschein' | 'rechnung'>('lieferschein')
 
   const handleFileSelect = async (file: File) => {
     if (!file.type.startsWith('image/')) {
@@ -30,6 +31,7 @@ export function LieferscheinQuickScan({ auftragId, betriebId, onSuccess }: Props
       formData.append('file', file)
       formData.append('auftragId', auftragId)
       formData.append('betriebId', betriebId)
+      formData.append('dokumentTyp', dokumentTyp)
 
       const res = await fetch('/api/lieferschein/scan-and-insert', {
         method: 'POST',
@@ -55,13 +57,19 @@ export function LieferscheinQuickScan({ auftragId, betriebId, onSuccess }: Props
         <div className="flex items-start gap-4">
           <CheckCircle2 className="w-6 h-6 text-green-600 flex-shrink-0 mt-1" />
           <div className="flex-1">
-            <h3 className="font-bold text-green-900">✅ Lieferschein gescannt!</h3>
+            <h3 className="font-bold text-green-900">
+              ✅ {dokumentTyp === 'rechnung' ? 'Rechnung' : 'Lieferschein'} gescannt!
+            </h3>
             <p className="text-sm text-green-800 mt-2">
-              📦 <strong>{result.scannedTeile}</strong> Teile erkannt
+              📦 <strong>{result.scannedTeile}</strong> Positionen erkannt
             </p>
-            <p className="text-sm text-green-800">
-              ✓ <strong>{result.gueltigeTeile}</strong> gültig, <strong>{result.eingefoegteTeile}</strong> eingefügt
-            </p>
+            {dokumentTyp === 'lieferschein' ? (
+              <p className="text-sm text-green-800">
+                ✓ <strong>{result.gueltigeTeile}</strong> gültig, <strong>{result.eingefoegteTeile}</strong> eingefügt
+              </p>
+            ) : (
+              <p className="text-sm text-green-800">Als Beleg archiviert, keine Ersatzteile angelegt.</p>
+            )}
             <Button
               onClick={() => setResult(null)}
               variant="outline"
@@ -80,10 +88,21 @@ export function LieferscheinQuickScan({ auftragId, betriebId, onSuccess }: Props
     <Card className="p-6 border-blue-200 bg-blue-50">
       <div className="text-center">
         <div className="text-4xl mb-3">📄</div>
-        <h3 className="font-bold mb-2">Lieferschein scannen</h3>
+        <h3 className="font-bold mb-2">Dokument scannen</h3>
         <p className="text-sm text-gray-600 mb-4">
-          Teile werden automatisch erkannt & eingefügt
+          {dokumentTyp === 'lieferschein' ? 'Teile werden automatisch erkannt & eingefügt' : 'Wird archiviert und in der Auftragsmappe angezeigt'}
         </p>
+
+        <div className="flex gap-2 mb-4 justify-center">
+          <button type="button" onClick={() => setDokumentTyp('lieferschein')}
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${dokumentTyp === 'lieferschein' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200'}`}>
+            📦 Lieferschein
+          </button>
+          <button type="button" onClick={() => setDokumentTyp('rechnung')}
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${dokumentTyp === 'rechnung' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200'}`}>
+            🧾 Rechnung
+          </button>
+        </div>
 
         {error && (
           <div className="flex items-center gap-2 text-red-600 bg-red-50 p-3 rounded mb-4 text-sm">
