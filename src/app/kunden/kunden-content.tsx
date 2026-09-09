@@ -4,6 +4,7 @@ import { Users, Search, Plus, Phone, MapPin, Building, Car, ClipboardList, Chevr
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { createClient } from '@/lib/supabase/client'
+import { useBetrieb } from '@/lib/betrieb-context'
 import type { Kunde } from '@/types/database'
 
 type Auftrag = {
@@ -229,10 +230,12 @@ export function KundenContent({
   const [search, setSearch] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [formError, setFormError] = useState('')
   const [form, setForm] = useState({
     vorname: '', nachname: '', firma: '', email: '', telefon: '', mobil: '', strasse: '', plz: '', ort: ''
   })
   const supabase = createClient()
+  const { currentBetriebId } = useBetrieb()
 
   const filtered = kunden.filter(k => {
     const q = search.toLowerCase()
@@ -246,9 +249,12 @@ export function KundenContent({
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault()
+    setFormError('')
     if (!form.nachname) return
+    if (!currentBetriebId) { setFormError('Kein Betrieb geladen — bitte Seite neu laden.'); return }
     setSaving(true)
-    const { data } = await supabase.from('kunden').insert({
+    const { data, error } = await supabase.from('kunden').insert({
+      betrieb_id: currentBetriebId,
       vorname: form.vorname || null,
       nachname: form.nachname,
       firma: form.firma || null,
@@ -259,6 +265,7 @@ export function KundenContent({
       plz: form.plz || null,
       ort: form.ort || null,
     }).select().single()
+    if (error) { console.error('Kunde anlegen fehlgeschlagen:', error); setFormError(`Kunde konnte nicht angelegt werden: ${error.message}`) }
     if (data) {
       setKunden(prev => [data as Kunde, ...prev])
       setForm({ vorname: '', nachname: '', firma: '', email: '', telefon: '', mobil: '', strasse: '', plz: '', ort: '' })
@@ -324,6 +331,9 @@ export function KundenContent({
                       </div>
                     ))}
                   </div>
+                  {formError && (
+                    <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{formError}</div>
+                  )}
                   <div className="flex gap-2 pt-2">
                     <Button type="submit" disabled={saving} className="bg-orange-600 hover:bg-orange-700 text-white">
                       {saving ? 'Speichern...' : 'Kunde anlegen'}
