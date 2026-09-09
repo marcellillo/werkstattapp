@@ -65,13 +65,78 @@ export function RechnungFlow({ auftrag, firma, betriebId }: Props) {
           .order('created_at', { ascending: false }),
       ])
 
-      const kvs: OffenerPosten[] = (kvRows || []).map((kv: any) => ({
+      let kvs: OffenerPosten[] = (kvRows || []).map((kv: any) => ({
         id: kv.id,
         nummer: kv.nummer,
         summe: kv.ersatzteile_modus === 'festpreis'
           ? (kv.ersatzteile_festpreis || 0)
           : (kv.positionen || []).reduce((s: number, p: any) => s + (p.gesamtpreis || 0), 0),
       }))
+
+      // Bereits erfasste Ersatzteile (aus der Ersatzteile-Liste bzw. dem Lieferschein-
+      // Scanner), die noch in keinem Kostenvoranschlag stecken, automatisch übernehmen —
+      // statt sie ein zweites Mal manuell im Kostenvoranschlag eintippen zu müssen. Bereits
+      // übernommene Teile werden über kostenvoranschlag_position.ersatzteil_id erkannt und
+      // nie ein zweites Mal (doppelt) abgerechnet.
+      const alleTeile: any[] = auftrag.ersatzteile || []
+      if (alleTeile.length > 0) {
+        try {
+          const { data: bereitsUebernommen } = await supabase
+            .from('kostenvoranschlag_position')
+            .select('ersatzteil_id')
+            .not('ersatzteil_id', 'is', null)
+            .in('ersatzteil_id', alleTeile.map(t => t.id))
+          const uebernommenIds = new Set((bereitsUebernommen || []).map((r: any) => r.ersatzteil_id))
+          const neueTeile = alleTeile.filter(t => !uebernommenIds.has(t.id))
+
+          if (neueTeile.length > 0) {
+            let zielKvId: string | null = kvRows?.[0]?.id ?? null
+            if (!zielKvId) {
+              const createRes = await fetch('/api/kostenvoranschlag/create', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ auftragId: auftrag.id, betriebId, fahrzeugId: auftrag.fahrzeug?.id, typ: 'werkstatt' }),
+              })
+              const createData = await createRes.json()
+              if (createRes.ok && createData.kostenvoranschlag) zielKvId = createData.kostenvoranschlag.id
+            }
+
+            if (zielKvId) {
+              const positionen = neueTeile.map(t => {
+                const einzelpreis = t.einzelpreis ? t.einzelpreis * 1.45 : undefined
+                const gesamtpreis = einzelpreis ? einzelpreis * (t.menge || 1) : undefined
+                return {
+                  kostenvoranschlag_id: zielKvId, betrieb_id: betriebId, ersatzteil_id: t.id,
+                  beschreibung: t.bezeichnung || '', menge: t.menge || 1,
+                  ...(einzelpreis && { einzelpreis }), ...(gesamtpreis && { gesamtpreis }),
+                }
+              })
+              await supabase.from('kostenvoranschlag_position').insert(positionen)
+              await supabase.from('kostenvoranschlaege').update({ ersatzteile_modus: 'einzeln' }).eq('id', zielKvId)
+
+              // Endgültigen Stand neu laden, damit Summen korrekt sind
+              const { data: kvRowsNeu } = await supabase
+                .from('kostenvoranschlaege')
+                .select('id, nummer, ersatzteile_modus, ersatzteile_festpreis, positionen:kostenvoranschlag_position(gesamtpreis)')
+                .eq('auftrag_id', auftrag.id)
+                .eq('betrieb_id', betriebId)
+                .is('rechnung_id', null)
+                .order('created_at', { ascending: false })
+              kvs = (kvRowsNeu || []).map((kv: any) => ({
+                id: kv.id,
+                nummer: kv.nummer,
+                auto: kv.id === zielKvId,
+                summe: kv.ersatzteile_modus === 'festpreis'
+                  ? (kv.ersatzteile_festpreis || 0)
+                  : (kv.positionen || []).reduce((s: number, p: any) => s + (p.gesamtpreis || 0), 0),
+              }))
+            }
+          }
+        } catch (autoError) {
+          console.error('[RechnungFlow] Automatisches Übernehmen der Ersatzteile fehlgeschlagen:', autoError)
+        }
+      }
+
       let was: OffenerPosten[] = (waRows || []).map((wa: any) => ({
         id: wa.id,
         nummer: wa.nummer,
@@ -234,6 +299,7 @@ export function RechnungFlow({ auftrag, firma, betriebId }: Props) {
                       <span className="flex items-center gap-2">
                         <input type="checkbox" checked={selectedKvIds.has(kv.id)} onChange={() => toggleKv(kv.id)} className="w-4 h-4" />
                         {kv.nummer}
+                        {kv.auto && <span className="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">Ersatzteile automatisch übernommen</span>}
                       </span>
                       <span className="font-medium text-gray-700 tabular-nums">{kv.summe.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €</span>
                     </label>
