@@ -4,6 +4,7 @@ import { Receipt, ChevronRight, Percent, Calculator, Loader2 } from 'lucide-reac
 import { RechnungDruck } from './rechnung-druck'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
+import { mitAufschlag } from '@/lib/ersatzteil-aufschlag'
 
 interface Props {
   auftrag: any
@@ -105,7 +106,7 @@ export function RechnungFlow({ auftrag, firma, betriebId }: Props) {
 
             if (zielKvId) {
               const positionen = neueTeile.map(t => {
-                const einzelpreis = t.einzelpreis ? t.einzelpreis * 1.45 : undefined
+                const einzelpreis = t.einzelpreis ? mitAufschlag(t.einzelpreis) : undefined
                 const gesamtpreis = einzelpreis ? einzelpreis * (t.menge || 1) : undefined
                 return {
                   kostenvoranschlag_id: zielKvId, betrieb_id: betriebId, ersatzteil_id: t.id,

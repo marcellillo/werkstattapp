@@ -115,10 +115,14 @@ export function ServiceWeckerContent({ fahrzeuge: initialFahrzeuge }: { fahrzeug
   async function handleTerminErstellen(f: any) {
     if (!f.naechster_service_datum) return
     setCreatingTermin(f.id)
+    // Bei bereits ueberfaelligem Service-Termin auf heute datieren statt in
+    // die Vergangenheit -- sonst faellt der Termin aus dem Kalender (der nur
+    // ab heute anzeigt) und taucht nur ganz unten in der "Vergangen"-Liste auf.
+    const terminDatum = f.naechster_service_datum >= today ? f.naechster_service_datum : today
     const { error } = await supabase.from('termine').insert({
       betrieb_id: f.betrieb_id,
       titel: `Service ${f.kennzeichen}`,
-      datum: f.naechster_service_datum,
+      datum: terminDatum,
       typ: 'werkstatt',
       status: 'offen',
       fahrzeug_id: f.id,

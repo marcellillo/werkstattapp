@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Plus, Trash2, Upload } from 'lucide-react'
 import { LieferscheinScanner } from '@/components/lieferschein-scanner'
 import { LieferscheinGalerie } from '@/components/lieferschein-galerie'
+import { mitAufschlag } from '@/lib/ersatzteil-aufschlag'
 
 interface Teil {
   id?: string
@@ -137,7 +138,7 @@ export function TeileErfassungTabs({
     }
   }
 
-  const totalMitPreis = mitPreisTeile.reduce((sum, t) => sum + (t.menge * (t.preis || 0) * 1.45), 0)
+  const totalMitPreis = mitPreisTeile.reduce((sum, t) => sum + mitAufschlag(t.menge * (t.preis || 0)), 0)
   const totalOhnePreis = ohnePreisTeile.length
 
   return (
@@ -218,7 +219,7 @@ export function TeileErfassungTabs({
                     <div className="flex-1">
                       <p className="text-sm font-medium">{teil.beschreibung}</p>
                       <p className="text-xs text-gray-600">
-                        {teil.menge}x @ {teil.preis?.toFixed(2)} € = {(teil.menge * (teil.preis || 0) * 1.45).toFixed(2)} € (mit 45% Aufschlag)
+                        {teil.menge}x @ {teil.preis?.toFixed(2)} € = {mitAufschlag(teil.menge * (teil.preis || 0)).toFixed(2)} € (mit 45% Aufschlag)
                       </p>
                     </div>
                     <button

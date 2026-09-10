@@ -84,10 +84,15 @@ export function TuevWeckerContent({ fahrzeuge: initialFahrzeuge }: { fahrzeuge: 
 
   async function handleTerminErstellen(f: any) {
     setCreatingTermin(f.id)
+    // Bei bereits ueberfaelligem HU-Termin (die Buttons stehen genau fuer
+    // diese Faelle prominent bereit) auf heute datieren statt in die
+    // Vergangenheit -- sonst faellt der Termin aus dem Kalender (der nur ab
+    // heute anzeigt) und taucht nur ganz unten in der "Vergangen"-Liste auf.
+    const terminDatum = f.naechste_hauptuntersuchung >= heute ? f.naechste_hauptuntersuchung : heute
     const { error } = await supabase.from('termine').insert({
       betrieb_id: f.betrieb_id,
       titel: `TÜV-Vorbereitung ${f.kennzeichen}`,
-      datum: f.naechste_hauptuntersuchung,
+      datum: terminDatum,
       typ: 'tuev',
       status: 'offen',
       fahrzeug_id: f.id,

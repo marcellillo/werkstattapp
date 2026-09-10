@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { mitAufschlag } from '@/lib/ersatzteil-aufschlag'
 
 export async function POST(req: NextRequest) {
   try {
@@ -17,7 +18,7 @@ export async function POST(req: NextRequest) {
 
     // Füge jedes Teil zur Tabelle hinzu (mit 45% Aufschlag auf Preis wenn vorhanden)
     const positionen = teile.map(teil => {
-      const einzelpreis = teil.preis ? teil.preis * 1.45 : undefined
+      const einzelpreis = teil.preis ? mitAufschlag(teil.preis) : undefined
       const gesamtpreis = einzelpreis ? einzelpreis * (teil.menge || 1) : undefined
 
       return {
