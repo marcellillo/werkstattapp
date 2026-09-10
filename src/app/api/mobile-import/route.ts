@@ -59,15 +59,21 @@ export async function POST(req: Request) {
 
   let importiert = 0, aktualisiert = 0, uebersprungen = 0
   const fehler: string[] = []
+  const uebersprungenGruende: string[] = []
 
-  for (const ad of ads) {
+  for (const [index, ad] of ads.entries()) {
     // Flexible Spalten-Namen für B-Nummer (case-insensitive für CSV-Parser)
     const bNummer: string | null = ad.internalnumber || ad.internalNumber || ad['b-nummer'] || ad['B-Nummer'] || ad.id || null
     const vin: string | null = ad.vin || ad['vin'] || null
     const make = (ad.make || ad.marke || '').replace(/-/g, ' ')
     const makeCap = make ? make.charAt(0) + make.slice(1).toLowerCase() : ''
     const model = ad.modeldescription || ad.modelDescription || ad.model || ad.modell || ''
-    if (!model || model === 'undefined') { uebersprungen++; continue }
+    if (!model || model === 'undefined') {
+      uebersprungen++
+      const spalten = Object.keys(ad).join(', ')
+      uebersprungenGruende.push(`Zeile ${index + 2}${bNummer ? ` (${bNummer})` : ''}: kein Modell-Feld erkannt — gefundene Spalten: ${spalten || '(keine)'}`)
+      continue
+    }
 
     const baujahr = ad.firstregistration || ad.firstRegistration ? parseInt(String(ad.firstregistration || ad.firstRegistration).slice(0, 4)) : null
     // Handle both JSON (price.consumerPriceGross object) and CSV (price string)
@@ -156,7 +162,7 @@ export async function POST(req: Request) {
   }
 
     console.log(`[Mobile Import] Complete: ${importiert} new, ${aktualisiert} updated, ${uebersprungen} skipped, ${fehler.length} errors`)
-    return NextResponse.json({ importiert, aktualisiert, uebersprungen, fehler })
+    return NextResponse.json({ importiert, aktualisiert, uebersprungen, fehler, uebersprungenGruende })
   } catch (error) {
     console.error('[Mobile Import] Fatal error:', error)
     return NextResponse.json({

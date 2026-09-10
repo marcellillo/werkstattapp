@@ -12,6 +12,8 @@ export default function BestandPage() {
     importiert: number
     aktualisiert: number
     uebersprungen: number
+    uebersprungenGruende?: string[]
+    fehler?: string[]
   } | null>(null)
   const [imageStats, setImageStats] = useState<{
     updated: number
@@ -67,6 +69,15 @@ export default function BestandPage() {
         throw new Error('CSV-Datei ist leer oder hat nur Header')
       }
 
+      // Trennzeichen automatisch erkennen: deutsche/Mobile.de-Exporte nutzen oft
+      // Semikolon statt Komma (Komma ist im deutschen Zahlenformat das
+      // Dezimaltrennzeichen). Wird an Kommas fest verdrahtet, landet bei einer
+      // Semikolon-Datei die komplette Kopfzeile als ein einziges Feld, und
+      // jede Zeile wird mangels erkanntem "Modell"-Feld übersprungen.
+      const kommas = (lines[0].match(/,/g) || []).length
+      const semikolons = (lines[0].match(/;/g) || []).length
+      const delimiter = semikolons > kommas ? ';' : ','
+
       // CSV Parser für quoted fields (z.B. "field","value")
       const parseCSVLine = (line: string) => {
         const values = []
@@ -77,7 +88,7 @@ export default function BestandPage() {
           const char = line[i]
           if (char === '"') {
             inQuotes = !inQuotes
-          } else if (char === ',' && !inQuotes) {
+          } else if (char === delimiter && !inQuotes) {
             values.push(current.trim().replace(/^"|"$/g, ''))
             current = ''
           } else {
@@ -138,6 +149,8 @@ export default function BestandPage() {
         importiert: result.importiert || 0,
         aktualisiert: result.aktualisiert || 0,
         uebersprungen: result.uebersprungen || 0,
+        uebersprungenGruende: result.uebersprungenGruende || [],
+        fehler: result.fehler || [],
       })
 
       setSuccess(`✅ Import erfolgreich! ${result.importiert} neue, ${result.aktualisiert} aktualisiert`)
@@ -226,6 +239,15 @@ export default function BestandPage() {
                   <p>⏭️ Übersprungen: <strong>{stats.uebersprungen}</strong></p>
                 </div>
               )}
+              {stats && (stats.uebersprungenGruende?.length || stats.fehler?.length) ? (
+                <div className="mt-3 bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-900 space-y-1 max-h-48 overflow-y-auto">
+                  {stats.fehler?.map((f, i) => <p key={'f' + i}>❌ {f}</p>)}
+                  {stats.uebersprungenGruende?.slice(0, 20).map((g, i) => <p key={'g' + i}>⏭️ {g}</p>)}
+                  {(stats.uebersprungenGruende?.length ?? 0) > 20 && (
+                    <p className="italic">… und {(stats.uebersprungenGruende!.length - 20)} weitere</p>
+                  )}
+                </div>
+              ) : null}
               {imageStats && (
                 <div className="mt-2 text-sm text-green-800">
                   <p>🖼️ Bilder übernommen: <strong>{imageStats.updated}</strong> Fahrzeuge</p>
