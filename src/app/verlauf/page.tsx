@@ -16,14 +16,14 @@ export default async function VerlaufPage() {
   const { data: auftraege } = await supabase
     .from('auftraege')
     .select(`
-      id, created_at, status, arbeiten, tuev_ergebnis, tuev_kandidat,
+      id, erstellt_am, status, arbeiten, tuev_ergebnis, tuev_kandidat,
       fahrzeug:fahrzeuge(id, kennzeichen, marke, modell, baujahr, fahrzeug_typ),
       kunde:kunden(id, vorname, nachname, telefon, firma),
-      ersatzteile(id, bezeichnung, teilenummer, preis, status, menge)
+      ersatzteile(id, bezeichnung, teilenummer, einzelpreis, status, menge)
     `)
     .eq('betrieb_id', betriebId)
     .eq('status', 'ausgeliefert')
-    .order('created_at', { ascending: false })
+    .order('erstellt_am', { ascending: false })
     .limit(200)
 
   return (

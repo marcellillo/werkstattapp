@@ -87,7 +87,7 @@ export function EinstellungenContent({ initialConfig, betriebName, betriebId }: 
 
   async function ladenMitarbeiterDaten() {
     const [{ data: users }, { data: invites }] = await Promise.all([
-      supabase.from('betrieb_users').select('id, profile_id, rolle, profiles(full_name, email)').eq('betrieb_id', betriebId),
+      supabase.from('betrieb_users').select('id, profile_id, role, profiles(full_name, email)').eq('betrieb_id', betriebId),
       supabase.from('user_invitations').select('*').eq('betrieb_id', betriebId).order('erstellt_am', { ascending: false }),
     ])
     setTeamMembers(users ?? [])
@@ -656,7 +656,7 @@ export function EinstellungenContent({ initialConfig, betriebName, betriebId }: 
                         <p className="text-sm text-slate-600">{user.profiles?.email}</p>
                       </div>
                       <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium">
-                        {ROLLEN[user.rolle as keyof typeof ROLLEN]}
+                        {ROLLEN[user.role as keyof typeof ROLLEN]}
                       </span>
                     </div>
                   ))}

@@ -35,7 +35,7 @@ export default async function StatistikenPage() {
     // Werkstatt-Aufträge (fremde Fahrzeuge)
     supabase
       .from('auftraege')
-      .select('id, einnahmen, fertiggestellt_am, ersatzteile(kosten)')
+      .select('id, einnahmen, fertiggestellt_am, ersatzteile(einzelpreis, menge)')
       .eq('betrieb_id', betriebId)
       .eq('status', 'fertig')
       .not('fahrzeug', 'is', null)
@@ -54,7 +54,7 @@ export default async function StatistikenPage() {
   // Berechne Ersatzteile-Kosten für Werkstatt
   const werkstattWithKosten = (werkstattRaw ?? []).map((w: any) => ({
     ...w,
-    ersatzteile_kosten: (w.ersatzteile ?? []).reduce((sum: number, e: any) => sum + (e.kosten || 0), 0),
+    ersatzteile_kosten: (w.ersatzteile ?? []).reduce((sum: number, e: any) => sum + ((e.einzelpreis || 0) * (e.menge || 1)), 0),
   }))
 
   return (

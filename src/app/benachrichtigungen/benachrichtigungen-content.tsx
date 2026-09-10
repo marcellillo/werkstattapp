@@ -6,6 +6,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { cn, formatDateTime } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
+import { useBetrieb } from '@/lib/betrieb-context'
 
 const TYP_CONFIG: Record<string, { icon: React.ElementType; farbe: string; label: string }> = {
   info:                 { icon: Info,         farbe: 'text-blue-500',   label: 'Info' },
@@ -35,14 +36,19 @@ export function BenachrichtigungenContent({ notifications, unreadCount }: Props)
   const [kategorie, setKategorie] = useState('alle')
   const [refreshing, setRefreshing] = useState(false)
   const supabase = createClient()
+  const { currentBetriebId } = useBetrieb()
 
   async function alsGelesenMarkieren(id: string) {
-    await supabase.from('benachrichtigungen').update({ gelesen: true }).eq('id', id)
+    const { error } = await supabase.from('benachrichtigungen').update({ gelesen: true }).eq('id', id)
+    if (error) { console.error('Als gelesen markieren fehlgeschlagen:', error); return }
     setListe(l => l.map(n => n.id === id ? { ...n, gelesen: true } : n))
   }
 
   async function alleAlsGelesenMarkieren() {
-    await supabase.from('benachrichtigungen').update({ gelesen: true }).eq('gelesen', false)
+    if (!currentBetriebId) return
+    const { error } = await supabase.from('benachrichtigungen').update({ gelesen: true })
+      .eq('gelesen', false).eq('betrieb_id', currentBetriebId)
+    if (error) { console.error('Alle als gelesen markieren fehlgeschlagen:', error); return }
     setListe(l => l.map(n => ({ ...n, gelesen: true })))
   }
 

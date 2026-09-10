@@ -31,7 +31,7 @@ export function VerlaufContent({ auftraege }: { auftraege: any[] }) {
 
   const totalTeile = auftraege.reduce((sum, a) => sum + (a.ersatzteile?.length ?? 0), 0)
   const totalUmsatz = auftraege.reduce((sum, a) => {
-    return sum + (a.ersatzteile ?? []).reduce((s: number, t: any) => s + ((t.preis ?? 0) * (t.menge ?? 1)), 0)
+    return sum + (a.ersatzteile ?? []).reduce((s: number, t: any) => s + ((t.einzelpreis ?? 0) * (t.menge ?? 1)), 0)
   }, 0)
 
   return (
@@ -83,7 +83,7 @@ export function VerlaufContent({ auftraege }: { auftraege: any[] }) {
             const teile: any[] = a.ersatzteile ?? []
             const isOpen = expanded === a.id
             const eigen = a.fahrzeug?.fahrzeug_typ === 'eigen'
-            const teileWert = teile.reduce((s: number, t: any) => s + ((t.preis ?? 0) * (t.menge ?? 1)), 0)
+            const teileWert = teile.reduce((s: number, t: any) => s + ((t.einzelpreis ?? 0) * (t.menge ?? 1)), 0)
 
             return (
               <div key={a.id} className="bg-white border border-gray-200 rounded-xl overflow-hidden hover:border-orange-200 transition-colors">
@@ -95,13 +95,13 @@ export function VerlaufContent({ auftraege }: { auftraege: any[] }) {
                   {/* Datum */}
                   <div className="flex-shrink-0 w-12 text-center">
                     <p className="text-base font-bold text-gray-900 leading-none">
-                      {new Date(a.created_at).getDate().toString().padStart(2, '0')}
+                      {new Date(a.erstellt_am).getDate().toString().padStart(2, '0')}
                     </p>
                     <p className="text-xs text-gray-400">
-                      {new Date(a.created_at).toLocaleDateString('de-DE', { month: 'short' })}
+                      {new Date(a.erstellt_am).toLocaleDateString('de-DE', { month: 'short' })}
                     </p>
                     <p className="text-xs text-gray-300">
-                      {new Date(a.created_at).getFullYear()}
+                      {new Date(a.erstellt_am).getFullYear()}
                     </p>
                   </div>
 
@@ -229,9 +229,9 @@ export function VerlaufContent({ auftraege }: { auftraege: any[] }) {
                               </div>
                               <div className="flex items-center gap-3 flex-shrink-0 ml-2">
                                 {t.menge && t.menge > 1 && <span className="text-xs text-gray-500">×{t.menge}</span>}
-                                {t.preis && (
+                                {t.einzelpreis && (
                                   <span className="text-xs font-medium text-gray-700">
-                                    {new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(t.preis * (t.menge ?? 1))}
+                                    {new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(t.einzelpreis * (t.menge ?? 1))}
                                   </span>
                                 )}
                               </div>

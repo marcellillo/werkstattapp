@@ -216,7 +216,7 @@ export function AnnahmeProtokoll({ auftrag, firma }: Props) {
         checklisteData[item.id] = { status: item.status, notiz: item.notiz }
       }
     }
-    await sb.from('auftraege').update({
+    const { error } = await sb.from('auftraege').update({
       annahme_km: annahmeKm ? parseInt(annahmeKm) : null,
       annahme_tank: annahmeTank,
       annahme_schaeden: annahmeSchaeden || null,
@@ -227,6 +227,11 @@ export function AnnahmeProtokoll({ auftrag, firma }: Props) {
       annahme_checkliste: Object.keys(checklisteData).length > 0 ? checklisteData : null,
     }).eq('id', auftrag.id)
     setSaving(false)
+    if (error) {
+      console.error('Annahmeprotokoll speichern fehlgeschlagen:', error)
+      alert(`Speichern fehlgeschlagen: ${error.message}`)
+      return
+    }
     setSaved(true)
     if (undDrucken) window.print()
   }
