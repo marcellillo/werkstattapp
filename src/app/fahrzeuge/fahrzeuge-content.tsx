@@ -158,8 +158,9 @@ export function FahrzeugeContent({
     setLoeschenLoading(true)
     const sb = createClient()
     // fahrzeug löschen → auftraege/ersatzteile/fotos werden per ON DELETE CASCADE mitgelöscht
-    await sb.from('fahrzeuge').delete().eq('id', loeschen.fahrzeugId)
+    const { error } = await sb.from('fahrzeuge').delete().eq('id', loeschen.fahrzeugId)
     setLoeschenLoading(false)
+    if (error) { console.error('Fahrzeug löschen fehlgeschlagen:', error); alert(`Löschen fehlgeschlagen: ${error.message}`); return }
     setLoeschen(null)
     router.refresh()
   }

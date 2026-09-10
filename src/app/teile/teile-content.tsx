@@ -174,10 +174,11 @@ function ArtikelPanel({
   async function handleDelete() {
     if (!artikel || !confirm(`„${artikel.bezeichnung}" wirklich löschen?`)) return
     setDeleting(true)
-    await supabase.from('lager_artikel').delete().eq('id', artikel.id)
+    const { error } = await supabase.from('lager_artikel').delete().eq('id', artikel.id)
+    setDeleting(false)
+    if (error) { console.error('Artikel löschen fehlgeschlagen:', error); alert(`Löschen fehlgeschlagen: ${error.message}`); return }
     onDeleted(artikel.id)
     onClose()
-    setDeleting(false)
   }
 
   return (
@@ -319,9 +320,14 @@ function LagerbestandSection({ artikel: initialArtikel }: { artikel: any[] }) {
 
   async function adjustBestand(a: any, delta: number) {
     const newBestand = Math.max(0, parseFloat(a.bestand ?? 0) + delta)
+    const vorher = a.bestand
     setSavingBestand(a.id)
     setArtikel(prev => prev.map(x => x.id === a.id ? { ...x, bestand: newBestand } : x))
-    await supabase.from('lager_artikel').update({ bestand: newBestand, aktualisiert_am: new Date().toISOString() }).eq('id', a.id)
+    const { error } = await supabase.from('lager_artikel').update({ bestand: newBestand, aktualisiert_am: new Date().toISOString() }).eq('id', a.id)
+    if (error) {
+      console.error('Bestand aendern fehlgeschlagen:', error)
+      setArtikel(prev => prev.map(x => x.id === a.id ? { ...x, bestand: vorher } : x))
+    }
     setSavingBestand(null)
   }
 
@@ -492,23 +498,29 @@ function BestellungenSection({ teile: initialTeile }: { teile: any[] }) {
   })
 
   async function handleStatusChange(id: string, status: TeilStatus) {
+    const vorher = teile.find(t => t.id === id)?.status
     setTeile(prev => prev.map(t => t.id === id ? { ...t, status } : t))
-    await supabase.from('ersatzteile').update({ status }).eq('id', id)
+    const { error } = await supabase.from('ersatzteile').update({ status }).eq('id', id)
+    if (error) { console.error('Status ändern fehlgeschlagen:', error); setTeile(prev => prev.map(t => t.id === id ? { ...t, status: vorher as TeilStatus } : t)) }
   }
 
   async function handleMengeChange(id: string, delta: number) {
     const teil = teile.find(t => t.id === id)
     if (!teil) return
+    const vorher = teil.menge
     const newMenge = Math.max(1, (teil.menge ?? 1) + delta)
     setTeile(prev => prev.map(t => t.id === id ? { ...t, menge: newMenge } : t))
-    await supabase.from('ersatzteile').update({ menge: newMenge }).eq('id', id)
+    const { error } = await supabase.from('ersatzteile').update({ menge: newMenge }).eq('id', id)
+    if (error) { console.error('Menge ändern fehlgeschlagen:', error); setTeile(prev => prev.map(t => t.id === id ? { ...t, menge: vorher } : t)) }
   }
 
   async function handleMengeSet(id: string, value: string) {
     const n = parseInt(value)
     if (isNaN(n) || n < 1) return
+    const vorher = teile.find(t => t.id === id)?.menge
     setTeile(prev => prev.map(t => t.id === id ? { ...t, menge: n } : t))
-    await supabase.from('ersatzteile').update({ menge: n }).eq('id', id)
+    const { error } = await supabase.from('ersatzteile').update({ menge: n }).eq('id', id)
+    if (error) { console.error('Menge setzen fehlgeschlagen:', error); setTeile(prev => prev.map(t => t.id === id ? { ...t, menge: vorher ?? 1 } : t)) }
   }
 
   async function handleEmailSync() {
@@ -538,8 +550,12 @@ function BestellungenSection({ teile: initialTeile }: { teile: any[] }) {
     if (zuBestellen.length === 0) return
     setBulkLoading(true)
     setTeile(prev => prev.map(t => t.status === 'nicht_bestellt' ? { ...t, status: 'bestellt' } : t))
-    await supabase.from('ersatzteile').update({ status: 'bestellt' }).eq('status', 'nicht_bestellt')
+    const { error } = await supabase.from('ersatzteile').update({ status: 'bestellt' }).in('id', zuBestellen.map(t => t.id))
     setBulkLoading(false)
+    if (error) {
+      console.error('Alle bestellen fehlgeschlagen:', error)
+      setTeile(prev => prev.map(t => zuBestellen.some(z => z.id === t.id) ? { ...t, status: 'nicht_bestellt' } : t))
+    }
   }
 
   const aufLager  = teile.filter(t => t.status === 'geliefert').length
