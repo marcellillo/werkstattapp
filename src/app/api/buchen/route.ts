@@ -96,6 +96,7 @@ export async function POST(req: NextRequest) {
 
   // ── 1. Kunde: Duplikat per Telefon → E-Mail → neu anlegen ──────────────
   let kundeId: string | null = null
+  let auftragId: string | null = null
   try {
     let existing: any = null
     const kzNorm = kennzeichen?.toUpperCase().replace(/\s+/g, '') ?? null
@@ -160,7 +161,7 @@ export async function POST(req: NextRequest) {
         ? `\n\n📄 Fahrzeugschein-Foto vorhanden (siehe Termine → Online-Buchung)`
         : ''
 
-      const { error: auftragError } = await supabase.from('auftraege').insert({
+      const { data: neuerAuftrag, error: auftragError } = await supabase.from('auftraege').insert({
         betrieb_id: defaultBetriebId,
         auftrag_nr: auftragNr,
         fahrzeug_id: fahrzeugId,
@@ -169,8 +170,9 @@ export async function POST(req: NextRequest) {
         arbeiten: leistung,
         geplante_fertigstellung: datum,
         bemerkungen: `Online-Buchung vom ${datum}${uhrzeit ? ' ' + uhrzeit + ' Uhr' : ''}${nachricht ? '\nKundenwunsch: ' + nachricht : ''}${hinweis}${fahrzeugscheinHinweis}`,
-      })
+      }).select('id').single()
       if (auftragError) console.error('Auftrag insert error:', auftragError)
+      if (neuerAuftrag) auftragId = neuerAuftrag.id
     }
   } catch (e) {
     console.error('Kunde/Fahrzeug/Auftrag error:', e)
@@ -187,6 +189,7 @@ export async function POST(req: NextRequest) {
     quelle: 'website',
     status: 'offen',
     kunden_id: kundeId,
+    auftrag_id: auftragId,
     notizen: `Online-Buchung von der Website${fahrzeugscheinPfad ? '\nFahrzeugschein-Pfad: ' + fahrzeugscheinPfad : ''}`,
   })
 

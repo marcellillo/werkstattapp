@@ -1,5 +1,6 @@
 'use client'
 import { useState } from 'react'
+import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { Calendar, Plus, ShieldCheck, Globe, Phone, Clock, Car, User, Trash2, CheckCircle, X, MessageCircle, Mail } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -599,7 +600,12 @@ function TerminCard({ termin, onStatus, onDelete }: {
           {(termin.kunde || termin.fahrzeug || termin.hebebuehne) && (
             <p className="text-xs text-gray-600 mt-0.5 flex items-center gap-2 flex-wrap">
               {termin.kunde && <span><User className="w-3 h-3 inline mr-0.5" />{termin.kunde.vorname} {termin.kunde.nachname}</span>}
-              {termin.fahrzeug && <span><Car className="w-3 h-3 inline mr-0.5" />{termin.fahrzeug.kennzeichen}</span>}
+              {termin.fahrzeug && termin.fahrzeug_id && (
+                <Link href={`/fahrzeuge/${termin.fahrzeug_id}`} onClick={e => e.stopPropagation()}
+                  className="text-blue-600 hover:underline">
+                  <Car className="w-3 h-3 inline mr-0.5" />{termin.fahrzeug.kennzeichen}
+                </Link>
+              )}
               {termin.hebebuehne && (
                 <span className="flex items-center gap-0.5 bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded font-medium">
                   <ShieldCheck className="w-3 h-3" />Bühne {termin.hebebuehne.nummer} reserviert
