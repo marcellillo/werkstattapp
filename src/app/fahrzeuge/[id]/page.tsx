@@ -36,7 +36,7 @@ export default async function FahrzeugDetailPage({ params }: { params: Promise<{
       .eq('auftrag_id', id)
       .order('erstellt_am', { ascending: false })
       .limit(20),
-    supabase.from('werkstatt_einstellungen').select('wert').eq('schluessel', 'google_bewertung_url').maybeSingle(),
+    supabase.from('betrieb_einstellungen').select('wert').eq('betrieb_id', betriebId).eq('schluessel', 'google_bewertung_url').maybeSingle(),
   ])
 
   if (auftragError) console.error('Auftrag query error:', JSON.stringify(auftragError))
@@ -49,7 +49,7 @@ export default async function FahrzeugDetailPage({ params }: { params: Promise<{
   }
 
   const { data: steuerCfg } = await supabase
-    .from('werkstatt_einstellungen').select('wert').eq('schluessel', 'fahrzeug_steuerart_standard').maybeSingle()
+    .from('betrieb_einstellungen').select('wert').eq('betrieb_id', betriebId).eq('schluessel', 'fahrzeug_steuerart_standard').maybeSingle()
   const standardSteuerart = ((steuerCfg as any)?.wert as 'differenz' | 'regel' | 'ausfuhr') ?? 'differenz'
 
   return (

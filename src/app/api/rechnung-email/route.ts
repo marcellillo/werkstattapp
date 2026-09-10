@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/admin'
 import { Resend } from 'resend'
 import QRCode from 'qrcode'
 import { buildGiroCode } from '@/lib/girocode'
 import { resolveRechnungDetail, type RechnungDetail } from '@/lib/rechnung-detail'
+import { resolveFirmaSettings } from '@/lib/firma-settings'
 
 function fmt(d?: string | null) {
   if (!d) return '—'
@@ -19,14 +19,6 @@ async function toQrDataUrl(text: string): Promise<string | null> {
   try {
     return await QRCode.toDataURL(text, { width: 96, margin: 1, errorCorrectionLevel: 'M' })
   } catch { return null }
-}
-
-async function ladeFirmaConfig(): Promise<Record<string, string>> {
-  const admin = createAdminClient()
-  const { data: rows } = await admin.from('werkstatt_einstellungen').select('schluessel, wert')
-  const cfg: Record<string, string> = {}
-  for (const r of rows ?? []) if (r.wert) cfg[r.schluessel] = r.wert
-  return cfg
 }
 
 async function buildRechnungHtml(detail: RechnungDetail): Promise<string> {
@@ -351,15 +343,6 @@ export async function POST(req: NextRequest) {
   }
 
   if (typ === 'fertig') {
-    // Fertig-Benachrichtigung: unverändertes Verhalten (globale Werkstatt-Einstellungen, auftrag_id)
-    const firma = await ladeFirmaConfig()
-    const resendKey = firma.resend_api_key || process.env.RESEND_API_KEY
-    if (!resendKey) {
-      return NextResponse.json(
-        { error: 'Resend API-Key fehlt. Bitte in Einstellungen → "Resend API-Key" eintragen oder als RESEND_API_KEY Umgebungsvariable setzen.' },
-        { status: 500 },
-      )
-    }
     if (!auftrag_id) return NextResponse.json({ error: 'auftrag_id erforderlich' }, { status: 400 })
 
     const { data: auftrag } = await supabase
@@ -368,6 +351,23 @@ export async function POST(req: NextRequest) {
       .eq('id', auftrag_id)
       .single()
     if (!auftrag) return NextResponse.json({ error: 'Auftrag nicht gefunden' }, { status: 404 })
+
+    const { data: betriebCheck } = await supabase
+      .from('betrieb_users')
+      .select('id')
+      .eq('betrieb_id', auftrag.betrieb_id)
+      .eq('profile_id', user.id)
+      .maybeSingle()
+    if (!betriebCheck) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+    const firma = await resolveFirmaSettings(supabase, auftrag.betrieb_id)
+    const resendKey = firma.resend_api_key || process.env.RESEND_API_KEY
+    if (!resendKey) {
+      return NextResponse.json(
+        { error: 'Resend API-Key fehlt. Bitte in Einstellungen → "Resend API-Key" eintragen oder als RESEND_API_KEY Umgebungsvariable setzen.' },
+        { status: 500 },
+      )
+    }
 
     const empfaenger = an || auftrag.kunde?.email
     if (!empfaenger) return NextResponse.json({ error: 'Keine E-Mail-Adresse vorhanden' }, { status: 400 })
@@ -387,6 +387,7 @@ export async function POST(req: NextRequest) {
     }
 
     await supabase.from('email_protokoll').insert({
+      betrieb_id: auftrag.betrieb_id,
       betreff: subject,
       absender: fromEmail,
       inhalt: `An: ${empfaenger} | Fertig-Benachrichtigung`,
@@ -450,6 +451,7 @@ export async function POST(req: NextRequest) {
   }
 
   await supabase.from('email_protokoll').insert({
+    betrieb_id: betriebId,
     betreff: subject,
     absender: fromEmail,
     inhalt: `An: ${empfaenger} | Rechnung ${detail.rechnung.rechnungs_nr}`,

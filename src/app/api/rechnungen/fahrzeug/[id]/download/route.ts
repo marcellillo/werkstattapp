@@ -4,6 +4,7 @@ import {
   generateFahrzeugRechnungHtml,
   type FahrzeugRechnungDaten,
 } from '@/lib/fahrzeug-rechnung-generator'
+import { resolveFirmaSettings } from '@/lib/firma-settings'
 
 export async function GET(
   req: NextRequest,
@@ -63,14 +64,7 @@ export async function GET(
     }
 
     // Firmen-Daten laden
-    const { data: configRows } = await supabase
-      .from('werkstatt_einstellungen')
-      .select('schluessel, wert')
-
-    const cfg: Record<string, string> = {}
-    for (const row of configRows ?? []) {
-      if (row.wert) cfg[row.schluessel] = row.wert
-    }
+    const cfg = await resolveFirmaSettings(supabase, rechnung.betrieb_id)
 
     const firmaDaten = {
       name: cfg.firma_name ?? 'Werkstatt',

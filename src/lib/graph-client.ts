@@ -11,7 +11,7 @@ export interface GraphConfig {
 const GRAPH_BASE = 'https://graph.microsoft.com/v1.0'
 const REDIRECT_URI = `${process.env.NEXT_PUBLIC_APP_URL ?? 'https://werkstatt-app-umber.vercel.app'}/api/graph/callback`
 
-export function getOAuthUrl(clientId: string, tenantId: string): string {
+export function getOAuthUrl(clientId: string, tenantId: string, state: string): string {
   const params = new URLSearchParams({
     client_id: clientId,
     response_type: 'code',
@@ -19,6 +19,7 @@ export function getOAuthUrl(clientId: string, tenantId: string): string {
     response_mode: 'query',
     scope: 'https://graph.microsoft.com/Mail.Read offline_access',
     prompt: 'select_account',
+    state,
   })
   return `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/authorize?${params}`
 }

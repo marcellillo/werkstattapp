@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { AppLayout } from '@/components/layout/app-layout'
 import { BuchhaltungContent } from './buchhaltung-content'
 import { getBetriebIdForUser } from '@/lib/server-betrieb'
+import { resolveFirmaSettings } from '@/lib/firma-settings'
 
 export default async function BuchhaltungPage() {
   const supabase = await createClient()
@@ -15,7 +16,7 @@ export default async function BuchhaltungPage() {
     { data: auftraege },
     { data: ausgaben },
     { data: kundenRechnungen },
-    { data: cfgRows },
+    cfg,
   ] = await Promise.all([
     supabase
       .from('auftraege')
@@ -34,14 +35,8 @@ export default async function BuchhaltungPage() {
       .select('*, kunde:kunden(vorname, nachname, telefon), fahrzeug:fahrzeuge(kennzeichen, marke, modell)')
       .eq('betrieb_id', betriebId)
       .order('erstellt_am', { ascending: false }),
-    supabase
-      .from('werkstatt_einstellungen')
-      .select('schluessel, wert')
-      .in('schluessel', ['firma_kleinunternehmer', 'firma_stundensatz', 'firma_name']),
+    resolveFirmaSettings(supabase, betriebId),
   ])
-
-  const cfg: Record<string, string> = {}
-  for (const r of cfgRows ?? []) if (r.wert) cfg[r.schluessel] = r.wert
 
   return (
     <AppLayout title="Buchhaltung">

@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect, notFound } from 'next/navigation'
 import { AuftragsMappe } from './auftrags-mappe'
 import { getBetriebIdForUser } from '@/lib/server-betrieb'
+import { resolveFirmaSettings } from '@/lib/firma-settings'
 
 export default async function MappePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -20,18 +21,15 @@ export default async function MappePage({ params }: { params: Promise<{ id: stri
 
   if (!auftrag) notFound()
 
-  const [{ data: fotos }, { data: rechnung }, { data: configRows }, { data: dokumente }, { data: lieferantenRechnungen }] = await Promise.all([
+  const [{ data: fotos }, { data: rechnung }, cfg, { data: dokumente }, { data: lieferantenRechnungen }] = await Promise.all([
     supabase.from('auftrag_fotos').select('*').eq('auftrag_id', id).order('erstellt_am'),
     supabase.from('kunden_rechnungen').select('*').eq('auftrag_id', id).maybeSingle(),
-    supabase.from('werkstatt_einstellungen').select('schluessel, wert'),
+    resolveFirmaSettings(supabase, betriebId),
     supabase.from('lieferschein_uploads').select('*').eq('auftrag_id', id).order('erstellt_am'),
     auftrag.fahrzeug_id
       ? supabase.from('supplier_invoices').select('*').eq('fahrzeug_id', auftrag.fahrzeug_id).order('erstellt_am')
       : Promise.resolve({ data: [] as any[] }),
   ])
-
-  const cfg: Record<string, string> = {}
-  for (const row of configRows ?? []) if (row.wert) cfg[row.schluessel] = row.wert
 
   return (
     <AuftragsMappe

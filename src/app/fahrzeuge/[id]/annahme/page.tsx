@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect, notFound } from 'next/navigation'
 import { AnnahmeProtokoll } from './annahme-protokoll'
 import { getBetriebIdForUser } from '@/lib/server-betrieb'
+import { resolveFirmaSettings } from '@/lib/firma-settings'
 
 export default async function AnnahmePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -11,22 +12,17 @@ export default async function AnnahmePage({ params }: { params: Promise<{ id: st
 
   const betriebId = await getBetriebIdForUser(supabase, user.id)
 
-  const [{ data: auftrag }, { data: configRows }] = await Promise.all([
+  const [{ data: auftrag }, cfg] = await Promise.all([
     supabase
       .from('auftraege')
       .select('*, fahrzeug:fahrzeuge(*), kunde:kunden(*)')
       .eq('betrieb_id', betriebId)
       .eq('id', id)
       .single(),
-    supabase.from('werkstatt_einstellungen').select('schluessel, wert'),
+    resolveFirmaSettings(supabase, betriebId),
   ])
 
   if (!auftrag) notFound()
-
-  const cfg: Record<string, string> = {}
-  for (const row of configRows ?? []) {
-    if (row.wert) cfg[row.schluessel] = row.wert
-  }
 
   return <AnnahmeProtokoll auftrag={auftrag as any} firma={cfg} />
 }

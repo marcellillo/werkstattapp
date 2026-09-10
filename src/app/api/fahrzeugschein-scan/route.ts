@@ -10,12 +10,22 @@ export async function POST(req: Request) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const { data: userBetrieb } = await supabase
+    .from('betrieb_users')
+    .select('betrieb_id')
+    .eq('profile_id', user.id)
+    .order('is_primary', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  const betriebId = userBetrieb?.betrieb_id
+  if (!betriebId) return NextResponse.json({ error: 'Kein Betrieb zugeordnet' }, { status: 403 })
+
   const formData = await req.formData()
   const file = formData.get('bild') as File | null
   if (!file) return NextResponse.json({ error: 'Kein Bild übermittelt' }, { status: 400 })
 
   const adminSupabase = createAdminClient()
-  const { data: rows } = await adminSupabase.from('werkstatt_einstellungen').select('schluessel, wert')
+  const { data: rows } = await adminSupabase.from('betrieb_einstellungen').select('schluessel, wert').eq('betrieb_id', betriebId)
   const cfg: Record<string, string> = {}
   for (const r of rows ?? []) if (r.wert) cfg[r.schluessel] = r.wert
 

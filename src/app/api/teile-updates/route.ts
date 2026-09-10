@@ -3,14 +3,29 @@ export const runtime = 'nodejs'
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
+async function ladeBetriebId(supabase: any, userId: string): Promise<string | null> {
+  const { data: userBetrieb } = await supabase
+    .from('betrieb_users')
+    .select('betrieb_id')
+    .eq('profile_id', userId)
+    .order('is_primary', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  return userBetrieb?.betrieb_id ?? null
+}
+
 export async function GET() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const betriebId = await ladeBetriebId(supabase, user.id)
+  if (!betriebId) return NextResponse.json({ error: 'Kein Betrieb zugeordnet' }, { status: 403 })
+
   const { data } = await supabase
-    .from('werkstatt_einstellungen')
+    .from('betrieb_einstellungen')
     .select('wert')
+    .eq('betrieb_id', betriebId)
     .eq('schluessel', 'teile_updates_ausstehend')
     .maybeSingle()
 
@@ -23,11 +38,15 @@ export async function POST(req: Request) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const betriebId = await ladeBetriebId(supabase, user.id)
+  if (!betriebId) return NextResponse.json({ error: 'Kein Betrieb zugeordnet' }, { status: 403 })
+
   const { id, aktion } = await req.json()
 
   const { data } = await supabase
-    .from('werkstatt_einstellungen')
+    .from('betrieb_einstellungen')
     .select('wert')
+    .eq('betrieb_id', betriebId)
     .eq('schluessel', 'teile_updates_ausstehend')
     .maybeSingle()
 
@@ -40,7 +59,7 @@ export async function POST(req: Request) {
 
     for (const teil of update.teile) {
       if (teil.vorhanden_id) {
-        const { data: vorh } = await supabase.from('ersatzteile').select('status').eq('id', teil.vorhanden_id).maybeSingle()
+        const { data: vorh } = await supabase.from('ersatzteile').select('status').eq('betrieb_id', betriebId).eq('id', teil.vorhanden_id).maybeSingle()
         if (vorh) {
           const aktuellIdx = statusReihenfolge.indexOf(vorh.status)
           const neuIdx = statusReihenfolge.indexOf(update.neuer_status)
@@ -50,11 +69,12 @@ export async function POST(req: Request) {
               lieferant: update.lieferant,
               ...(update.neuer_status === 'geliefert' ? { geliefert_am: new Date().toISOString().split('T')[0] } : {}),
               ...(update.neuer_status === 'bestellt' ? { bestellt_am: new Date().toISOString().split('T')[0] } : {}),
-            }).eq('id', teil.vorhanden_id)
+            }).eq('betrieb_id', betriebId).eq('id', teil.vorhanden_id)
           }
         }
       } else if (update.auftrag_id) {
         await supabase.from('ersatzteile').insert({
+          betrieb_id: betriebId,
           auftrag_id: update.auftrag_id,
           bezeichnung: teil.bezeichnung,
           teilenummer: teil.teilenummer ?? null,
@@ -70,6 +90,7 @@ export async function POST(req: Request) {
 
     if (update.neuer_status === 'geliefert' && update.auftrag_id) {
       await supabase.from('benachrichtigungen').insert({
+        betrieb_id: betriebId,
         titel: `Teile eingetroffen: ${update.lieferant}`,
         nachricht: `Lieferung von ${update.lieferant}: ${update.teile.map((t: any) => t.bezeichnung).join(', ')}`,
         typ: 'teil_eingetroffen',
@@ -82,13 +103,14 @@ export async function POST(req: Request) {
   if (update.protokoll_id) {
     await supabase.from('email_protokoll')
       .update({ verarbeitet: true })
+      .eq('betrieb_id', betriebId)
       .eq('id', update.protokoll_id)
   }
 
   const restUpdates = updates.filter((u: any) => u.id !== id)
-  await supabase.from('werkstatt_einstellungen').upsert(
-    { schluessel: 'teile_updates_ausstehend', wert: JSON.stringify(restUpdates) },
-    { onConflict: 'schluessel' }
+  await supabase.from('betrieb_einstellungen').upsert(
+    { betrieb_id: betriebId, schluessel: 'teile_updates_ausstehend', wert: JSON.stringify(restUpdates) },
+    { onConflict: 'betrieb_id,schluessel' }
   )
 
   return NextResponse.json({ erfolg: true, aktion, restlich: restUpdates.length })

@@ -136,300 +136,316 @@ Regeln:
   return JSON.parse(cleaned) as EmailAnalyse
 }
 
+// Laedt die Betrieb-gescopten E-Mail-Sync-Einstellungen (betrieb_einstellungen
+// ersetzt die alte globale werkstatt_einstellungen-Tabelle, die JEDEM
+// eingeloggten Nutzer Zugriff auf alle Betriebe gab).
+async function ladeSyncConfig(supabase: any, betriebId: string): Promise<Record<string, string>> {
+  const { data: rows } = await supabase.from('betrieb_einstellungen').select('schluessel, wert').eq('betrieb_id', betriebId)
+  const cfg: Record<string, string> = {}
+  for (const r of rows ?? []) if (r.wert) cfg[r.schluessel] = r.wert
+  return cfg
+}
+
+async function syncBetrieb(supabase: any, betriebId: string, cfg: Record<string, string>) {
+  const { graph_client_id, graph_tenant_id, graph_client_secret, graph_refresh_token } = cfg
+  const apiKey = cfg.anthropic_api_key || process.env.ANTHROPIC_API_KEY
+  const anthropic = apiKey ? new Anthropic({ apiKey }) : null
+
+  const { accessToken, refreshToken: newRefresh } = await refreshAccessToken(
+    graph_refresh_token, graph_client_id, graph_tenant_id, graph_client_secret,
+  )
+  if (newRefresh !== graph_refresh_token) {
+    await supabase.from('betrieb_einstellungen')
+      .upsert({ betrieb_id: betriebId, schluessel: 'graph_refresh_token', wert: newRefresh }, { onConflict: 'betrieb_id,schluessel' })
+  }
+
+  const messages = await fetchUnreadMessages(accessToken, 50)
+
+  let neuErstellt = 0
+  let statusAktualisiert = 0
+  let rechnungenImportiert = 0
+  let duplikate = 0
+  const fehler: string[] = []
+  const verarbeitet: string[] = []
+
+  // Nur relevante E-Mails verarbeiten (Anhang ODER Rechnungs-Keywords im Betreff)
+  const rechnungsKeywords = /rechnung|invoice|zahlungsavis|bestellung|liefersch|order|faktura/i
+  const relevanteMessages = messages.filter(msg =>
+    msg.hasAttachments || rechnungsKeywords.test(msg.subject ?? '')
+  )
+
+  for (const msg of relevanteMessages) {
+    try {
+      let anhaenge: { name: string; contentType: string; contentBytes: string }[] = []
+      if (msg.hasAttachments) {
+        try {
+          anhaenge = await fetchAttachments(accessToken, msg.id)
+        } catch (e: any) {
+          fehler.push(`Anhang-Fehler "${msg.subject?.slice(0, 30)}": ${e.message}`)
+        }
+      }
+      let analyse: EmailAnalyse | null = null
+
+      if (anthropic) {
+        try {
+          analyse = await analysiereEmailMitClaude(anthropic, msg, anhaenge)
+        } catch (e: any) {
+          fehler.push(`Claude-Fehler "${msg.subject?.slice(0, 30)}": ${e.message}`)
+        }
+      } else {
+        fehler.push(`Kein Claude API-Key — bitte unter Einstellungen eintragen`)
+      }
+
+      // Fallback auf Regex wenn Claude nicht verfuegbar
+      if (!analyse) {
+        const inhalt = msg.body.contentType === 'html'
+          ? msg.body.content.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+          : msg.body.content
+        const { parseEmail, istRechnungsEmail, parseRechnung } = await import('@/lib/email-parser')
+        const parsed = parseEmail({ absender: msg.from.emailAddress.address, betreff: msg.subject ?? '', inhalt })
+        const istRechnung = istRechnungsEmail(msg.subject ?? '', inhalt) || msg.hasAttachments
+        analyse = {
+          typ: istRechnung ? 'rechnung' : 'lieferstatus',
+          lieferant: parsed.lieferant !== 'Unbekannt' ? parsed.lieferant : (msg.from.emailAddress.name || msg.from.emailAddress.address),
+          status: parsed.status,
+          auftragsnummer: parsed.auftragsnummer,
+          kennzeichen: parsed.kennzeichen,
+          teile: parsed.teile,
+          rechnung: istRechnung ? (() => { const r = parseRechnung({ absender: msg.from.emailAddress.address, betreff: msg.subject ?? '', inhalt }); return { rechnungsnummer: r.rechnungsnummer, datum: r.datum, faellig_am: r.faelligAm, gesamt: r.gesamt } })() : null,
+        }
+      }
+
+      if (!analyse) {
+        await markMessageAsRead(accessToken, msg.id)
+        continue
+      }
+
+      // Wenn PDF-Anhang vorhanden, immer als Rechnung behandeln
+      if (anhaenge.length > 0 && analyse.typ !== 'rechnung') {
+        analyse.typ = 'rechnung'
+        if (!analyse.rechnung) analyse.rechnung = { rechnungsnummer: null, datum: null, faellig_am: null, gesamt: null }
+      }
+
+      // ── Rechnung importieren ────────────────────────────────────────
+      if (analyse.typ === 'rechnung') {
+        const r = analyse.rechnung
+
+        // Duplikat-Check: gleiche Rechnungsnummer ODER gleicher Absender + gleiches Datum
+        if (r?.rechnungsnummer) {
+          const { data: exist } = await supabase.from('rechnungen')
+            .select('id').eq('betrieb_id', betriebId).eq('rechnungsnummer', r.rechnungsnummer).maybeSingle()
+          if (exist) {
+            duplikate++
+            await markMessageAsRead(accessToken, msg.id)
+            continue
+          }
+        } else {
+          // Kein Rechnungsnummer: check Absender + Datum
+          const absenderEmail = msg.from.emailAddress.address
+          const datum = r?.datum ?? new Date().toISOString().split('T')[0]
+          const { data: exist } = await supabase.from('rechnungen')
+            .select('id').eq('betrieb_id', betriebId).eq('absender_email', absenderEmail).eq('datum', datum).maybeSingle()
+          if (exist) {
+            duplikate++
+            await markMessageAsRead(accessToken, msg.id)
+            continue
+          }
+        }
+
+        const { data: neu } = await supabase.from('rechnungen').insert({
+          betrieb_id: betriebId,
+          lieferant: analyse.lieferant,
+          rechnungsnummer: r?.rechnungsnummer ?? null,
+          datum: r?.datum ?? null,
+          faellig_am: r?.faellig_am ?? null,
+          gesamt: r?.gesamt ?? null,
+          absender_email: msg.from.emailAddress.address,
+          bezahlt: false,
+        }).select('id').maybeSingle()
+
+        if (neu && analyse.teile.length > 0) {
+          await supabase.from('rechnung_positionen').insert(
+            analyse.teile.map(t => ({
+              rechnung_id: neu.id,
+              bezeichnung: t.bezeichnung,
+              teilenummer: t.teilenummer ?? null,
+              menge: t.menge ?? 1,
+              einzelpreis: t.einzelpreis ?? null,
+              gesamtpreis: t.einzelpreis && t.menge ? Math.round(t.einzelpreis * t.menge * 100) / 100 : null,
+            }))
+          )
+        }
+
+        rechnungenImportiert++
+        verarbeitet.push(`Rechnung: ${analyse.lieferant}${r?.rechnungsnummer ? ` (${r.rechnungsnummer})` : ''} — ${analyse.teile.length} Positionen, ${anhaenge.length} Anhänge gelesen`)
+        await markMessageAsRead(accessToken, msg.id)
+        continue
+      }
+
+      // ── Lieferstatus / Teile-Updates ────────────────────────────────
+      if (analyse.status === 'unbekannt' && analyse.typ === 'sonstiges') {
+        await markMessageAsRead(accessToken, msg.id)
+        continue
+      }
+
+      let auftragId: string | null = null
+      if (analyse.auftragsnummer) {
+        const { data: a } = await supabase.from('auftraege').select('id')
+          .eq('betrieb_id', betriebId).ilike('auftrag_nr', `%${analyse.auftragsnummer}%`).maybeSingle()
+        if (a) auftragId = a.id
+      }
+      if (!auftragId && analyse.kennzeichen) {
+        const { data: fz } = await supabase.from('fahrzeuge').select('id')
+          .eq('betrieb_id', betriebId).ilike('kennzeichen', `%${analyse.kennzeichen}%`).maybeSingle()
+        if (fz) {
+          const { data: a } = await supabase.from('auftraege').select('id')
+            .eq('betrieb_id', betriebId)
+            .eq('fahrzeug_id', fz.id)
+            .not('status', 'in', '(fertig,ausgeliefert,storniert)')
+            .order('erstellt_am', { ascending: false }).limit(1).maybeSingle()
+          if (a) auftragId = a.id
+        }
+      }
+
+      const inhaltKurz = msg.body.contentType === 'html'
+        ? msg.body.content.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 3000)
+        : msg.body.content.slice(0, 3000)
+
+      const { data: protokoll } = await supabase.from('email_protokoll').insert({
+        betrieb_id: betriebId,
+        auftrag_id: auftragId,
+        absender: msg.from.emailAddress.address,
+        betreff: msg.subject,
+        inhalt: inhaltKurz,
+        empfangen_am: msg.receivedDateTime,
+        erkannter_status: analyse.status,
+        verarbeitet: false,
+      }).select('id').maybeSingle()
+
+      if (analyse.teile.length > 0 && analyse.status !== 'unbekannt') {
+        // Vorhandene Teile im Auftrag suchen (für Zuordnung im Bestätigungsdialog)
+        const teileMitZuordnung = await Promise.all(analyse.teile
+          .filter(t => t.bezeichnung && t.bezeichnung !== 'Siehe E-Mail')
+          .map(async teil => {
+            let vorhandenId: string | null = null
+            if (auftragId) {
+              let q = supabase.from('ersatzteile').select('id, status').eq('betrieb_id', betriebId).eq('auftrag_id', auftragId)
+              if (teil.teilenummer) {
+                q = q.or(`teilenummer.eq.${teil.teilenummer},bezeichnung.ilike.%${teil.bezeichnung.slice(0, 20)}%`)
+              } else {
+                q = q.ilike('bezeichnung', `%${teil.bezeichnung.slice(0, 20)}%`)
+              }
+              const { data: vorh } = await q.limit(1).maybeSingle()
+              if (vorh) vorhandenId = vorh.id
+            }
+            return { ...teil, vorhanden_id: vorhandenId }
+          })
+        )
+
+        // Fahrzeugbezeichnung ermitteln
+        let fahrzeugLabel = ''
+        if (auftragId) {
+          const { data: fzData } = await supabase.from('auftraege')
+            .select('auftrag_nr, fahrzeug:fahrzeuge(marke, modell, kennzeichen)')
+            .eq('betrieb_id', betriebId)
+            .eq('id', auftragId).maybeSingle()
+          if (fzData) {
+            const fz = fzData.fahrzeug as any
+            fahrzeugLabel = fz ? `${fz.marke ?? ''} ${fz.modell ?? ''} (${fz.kennzeichen ?? ''})`.trim() : ''
+          }
+        }
+
+        // In Warteschlange speichern statt direkt aktualisieren
+        const { data: queueRow } = await supabase.from('betrieb_einstellungen')
+          .select('wert').eq('betrieb_id', betriebId).eq('schluessel', 'teile_updates_ausstehend').maybeSingle()
+        const queue: any[] = queueRow?.wert ? JSON.parse(queueRow.wert) : []
+        queue.push({
+          id: `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+          protokoll_id: protokoll?.id ?? null,
+          absender: msg.from.emailAddress.address,
+          betreff: msg.subject,
+          lieferant: analyse.lieferant,
+          auftrag_id: auftragId,
+          fahrzeug_label: fahrzeugLabel,
+          neuer_status: analyse.status,
+          teile: teileMitZuordnung,
+          erstellt_am: new Date().toISOString(),
+        })
+        await supabase.from('betrieb_einstellungen').upsert(
+          { betrieb_id: betriebId, schluessel: 'teile_updates_ausstehend', wert: JSON.stringify(queue) },
+          { onConflict: 'betrieb_id,schluessel' }
+        )
+
+        neuErstellt++
+        verarbeitet.push(`Ausstehend: ${analyse.lieferant} — ${teileMitZuordnung.length} Teile (${analyse.status})`)
+      }
+
+      await markMessageAsRead(accessToken, msg.id)
+    } catch (e: any) {
+      fehler.push(`"${msg.subject}": ${e.message}`)
+    }
+  }
+
+  await supabase.from('betrieb_einstellungen').upsert(
+    { betrieb_id: betriebId, schluessel: 'letzter_email_sync', wert: new Date().toISOString() },
+    { onConflict: 'betrieb_id,schluessel' }
+  )
+
+  return { emailsGeprueft: messages.length, neuErstellt, statusAktualisiert, rechnungenImportiert, duplikate, verarbeitet, fehler }
+}
+
 export async function POST(req: Request) {
   // Interner Cron-Aufruf oder eingeloggter User
   const cronToken = req.headers.get('x-cron-internal')
   const isCron = cronToken && cronToken === (process.env.CRON_SECRET ?? 'cron')
 
-  let supabase: any
-  let betriebId: string | null = null
   if (isCron) {
+    // Cron kennt keinen eingeloggten Nutzer/Betrieb: alle Betriebe mit aktivem
+    // E-Mail-Sync durchlaufen statt (wie zuvor) eine einzelne Test-Werkstatt
+    // hart zu verdrahten.
     const { createAdminClient } = await import('@/lib/supabase/admin')
-    supabase = createAdminClient()
-    const { data: defaultBetrieb } = await supabase.from('betriebe').select('id').eq('name', 'Standardwerkstatt').single()
-    betriebId = defaultBetrieb?.id || null
-  } else {
-    supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: 'Nicht angemeldet' }, { status: 401 })
+    const supabase = createAdminClient()
+    const { data: betriebe } = await supabase.from('betriebe').select('id')
 
-    const { data: userBetrieb } = await supabase
-      .from('betrieb_users')
-      .select('betrieb_id')
-      .eq('profile_id', user.id)
-      .single()
-    if (!userBetrieb?.betrieb_id) {
-      return NextResponse.json({ error: 'Kein Betrieb zugeordnet' }, { status: 403 })
+    const ergebnisse: any[] = []
+    for (const b of betriebe ?? []) {
+      const cfg = await ladeSyncConfig(supabase, b.id)
+      if (cfg.email_sync_aktiv !== 'true' || !cfg.graph_refresh_token) continue
+      try {
+        const result = await syncBetrieb(supabase, b.id, cfg)
+        ergebnisse.push({ betrieb_id: b.id, erfolg: true, ...result })
+      } catch (e: any) {
+        ergebnisse.push({ betrieb_id: b.id, erfolg: false, error: e.message })
+      }
     }
-    betriebId = userBetrieb.betrieb_id
+    return NextResponse.json({ erfolg: true, betriebe: ergebnisse })
   }
 
-  const { data: rows } = await supabase.from('werkstatt_einstellungen').select('schluessel, wert')
-  const cfg: Record<string, string> = {}
-  for (const r of rows ?? []) if (r.wert) cfg[r.schluessel] = r.wert
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Nicht angemeldet' }, { status: 401 })
 
-  const { graph_client_id, graph_tenant_id, graph_client_secret, graph_refresh_token } = cfg
-  if (!graph_refresh_token) {
+  const { data: userBetrieb } = await supabase
+    .from('betrieb_users')
+    .select('betrieb_id')
+    .eq('profile_id', user.id)
+    .single()
+  if (!userBetrieb?.betrieb_id) {
+    return NextResponse.json({ error: 'Kein Betrieb zugeordnet' }, { status: 403 })
+  }
+  const betriebId = userBetrieb.betrieb_id
+
+  const cfg = await ladeSyncConfig(supabase, betriebId)
+  if (!cfg.graph_refresh_token) {
     return NextResponse.json(
       { error: 'Microsoft-Konto nicht verbunden. Bitte unter Einstellungen verbinden.' },
       { status: 400 },
     )
   }
 
-  const apiKey = cfg.anthropic_api_key || process.env.ANTHROPIC_API_KEY
-  const anthropic = apiKey ? new Anthropic({ apiKey }) : null
-
   try {
-    const { accessToken, refreshToken: newRefresh } = await refreshAccessToken(
-      graph_refresh_token, graph_client_id, graph_tenant_id, graph_client_secret,
-    )
-    if (newRefresh !== graph_refresh_token) {
-      await supabase.from('werkstatt_einstellungen')
-        .upsert({ schluessel: 'graph_refresh_token', wert: newRefresh }, { onConflict: 'schluessel' })
-    }
-
-    const messages = await fetchUnreadMessages(accessToken, 50)
-
-    let neuErstellt = 0
-    let statusAktualisiert = 0
-    let rechnungenImportiert = 0
-    let duplikate = 0
-    const fehler: string[] = []
-    const verarbeitet: string[] = []
-
-    // Nur relevante E-Mails verarbeiten (Anhang ODER Rechnungs-Keywords im Betreff)
-    const rechnungsKeywords = /rechnung|invoice|zahlungsavis|bestellung|liefersch|order|faktura/i
-    const relevanteMessages = messages.filter(msg =>
-      msg.hasAttachments || rechnungsKeywords.test(msg.subject ?? '')
-    )
-
-    for (const msg of relevanteMessages) {
-      try {
-        let anhaenge: { name: string; contentType: string; contentBytes: string }[] = []
-        if (msg.hasAttachments) {
-          try {
-            anhaenge = await fetchAttachments(accessToken, msg.id)
-          } catch (e: any) {
-            fehler.push(`Anhang-Fehler "${msg.subject?.slice(0, 30)}": ${e.message}`)
-          }
-        }
-        let analyse: EmailAnalyse | null = null
-
-        if (anthropic) {
-          try {
-            analyse = await analysiereEmailMitClaude(anthropic, msg, anhaenge)
-          } catch (e: any) {
-            fehler.push(`Claude-Fehler "${msg.subject?.slice(0, 30)}": ${e.message}`)
-          }
-        } else {
-          fehler.push(`Kein Claude API-Key — bitte unter Einstellungen eintragen`)
-        }
-
-        // Fallback auf Regex wenn Claude nicht verfuegbar
-        if (!analyse) {
-          const inhalt = msg.body.contentType === 'html'
-            ? msg.body.content.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
-            : msg.body.content
-          const { parseEmail, istRechnungsEmail, parseRechnung } = await import('@/lib/email-parser')
-          const parsed = parseEmail({ absender: msg.from.emailAddress.address, betreff: msg.subject ?? '', inhalt })
-          const istRechnung = istRechnungsEmail(msg.subject ?? '', inhalt) || msg.hasAttachments
-          analyse = {
-            typ: istRechnung ? 'rechnung' : 'lieferstatus',
-            lieferant: parsed.lieferant !== 'Unbekannt' ? parsed.lieferant : (msg.from.emailAddress.name || msg.from.emailAddress.address),
-            status: parsed.status,
-            auftragsnummer: parsed.auftragsnummer,
-            kennzeichen: parsed.kennzeichen,
-            teile: parsed.teile,
-            rechnung: istRechnung ? (() => { const r = parseRechnung({ absender: msg.from.emailAddress.address, betreff: msg.subject ?? '', inhalt }); return { rechnungsnummer: r.rechnungsnummer, datum: r.datum, faellig_am: r.faelligAm, gesamt: r.gesamt } })() : null,
-          }
-        }
-
-        if (!analyse) {
-          await markMessageAsRead(accessToken, msg.id)
-          continue
-        }
-
-        // Wenn PDF-Anhang vorhanden, immer als Rechnung behandeln
-        if (anhaenge.length > 0 && analyse.typ !== 'rechnung') {
-          analyse.typ = 'rechnung'
-          if (!analyse.rechnung) analyse.rechnung = { rechnungsnummer: null, datum: null, faellig_am: null, gesamt: null }
-        }
-
-        // ── Rechnung importieren ────────────────────────────────────────
-        if (analyse.typ === 'rechnung') {
-          const r = analyse.rechnung
-
-          // Duplikat-Check: gleiche Rechnungsnummer ODER gleicher Absender + gleiches Datum
-          if (r?.rechnungsnummer) {
-            const { data: exist } = await supabase.from('rechnungen')
-              .select('id').eq('betrieb_id', betriebId).eq('rechnungsnummer', r.rechnungsnummer).maybeSingle()
-            if (exist) {
-              duplikate++
-              await markMessageAsRead(accessToken, msg.id)
-              continue
-            }
-          } else {
-            // Kein Rechnungsnummer: check Absender + Datum
-            const absenderEmail = msg.from.emailAddress.address
-            const datum = r?.datum ?? new Date().toISOString().split('T')[0]
-            const { data: exist } = await supabase.from('rechnungen')
-              .select('id').eq('betrieb_id', betriebId).eq('absender_email', absenderEmail).eq('datum', datum).maybeSingle()
-            if (exist) {
-              duplikate++
-              await markMessageAsRead(accessToken, msg.id)
-              continue
-            }
-          }
-
-          const { data: neu } = await supabase.from('rechnungen').insert({
-            betrieb_id: betriebId,
-            lieferant: analyse.lieferant,
-            rechnungsnummer: r?.rechnungsnummer ?? null,
-            datum: r?.datum ?? null,
-            faellig_am: r?.faellig_am ?? null,
-            gesamt: r?.gesamt ?? null,
-            absender_email: msg.from.emailAddress.address,
-            bezahlt: false,
-          }).select('id').maybeSingle()
-
-          if (neu && analyse.teile.length > 0) {
-            await supabase.from('rechnung_positionen').insert(
-              analyse.teile.map(t => ({
-                rechnung_id: neu.id,
-                bezeichnung: t.bezeichnung,
-                teilenummer: t.teilenummer ?? null,
-                menge: t.menge ?? 1,
-                einzelpreis: t.einzelpreis ?? null,
-                gesamtpreis: t.einzelpreis && t.menge ? Math.round(t.einzelpreis * t.menge * 100) / 100 : null,
-              }))
-            )
-          }
-
-          rechnungenImportiert++
-          verarbeitet.push(`Rechnung: ${analyse.lieferant}${r?.rechnungsnummer ? ` (${r.rechnungsnummer})` : ''} — ${analyse.teile.length} Positionen, ${anhaenge.length} Anhänge gelesen`)
-          await markMessageAsRead(accessToken, msg.id)
-          continue
-        }
-
-        // ── Lieferstatus / Teile-Updates ────────────────────────────────
-        if (analyse.status === 'unbekannt' && analyse.typ === 'sonstiges') {
-          await markMessageAsRead(accessToken, msg.id)
-          continue
-        }
-
-        let auftragId: string | null = null
-        if (analyse.auftragsnummer) {
-          const { data: a } = await supabase.from('auftraege').select('id')
-            .eq('betrieb_id', betriebId).ilike('auftrag_nr', `%${analyse.auftragsnummer}%`).maybeSingle()
-          if (a) auftragId = a.id
-        }
-        if (!auftragId && analyse.kennzeichen) {
-          const { data: fz } = await supabase.from('fahrzeuge').select('id')
-            .eq('betrieb_id', betriebId).ilike('kennzeichen', `%${analyse.kennzeichen}%`).maybeSingle()
-          if (fz) {
-            const { data: a } = await supabase.from('auftraege').select('id')
-              .eq('betrieb_id', betriebId)
-              .eq('fahrzeug_id', fz.id)
-              .not('status', 'in', '(fertig,ausgeliefert,storniert)')
-              .order('erstellt_am', { ascending: false }).limit(1).maybeSingle()
-            if (a) auftragId = a.id
-          }
-        }
-
-        const inhaltKurz = msg.body.contentType === 'html'
-          ? msg.body.content.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 3000)
-          : msg.body.content.slice(0, 3000)
-
-        const { data: protokoll } = await supabase.from('email_protokoll').insert({
-          betrieb_id: betriebId,
-          auftrag_id: auftragId,
-          absender: msg.from.emailAddress.address,
-          betreff: msg.subject,
-          inhalt: inhaltKurz,
-          empfangen_am: msg.receivedDateTime,
-          erkannter_status: analyse.status,
-          verarbeitet: false,
-        }).select('id').maybeSingle()
-
-        if (analyse.teile.length > 0 && analyse.status !== 'unbekannt') {
-          // Vorhandene Teile im Auftrag suchen (für Zuordnung im Bestätigungsdialog)
-          const teileMitZuordnung = await Promise.all(analyse.teile
-            .filter(t => t.bezeichnung && t.bezeichnung !== 'Siehe E-Mail')
-            .map(async teil => {
-              let vorhandenId: string | null = null
-              if (auftragId) {
-                let q = supabase.from('ersatzteile').select('id, status').eq('betrieb_id', betriebId).eq('auftrag_id', auftragId)
-                if (teil.teilenummer) {
-                  q = q.or(`teilenummer.eq.${teil.teilenummer},bezeichnung.ilike.%${teil.bezeichnung.slice(0, 20)}%`)
-                } else {
-                  q = q.ilike('bezeichnung', `%${teil.bezeichnung.slice(0, 20)}%`)
-                }
-                const { data: vorh } = await q.limit(1).maybeSingle()
-                if (vorh) vorhandenId = vorh.id
-              }
-              return { ...teil, vorhanden_id: vorhandenId }
-            })
-          )
-
-          // Fahrzeugbezeichnung ermitteln
-          let fahrzeugLabel = ''
-          if (auftragId) {
-            const { data: fzData } = await supabase.from('auftraege')
-              .select('auftrag_nr, fahrzeug:fahrzeuge(marke, modell, kennzeichen)')
-              .eq('betrieb_id', betriebId)
-              .eq('id', auftragId).maybeSingle()
-            if (fzData) {
-              const fz = fzData.fahrzeug as any
-              fahrzeugLabel = fz ? `${fz.marke ?? ''} ${fz.modell ?? ''} (${fz.kennzeichen ?? ''})`.trim() : ''
-            }
-          }
-
-          // In Warteschlange speichern statt direkt aktualisieren
-          const { data: queueRow } = await supabase.from('werkstatt_einstellungen')
-            .select('wert').eq('schluessel', 'teile_updates_ausstehend').maybeSingle()
-          const queue: any[] = queueRow?.wert ? JSON.parse(queueRow.wert) : []
-          queue.push({
-            id: `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-            protokoll_id: protokoll?.id ?? null,
-            absender: msg.from.emailAddress.address,
-            betreff: msg.subject,
-            lieferant: analyse.lieferant,
-            auftrag_id: auftragId,
-            fahrzeug_label: fahrzeugLabel,
-            neuer_status: analyse.status,
-            teile: teileMitZuordnung,
-            erstellt_am: new Date().toISOString(),
-          })
-          await supabase.from('werkstatt_einstellungen').upsert(
-            { schluessel: 'teile_updates_ausstehend', wert: JSON.stringify(queue) },
-            { onConflict: 'schluessel' }
-          )
-
-          neuErstellt++
-          verarbeitet.push(`Ausstehend: ${analyse.lieferant} — ${teileMitZuordnung.length} Teile (${analyse.status})`)
-        }
-
-        await markMessageAsRead(accessToken, msg.id)
-      } catch (e: any) {
-        fehler.push(`"${msg.subject}": ${e.message}`)
-      }
-    }
-
-    await supabase.from('werkstatt_einstellungen').upsert(
-      { schluessel: 'letzter_email_sync', wert: new Date().toISOString() },
-      { onConflict: 'schluessel' }
-    )
-
-    return NextResponse.json({
-      erfolg: true,
-      emailsGeprueft: messages.length,
-      neuErstellt,
-      statusAktualisiert,
-      rechnungenImportiert,
-      duplikate,
-      verarbeitet,
-      fehler,
-    })
+    const result = await syncBetrieb(supabase, betriebId, cfg)
+    return NextResponse.json({ erfolg: true, ...result })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }

@@ -17,6 +17,7 @@ export async function GET(req: NextRequest) {
   const code = searchParams.get('code')
   const error = searchParams.get('error')
   const errorDesc = searchParams.get('error_description')
+  const betriebId = searchParams.get('state')
 
   if (error || !code) {
     const msg = errorDesc ?? error ?? 'kein_code'
@@ -25,10 +26,20 @@ export async function GET(req: NextRequest) {
 
   const supabase = adminClient()
 
-  // Client-Credentials aus DB lesen
+  if (!betriebId) {
+    return NextResponse.redirect(new URL('/einstellungen?error=fehlender_betrieb_kontext', APP_URL))
+  }
+  const { data: betrieb } = await supabase.from('betriebe').select('id').eq('id', betriebId).maybeSingle()
+  if (!betrieb) {
+    return NextResponse.redirect(new URL('/einstellungen?error=ungueltiger_betrieb_kontext', APP_URL))
+  }
+
+  // Client-Credentials aus DB lesen (betrieb-gescopt: werkstatt_einstellungen
+  // war global und erlaubte jedem eingeloggten Nutzer Zugriff auf jeden Betrieb)
   const { data: rows } = await supabase
-    .from('werkstatt_einstellungen')
+    .from('betrieb_einstellungen')
     .select('schluessel, wert')
+    .eq('betrieb_id', betriebId)
     .in('schluessel', ['graph_client_id', 'graph_tenant_id', 'graph_client_secret'])
 
   const cfg: Record<string, string> = {}
@@ -56,11 +67,11 @@ export async function GET(req: NextRequest) {
     const email = me.mail ?? me.userPrincipalName ?? ''
 
     // Tokens speichern — service role umgeht RLS
-    await supabase.from('werkstatt_einstellungen').upsert([
-      { schluessel: 'graph_refresh_token', wert: refreshToken },
-      { schluessel: 'graph_email',         wert: email },
-      { schluessel: 'graph_access_token',  wert: accessToken },
-    ], { onConflict: 'schluessel' })
+    await supabase.from('betrieb_einstellungen').upsert([
+      { betrieb_id: betriebId, schluessel: 'graph_refresh_token', wert: refreshToken },
+      { betrieb_id: betriebId, schluessel: 'graph_email',         wert: email },
+      { betrieb_id: betriebId, schluessel: 'graph_access_token',  wert: accessToken },
+    ], { onConflict: 'betrieb_id,schluessel' })
 
     return NextResponse.redirect(new URL('/einstellungen?success=graph_verbunden', APP_URL))
   } catch (e: any) {

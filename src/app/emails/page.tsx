@@ -25,15 +25,16 @@ export default async function EmailsPage() {
     .limit(100)
 
   const { data: configRows } = await supabase
-    .from('werkstatt_einstellungen')
+    .from('betrieb_einstellungen')
     .select('schluessel, wert')
+    .eq('betrieb_id', betriebId)
 
   const cfg: Record<string, string> = {}
   for (const row of configRows ?? []) {
     if (row.wert) cfg[row.schluessel] = row.wert
   }
 
-  const istKonfiguriert = !!(cfg.ms_tenant_id && cfg.ms_client_id && cfg.ms_client_secret)
+  const istKonfiguriert = !!cfg.graph_refresh_token
   const teileUpdatesAusstehend = cfg.teile_updates_ausstehend
     ? JSON.parse(cfg.teile_updates_ausstehend)
     : []

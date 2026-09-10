@@ -19,8 +19,9 @@ export async function POST(req: NextRequest) {
 
   // API Key aus DB lesen, Fallback auf .env.local
   const { data: keyRow } = await supabase
-    .from('werkstatt_einstellungen')
+    .from('betrieb_einstellungen')
     .select('wert')
+    .eq('betrieb_id', betriebId)
     .eq('schluessel', 'anthropic_api_key')
     .maybeSingle()
   const apiKey = keyRow?.wert || process.env.ANTHROPIC_API_KEY

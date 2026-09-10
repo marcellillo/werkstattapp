@@ -31,7 +31,7 @@ export default async function VerkauftPage() {
   )
 
   const { data: steuerCfg } = await supabase
-    .from('werkstatt_einstellungen').select('wert').eq('schluessel', 'fahrzeug_steuerart_standard').maybeSingle()
+    .from('betrieb_einstellungen').select('wert').eq('betrieb_id', betriebId).eq('schluessel', 'fahrzeug_steuerart_standard').maybeSingle()
   const standardSteuerart = (steuerCfg?.wert as 'differenz' | 'regel' | 'ausfuhr') ?? 'differenz'
 
   return (
