@@ -11,20 +11,24 @@ export default async function MappePage({ params }: { params: Promise<{ id: stri
 
   const betriebId = await getBetriebIdForUser(supabase, user.id)
 
-  const [{ data: auftrag }, { data: fotos }, { data: rechnung }, { data: configRows }, { data: dokumente }] = await Promise.all([
-    supabase
-      .from('auftraege')
-      .select('*, fahrzeug:fahrzeuge(*), kunde:kunden(*), ersatzteile(*)')
-      .eq('betrieb_id', betriebId)
-      .eq('id', id)
-      .single(),
+  const { data: auftrag } = await supabase
+    .from('auftraege')
+    .select('*, fahrzeug:fahrzeuge(*), kunde:kunden(*), ersatzteile(*)')
+    .eq('betrieb_id', betriebId)
+    .eq('id', id)
+    .single()
+
+  if (!auftrag) notFound()
+
+  const [{ data: fotos }, { data: rechnung }, { data: configRows }, { data: dokumente }, { data: lieferantenRechnungen }] = await Promise.all([
     supabase.from('auftrag_fotos').select('*').eq('auftrag_id', id).order('erstellt_am'),
     supabase.from('kunden_rechnungen').select('*').eq('auftrag_id', id).maybeSingle(),
     supabase.from('werkstatt_einstellungen').select('schluessel, wert'),
     supabase.from('lieferschein_uploads').select('*').eq('auftrag_id', id).order('erstellt_am'),
+    auftrag.fahrzeug_id
+      ? supabase.from('supplier_invoices').select('*').eq('fahrzeug_id', auftrag.fahrzeug_id).order('erstellt_am')
+      : Promise.resolve({ data: [] as any[] }),
   ])
-
-  if (!auftrag) notFound()
 
   const cfg: Record<string, string> = {}
   for (const row of configRows ?? []) if (row.wert) cfg[row.schluessel] = row.wert
@@ -36,6 +40,7 @@ export default async function MappePage({ params }: { params: Promise<{ id: stri
       rechnung={rechnung as any}
       firma={cfg}
       dokumente={(dokumente ?? []) as any[]}
+      lieferantenRechnungen={(lieferantenRechnungen ?? []) as any[]}
     />
   )
 }
