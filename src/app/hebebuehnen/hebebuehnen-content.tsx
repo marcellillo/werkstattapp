@@ -262,14 +262,14 @@ export function HebebuehnenContent({
     if (!editName.trim()) return
     setBuehnen(prev => prev.map(b => b.id === id ? { ...b, bezeichnung: editName, beschreibung: editBeschreibung } : b))
     setEditId(null)
-    startTransition(() => { updateBuehne(id, editName, editBeschreibung) })
+    startTransition(() => { updateBuehne(id, betriebId, editName, editBeschreibung) })
   }
 
   async function handleDelete(id: string) {
     if (!confirm('Hebebühne wirklich löschen?')) return
     setBuehnen(prev => prev.filter(b => b.id !== id))
     updateUI({ order: ui.order.filter(x => x !== id), locked: ui.locked.filter(x => x !== id) })
-    startTransition(() => { deleteBuehne(id) })
+    startTransition(() => { deleteBuehne(id, betriebId) })
   }
 
   function handleToggleLock(id: string) {

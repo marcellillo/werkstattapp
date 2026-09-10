@@ -7,6 +7,16 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Nicht angemeldet' }, { status: 401 })
 
+  const { data: userBetrieb } = await supabase
+    .from('betrieb_users')
+    .select('betrieb_id')
+    .eq('profile_id', user.id)
+    .order('is_primary', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  const betriebId = userBetrieb?.betrieb_id
+  if (!betriebId) return NextResponse.json({ error: 'Kein Betrieb zugeordnet' }, { status: 403 })
+
   // API Key aus DB lesen, Fallback auf .env.local
   const { data: keyRow } = await supabase
     .from('werkstatt_einstellungen')
@@ -89,7 +99,7 @@ Wichtig:
   // Dedup-Check vor dem Speichern
   if (extrakt.rechnungsnummer) {
     const { data: exist } = await supabase.from('rechnungen')
-      .select('id').eq('rechnungsnummer', extrakt.rechnungsnummer).maybeSingle()
+      .select('id').eq('betrieb_id', betriebId).eq('rechnungsnummer', extrakt.rechnungsnummer).maybeSingle()
     if (exist) return NextResponse.json({ erfolg: true, rechnungId: exist.id, extrakt, duplikat: true })
   }
 
@@ -97,6 +107,7 @@ Wichtig:
   const { data: rechnung, error: rErr } = await supabase
     .from('rechnungen')
     .insert({
+      betrieb_id: betriebId,
       lieferant: extrakt.lieferant,
       rechnungsnummer: extrakt.rechnungsnummer,
       datum: extrakt.datum,
