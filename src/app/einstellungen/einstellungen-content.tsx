@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { createClient } from '@/lib/supabase/client'
 import { useRollen } from '@/lib/rollen-context'
+import { PushSettings } from '@/components/push-settings'
 
 interface Config {
   imap_email: string
@@ -524,6 +525,19 @@ export function EinstellungenContent({ initialConfig, betriebName, betriebId }: 
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 {saved ? 'Gespeichert!' : 'Speichern'}
               </button>
+            </CardContent>
+          </Card>
+
+          {/* Benachrichtigungen */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2">
+                <Bell className="w-5 h-5 text-orange-500" /> Benachrichtigungen
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-slate-600 mb-4">Push-Benachrichtigungen für dieses Gerät — z.B. bei neuen Online-Buchungen.</p>
+              <PushSettings />
             </CardContent>
           </Card>
         </div>

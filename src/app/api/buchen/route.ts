@@ -205,7 +205,13 @@ export async function POST(req: NextRequest) {
       process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
       process.env.VAPID_PRIVATE_KEY!,
     )
-    const { data: subs } = await supabase.from('push_subscriptions').select('*')
+    // Nur Mitarbeiter des Ziel-Betriebs benachrichtigen, nicht alle abonnierten
+    // Geraete app-weit (push_subscriptions ist pro user_id, nicht pro Betrieb).
+    const { data: betriebMitarbeiter } = await supabase.from('betrieb_users').select('profile_id').eq('betrieb_id', defaultBetriebId)
+    const mitarbeiterIds = (betriebMitarbeiter ?? []).map(m => m.profile_id)
+    const { data: subs } = mitarbeiterIds.length
+      ? await supabase.from('push_subscriptions').select('*').in('user_id', mitarbeiterIds)
+      : { data: [] as any[] }
     if (subs?.length) {
       const datumFormatted = new Date(datum + 'T00:00:00').toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
       const payload = JSON.stringify({
