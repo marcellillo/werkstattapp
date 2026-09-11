@@ -99,7 +99,7 @@ export async function POST(req: Request) {
       kilometerstand: km,
       farbe,
       motortyp: kraftstoff,
-      hubraum: ad.cubicCapacity ? String(ad.cubicCapacity) : null,
+      hubraum: (ad.cubicCapacity ?? ad.cubiccapacity ?? ad.hubraum) ? String(ad.cubicCapacity ?? ad.cubiccapacity ?? ad.hubraum) : null,
       leistung_kw: ad.power || null,
       verkaufspreis: preis,
       bilder_urls: bilder.length > 0 ? JSON.stringify(bilder) : null,
