@@ -5,7 +5,6 @@ import { Upload, Loader2, CheckCircle2, AlertCircle, FileText } from 'lucide-rea
 
 export default function BestandPage() {
   const [uploading, setUploading] = useState(false)
-  const [importingImages, setImportingImages] = useState(false)
   const [success, setSuccess] = useState('')
   const [error, setError] = useState('')
   const [stats, setStats] = useState<{
@@ -15,42 +14,7 @@ export default function BestandPage() {
     uebersprungenGruende?: string[]
     fehler?: string[]
   } | null>(null)
-  const [imageStats, setImageStats] = useState<{
-    updated: number
-  } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-
-  async function handleImportImages() {
-    setImportingImages(true)
-    setError('')
-
-    try {
-      console.log('[Bestand] Starting image import...')
-      const response = await fetch('/api/mobile-import-images', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
-      })
-
-      console.log('[Bestand] Response status:', response.status)
-      const result = await response.json()
-      console.log('[Bestand] Response data:', result)
-
-      if (!response.ok) {
-        const errorMsg = result.error || result.message || 'Bild-Import fehlgeschlagen'
-        throw new Error(errorMsg)
-      }
-
-      setImageStats({ updated: result.updated || 0 })
-      setSuccess(`✅ Import abgeschlossen! ${stats?.importiert || 0} Fahrzeuge + ${result.updated || 0} mit Bildern`)
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Bild-Import fehlgeschlagen'
-      console.error('[Bestand] Error:', errorMsg)
-      setError(errorMsg)
-    } finally {
-      setImportingImages(false)
-    }
-  }
 
   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -153,14 +117,7 @@ export default function BestandPage() {
         fehler: result.fehler || [],
       })
 
-      setSuccess(`✅ Import erfolgreich! ${result.importiert} neue, ${result.aktualisiert} aktualisiert`)
-
-      // Auto-import Bilder nach erfolgreichem CSV-Import (neu ODER aktualisiert)
-      if (result.importiert > 0 || result.aktualisiert > 0) {
-        setTimeout(() => {
-          handleImportImages()
-        }, 500)
-      }
+      setSuccess(`✅ Import erfolgreich! ${result.importiert} neue, ${result.aktualisiert} aktualisiert — Bilder sind direkt aus der CSV übernommen`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Upload fehlgeschlagen')
     } finally {
@@ -221,16 +178,12 @@ export default function BestandPage() {
           </div>
         )}
 
-        {(success || importingImages) && (
+        {success && (
           <div className="mt-6 bg-green-50 border border-green-200 rounded-lg p-4 flex items-start gap-3">
-            {importingImages ? (
-              <Loader2 className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5 animate-spin" />
-            ) : (
-              <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
-            )}
+            <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
             <div className="flex-1">
               <p className="font-semibold text-green-900">
-                {importingImages ? '⏳ Bilder werden importiert...' : success}
+                {success}
               </p>
               {stats && (
                 <div className="mt-2 text-sm text-green-800 space-y-1">
@@ -248,20 +201,6 @@ export default function BestandPage() {
                   )}
                 </div>
               ) : null}
-              {imageStats && (
-                <div className="mt-2 text-sm text-green-800">
-                  <p>🖼️ Bilder übernommen: <strong>{imageStats.updated}</strong> Fahrzeuge</p>
-                </div>
-              )}
-              {stats && stats.importiert > 0 && !importingImages && !imageStats && (
-                <button
-                  onClick={handleImportImages}
-                  disabled={importingImages}
-                  className="mt-3 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
-                >
-                  🖼️ Fahrzeug-Bilder importieren
-                </button>
-              )}
             </div>
           </div>
         )}
@@ -278,23 +217,24 @@ export default function BestandPage() {
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
         <h3 className="font-semibold text-blue-900 mb-3">💡 So funktioniert's:</h3>
         <ol className="text-sm text-blue-800 space-y-2 list-decimal list-inside">
-          <li>Exporte deine Fahrzeuge aus Mobile.de als CSV</li>
+          <li>Exportiere deine Fahrzeuge aus Mobile.de als CSV</li>
           <li>Lade die CSV-Datei hier hoch</li>
-          <li>Neue Fahrzeuge werden automatisch importiert</li>
-          <li>Bestehende Fahrzeuge werden aktualisiert</li>
-          <li>Status-Updates laufen automatisch (später)</li>
+          <li>Neue Fahrzeuge werden automatisch importiert — inkl. Bilder</li>
+          <li>Bestehende Fahrzeuge (gleiche B-Nummer/FIN) werden aktualisiert</li>
         </ol>
       </div>
 
       {/* CSV Format Info */}
       <div className="bg-slate-50 border border-slate-200 rounded-lg p-6">
         <h3 className="font-semibold text-slate-900 mb-3">📋 CSV-Format:</h3>
-        <p className="text-sm text-slate-600 mb-3">Deine CSV sollte diese Spalten haben:</p>
+        <p className="text-sm text-slate-600 mb-3">
+          Der normale Mobile.de-Bestandsexport funktioniert direkt — u.a. diese Spalten werden erkannt:
+        </p>
         <code className="text-xs bg-slate-800 text-slate-100 p-3 rounded block overflow-x-auto">
-          internalNumber, marke, modell, vin, baujahr, farbe, kraftstoff, km, preis
+          Interne Nr., Marke, Modell, Modellbezeichnung, Erstzulassung, Kilometerstand, Leistung (kW), Hubraum (ccm), Kraftstoff, Aussenfarbe, Preis (EUR, brutto), FIN, Alle Bilder (URLs)
         </code>
         <p className="text-xs text-slate-500 mt-3">
-          ℹ️ internalNumber = B-Nummer von Mobile.de (Eindeutiges ID-Feld)
+          ℹ️ &quot;Interne Nr.&quot; = deine B-Nummer, dient als eindeutiges Erkennungsmerkmal für spätere Updates. Die Bilder kommen direkt aus der Spalte &quot;Alle Bilder (URLs)&quot; — kein separater Bild-Import nötig.
         </p>
       </div>
     </div>

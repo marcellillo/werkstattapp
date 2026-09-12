@@ -62,12 +62,17 @@ export async function POST(req: Request) {
   const uebersprungenGruende: string[] = []
 
   for (const [index, ad] of ads.entries()) {
-    // Flexible Spalten-Namen für B-Nummer (case-insensitive für CSV-Parser)
-    const bNummer: string | null = ad.internalnumber || ad.internalNumber || ad['b-nummer'] || ad['B-Nummer'] || ad.id || null
-    const vin: string | null = ad.vin || ad['vin'] || null
+    // Flexible Spalten-Namen (case-insensitive) — deckt sowohl den alten
+    // JSON-Export als auch den ECHTEN Mobile.de-CSV-Export mit deutschen
+    // Spaltennamen ab ("Interne Nr.", "FIN", "Erstzulassung", "Kilometerstand",
+    // "Leistung (kW)", "Hubraum (ccm)", "Preis (EUR, brutto)", "Aussenfarbe",
+    // "Kraftstoff", "Modellbezeichnung", "Alle Bilder (URLs)"). Die alten Keys
+    // bleiben als Fallback erhalten, falls mal ein anderes Format reinkommt.
+    const bNummer: string | null = ad.internalnumber || ad.internalNumber || ad['b-nummer'] || ad['B-Nummer'] || ad['interne nr.'] || ad.id || null
+    const vin: string | null = ad.vin || ad.fin || ad['fin'] || null
     const make = (ad.make || ad.marke || '').replace(/-/g, ' ')
     const makeCap = make ? make.charAt(0) + make.slice(1).toLowerCase() : ''
-    const model = ad.modeldescription || ad.modelDescription || ad.model || ad.modell || ''
+    const model = ad.modellbezeichnung || ad.modeldescription || ad.modelDescription || ad.model || ad.modell || ''
     if (!model || model === 'undefined') {
       uebersprungen++
       const spalten = Object.keys(ad).join(', ')
@@ -75,22 +80,34 @@ export async function POST(req: Request) {
       continue
     }
 
-    const baujahr = ad.firstregistration || ad.firstRegistration ? parseInt(String(ad.firstregistration || ad.firstRegistration).slice(0, 4)) : null
+    // Erstzulassung: JSON-Export liefert "YYYY-MM-DD…", die echte Mobile.de-CSV
+    // liefert "MM/YYYY" (z.B. "01/2021") — Jahr robust aus beiden Formaten holen
+    const erstzulassungRaw = ad.firstregistration || ad.firstRegistration || ad.erstzulassung || null
+    let baujahr: number | null = null
+    if (erstzulassungRaw) {
+      const s = String(erstzulassungRaw)
+      const jahr = s.includes('/') ? parseInt(s.slice(-4)) : parseInt(s.slice(0, 4))
+      baujahr = Number.isFinite(jahr) && jahr > 1900 ? jahr : null
+    }
     // Handle both JSON (price.consumerPriceGross object) and CSV (price string)
-    const priceValue = typeof ad.price === 'object' ? ad.price?.consumerPriceGross : ad.price
+    const priceValue = typeof ad.price === 'object' ? ad.price?.consumerPriceGross : (ad.price ?? ad['preis (eur, brutto)'])
     const preis = priceValue ? parseFloat(String(priceValue)) : null
     // Handle both JSON (array) and CSV (pipe-separated string) for images
     let bilder: string[] = []
-    if (typeof ad.images === 'string' && ad.images) {
-      bilder = ad.images.split('|').filter(Boolean)
-    } else if (Array.isArray(ad.images)) {
-      bilder = ad.images.map((img: any) => img.ref).filter(Boolean)
+    const imagesRaw = ad.images ?? ad['alle bilder (urls)'] ?? null
+    if (typeof imagesRaw === 'string' && imagesRaw) {
+      bilder = imagesRaw.split('|').map((s: string) => s.trim()).filter(Boolean)
+    } else if (Array.isArray(imagesRaw)) {
+      bilder = imagesRaw.map((img: any) => img.ref).filter(Boolean)
     }
-    const exteriorColor = ad.exteriorcolor || ad.exteriorColor
-    const fuel = ad.fuel
+    const exteriorColor = ad.exteriorcolor || ad.exteriorColor || ad.aussenfarbe
+    const fuel = ad.fuel || ad.kraftstoff
     const farbe = FARBE[exteriorColor] || exteriorColor || null
     const kraftstoff = KRAFTSTOFF[fuel] || fuel || null
-    const km = ad.mileage || null
+    const kmRaw = ad.mileage ?? ad.kilometerstand ?? null
+    const km = kmRaw ? parseInt(String(kmRaw), 10) : null
+    const leistungRaw = ad.power ?? ad['leistung (kw)'] ?? null
+    const hubraumRaw = ad.cubicCapacity ?? ad.cubiccapacity ?? ad.hubraum ?? ad['hubraum (ccm)'] ?? null
 
     const gemeinsam = {
       marke: makeCap,
@@ -99,8 +116,8 @@ export async function POST(req: Request) {
       kilometerstand: km,
       farbe,
       motortyp: kraftstoff,
-      hubraum: (ad.cubicCapacity ?? ad.cubiccapacity ?? ad.hubraum) ? String(ad.cubicCapacity ?? ad.cubiccapacity ?? ad.hubraum) : null,
-      leistung_kw: ad.power || null,
+      hubraum: hubraumRaw ? String(hubraumRaw) : null,
+      leistung_kw: leistungRaw ? parseInt(String(leistungRaw), 10) : null,
       verkaufspreis: preis,
       bilder_urls: bilder.length > 0 ? JSON.stringify(bilder) : null,
       notizen: preis ? `Verkaufspreis: ${preis.toLocaleString('de-DE', { minimumFractionDigits: 2 })} € (Brutto)` : null,
