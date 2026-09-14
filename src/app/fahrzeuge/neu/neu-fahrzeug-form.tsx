@@ -9,6 +9,33 @@ import { createClient } from '@/lib/supabase/client'
 import { useBetrieb } from '@/lib/betrieb-context'
 import type { Kunde, Hebebuehne } from '@/types/database'
 
+// Fotos direkt vom Handy sind oft 8-12 MB / >4000px breit. Das bläht sowohl den
+// Upload als auch den Claude-Vision-Request unnötig auf und macht den Scan langsam.
+// Für die Texterkennung reicht eine deutlich kleinere Version völlig aus.
+async function resizeForScan(file: File): Promise<Blob> {
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result as string)
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const el = new Image()
+    el.onload = () => resolve(el)
+    el.onerror = reject
+    el.src = dataUrl
+  })
+  const maxWidth = 1600
+  const scale = Math.min(1, maxWidth / img.width)
+  const canvas = document.createElement('canvas')
+  canvas.width = Math.round(img.width * scale)
+  canvas.height = Math.round(img.height * scale)
+  const ctx = canvas.getContext('2d')!
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.85))
+  return blob ?? file
+}
+
 interface MobileAd {
   mobileAdId: string
   internalNumber: string
@@ -236,8 +263,9 @@ export function NeuFahrzeugForm({ kunden, hebebuehnen }: Props) {
     setScanFehler('')
     setScanErfolg(false)
     try {
+      const resized = await resizeForScan(file)
       const fd = new FormData()
-      fd.append('bild', file)
+      fd.append('bild', resized, file.name.replace(/\.\w+$/, '.jpg'))
       const res = await fetch('/api/fahrzeugschein-scan', { method: 'POST', body: fd })
       const data = await res.json()
       if (!res.ok) { setScanFehler(data.error ?? 'Scan fehlgeschlagen'); return }
