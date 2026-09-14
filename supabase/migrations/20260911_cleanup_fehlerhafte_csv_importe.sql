@@ -17,12 +17,14 @@ DECLARE
   fahrzeug_ids UUID[];
   auftrag_ids UUID[];
 BEGIN
+  SET LOCAL search_path = public;
+
   SELECT array_agg(id) INTO fahrzeug_ids
-  FROM fahrzeuge
+  FROM public.fahrzeuge
   WHERE betrieb_id = helios_id AND kennzeichen ~ '^FZ-\d+$';
 
   SELECT array_agg(id) INTO auftrag_ids
-  FROM auftraege
+  FROM public.auftraege
   WHERE fahrzeug_id = ANY(fahrzeug_ids);
 
   RAISE NOTICE 'Fahrzeuge zum Loeschen: %', COALESCE(array_length(fahrzeug_ids, 1), 0);
@@ -32,11 +34,11 @@ BEGIN
   -- 'angenommen' steht (d.h. jemand hat inzwischen daran gearbeitet),
   -- bricht die Migration ab statt Daten zu verlieren.
   IF EXISTS (
-    SELECT 1 FROM auftraege WHERE id = ANY(auftrag_ids) AND status <> 'angenommen'
+    SELECT 1 FROM public.auftraege WHERE id = ANY(auftrag_ids) AND status <> 'angenommen'
   ) THEN
     RAISE EXCEPTION 'Abbruch: mindestens ein betroffener Auftrag hat einen anderen Status als "angenommen" -- bitte manuell pruefen.';
   END IF;
 
-  DELETE FROM auftraege WHERE id = ANY(auftrag_ids);
-  DELETE FROM fahrzeuge WHERE id = ANY(fahrzeug_ids);
+  DELETE FROM public.auftraege WHERE id = ANY(auftrag_ids);
+  DELETE FROM public.fahrzeuge WHERE id = ANY(fahrzeug_ids);
 END $$;
