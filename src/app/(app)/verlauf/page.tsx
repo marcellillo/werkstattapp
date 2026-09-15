@@ -1,0 +1,31 @@
+export const dynamic = 'force-dynamic'
+
+import { createClient } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
+import { VerlaufContent } from './verlauf-content'
+import { getBetriebIdForUser } from '@/lib/server-betrieb'
+
+export default async function VerlaufPage() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
+  const betriebId = await getBetriebIdForUser(supabase, user.id)
+
+  const { data: auftraege } = await supabase
+    .from('auftraege')
+    .select(`
+      id, erstellt_am, status, arbeiten, tuev_ergebnis, tuev_kandidat,
+      fahrzeug:fahrzeuge(id, kennzeichen, marke, modell, baujahr, fahrzeug_typ),
+      kunde:kunden(id, vorname, nachname, telefon, firma),
+      ersatzteile(id, bezeichnung, teilenummer, einzelpreis, status, menge)
+    `)
+    .eq('betrieb_id', betriebId)
+    .eq('status', 'ausgeliefert')
+    .order('erstellt_am', { ascending: false })
+    .limit(200)
+
+  return (
+    <VerlaufContent auftraege={(auftraege ?? []) as any[]} />
+  )
+}

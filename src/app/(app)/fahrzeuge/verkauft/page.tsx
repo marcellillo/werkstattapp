@@ -1,0 +1,39 @@
+import { createClient } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
+import { VerkauftContent } from './verkauft-content'
+import { getBetriebIdForUser } from '@/lib/server-betrieb'
+
+export default async function VerkauftPage() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
+  const betriebId = await getBetriebIdForUser(supabase, user.id)
+
+  const { data: raw } = await supabase
+    .from('auftraege')
+    .select(`
+      id, status, verkauft_am, auslieferung_geplant, einnahmen, bemerkungen, kaeufer_name, steuerart, erstellt_am,
+      ersatzteile(einzelpreis, menge),
+      fahrzeug:fahrzeuge(
+        id, marke, modell, kennzeichen, mobile_de_id, fahrzeug_typ,
+        baujahr, kilometerstand, farbe, motortyp, leistung_kw, bilder_urls,
+        verkaufspreis, einkaufspreis
+      )
+    `)
+    .eq('betrieb_id', betriebId)
+    .eq('status', 'verkauft')
+    .order('verkauft_am', { ascending: false, nullsFirst: false })
+
+  const verkauft = ((raw ?? []) as any[]).filter(
+    a => (a.fahrzeug as any)?.fahrzeug_typ === 'eigen'
+  )
+
+  const { data: steuerCfg } = await supabase
+    .from('betrieb_einstellungen').select('wert').eq('betrieb_id', betriebId).eq('schluessel', 'fahrzeug_steuerart_standard').maybeSingle()
+  const standardSteuerart = (steuerCfg?.wert as 'differenz' | 'regel' | 'ausfuhr') ?? 'differenz'
+
+  return (
+    <VerkauftContent verkauft={verkauft} standardSteuerart={standardSteuerart} isArchiv={false} />
+  )
+}

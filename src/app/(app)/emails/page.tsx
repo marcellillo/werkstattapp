@@ -1,0 +1,49 @@
+import { createClient } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
+import { EmailsContent } from './emails-content'
+import { getBetriebIdForUser } from '@/lib/server-betrieb'
+
+export default async function EmailsPage() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
+  const betriebId = await getBetriebIdForUser(supabase, user.id)
+
+  const { data: emails } = await supabase
+    .from('email_protokoll')
+    .select(`
+      *,
+      auftrag:auftraege(
+        id, auftrag_nr,
+        fahrzeug:fahrzeuge(marke, modell, kennzeichen)
+      )
+    `)
+    .eq('betrieb_id', betriebId)
+    .order('empfangen_am', { ascending: false })
+    .limit(100)
+
+  const { data: configRows } = await supabase
+    .from('betrieb_einstellungen')
+    .select('schluessel, wert')
+    .eq('betrieb_id', betriebId)
+
+  const cfg: Record<string, string> = {}
+  for (const row of configRows ?? []) {
+    if (row.wert) cfg[row.schluessel] = row.wert
+  }
+
+  const istKonfiguriert = !!cfg.graph_refresh_token
+  const teileUpdatesAusstehend = cfg.teile_updates_ausstehend
+    ? JSON.parse(cfg.teile_updates_ausstehend)
+    : []
+
+  return (
+    <EmailsContent
+      emails={(emails ?? []) as any[]}
+      istKonfiguriert={istKonfiguriert}
+      letzterSync={cfg.letzter_email_sync ?? null}
+      teileUpdates={teileUpdatesAusstehend}
+    />
+  )
+}
