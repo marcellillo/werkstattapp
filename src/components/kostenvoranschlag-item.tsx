@@ -18,7 +18,7 @@ export function KostenvoranschlagItem({ kostenvoranschlag, betriebId, onDelete }
   const [loading, setLoading] = useState(false)
   const [modus, setModus] = useState<'festpreis' | 'einzeln'>('festpreis')
   const [festpreis, setFestpreis] = useState<number>(0)
-  const [newPos, setNewPos] = useState({ beschreibung: '', preis: 0 })
+  const [newPos, setNewPos] = useState({ beschreibung: '', menge: 1, preis: 0 })
   const [printing, setPrinting] = useState(false)
 
   const handlePrint = async () => {
@@ -103,21 +103,22 @@ export function KostenvoranschlagItem({ kostenvoranschlag, betriebId, onDelete }
 
     try {
       const supabase = await createClient()
+      const menge = newPos.menge || 1
       const { data, error } = await supabase
         .from('kostenvoranschlag_position')
         .insert({
           kostenvoranschlag_id: kostenvoranschlag.id,
           betrieb_id: betriebId,
           beschreibung: newPos.beschreibung,
-          menge: 1,
+          menge,
           einzelpreis: newPos.preis,
-          gesamtpreis: newPos.preis,
+          gesamtpreis: menge * newPos.preis,
         })
         .select()
 
       if (error) throw error
       setPositionen([...positionen, data[0]])
-      setNewPos({ beschreibung: '', preis: 0 })
+      setNewPos({ beschreibung: '', menge: 1, preis: 0 })
     } catch (error) {
       console.error('Fehler beim Hinzufügen:', error)
       alert('Fehler beim Hinzufügen')
@@ -334,7 +335,9 @@ export function KostenvoranschlagItem({ kostenvoranschlag, betriebId, onDelete }
                         <thead>
                           <tr className="border-b bg-green-50">
                             <th className="text-left py-2 px-2">Teil</th>
-                            <th className="text-right py-2 px-2 w-24">Preis €</th>
+                            <th className="text-right py-2 px-2 w-16">Menge</th>
+                            <th className="text-right py-2 px-2 w-24">Einzelpreis €</th>
+                            <th className="text-right py-2 px-2 w-24">Gesamt €</th>
                             <th className="w-8"></th>
                           </tr>
                         </thead>
@@ -342,7 +345,9 @@ export function KostenvoranschlagItem({ kostenvoranschlag, betriebId, onDelete }
                           {positionen.map((pos) => (
                             <tr key={pos.id} className="border-b hover:bg-slate-50">
                               <td className="py-2 px-2">{pos.beschreibung}</td>
+                              <td className="text-right py-2 px-2">{pos.menge || 1}</td>
                               <td className="text-right py-2 px-2">{(pos.einzelpreis || 0).toFixed(2)} €</td>
+                              <td className="text-right py-2 px-2">{(pos.gesamtpreis ?? (pos.menge || 1) * (pos.einzelpreis || 0)).toFixed(2)} €</td>
                               <td className="text-center py-2 px-2">
                                 <button
                                   onClick={() => handleDeletePosition(pos.id)}
@@ -354,7 +359,7 @@ export function KostenvoranschlagItem({ kostenvoranschlag, betriebId, onDelete }
                             </tr>
                           ))}
                           <tr className="font-bold bg-green-100">
-                            <td className="py-2 px-2">Summe Ersatzteile:</td>
+                            <td className="py-2 px-2" colSpan={3}>Summe Ersatzteile:</td>
                             <td className="text-right py-2 px-2">{ersatzteile_summe.toFixed(2)} €</td>
                             <td></td>
                           </tr>
@@ -367,7 +372,7 @@ export function KostenvoranschlagItem({ kostenvoranschlag, betriebId, onDelete }
                         <span>➕</span>
                         Neues Teil:
                       </p>
-                      <div className="grid grid-cols-3 gap-2">
+                      <div className="grid grid-cols-4 gap-2">
                         <input
                           type="text"
                           placeholder="Beschreibung"
@@ -377,7 +382,16 @@ export function KostenvoranschlagItem({ kostenvoranschlag, betriebId, onDelete }
                         />
                         <input
                           type="number"
-                          placeholder="Preis"
+                          placeholder="Menge"
+                          value={newPos.menge}
+                          onChange={(e) => setNewPos({ ...newPos, menge: parseFloat(e.target.value) || 1 })}
+                          className="px-2 py-1 border rounded text-sm"
+                          step="1"
+                          min="1"
+                        />
+                        <input
+                          type="number"
+                          placeholder="Einzelpreis"
                           value={newPos.preis}
                           onChange={(e) => setNewPos({ ...newPos, preis: parseFloat(e.target.value) || 0 })}
                           className="px-2 py-1 border rounded text-sm"
