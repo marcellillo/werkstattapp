@@ -4,6 +4,7 @@ import { ChevronDown, Plus, Trash2, Edit, Printer } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { createClient } from '@/lib/supabase/client'
 import { KostenvoranschlagDetailsModal } from './kostenvoranschlag-details-modal'
+import { DecimalField } from '@/components/ui/decimal-field'
 
 interface Props {
   kostenvoranschlag: any
@@ -296,13 +297,11 @@ export function KostenvoranschlagItem({ kostenvoranschlag, betriebId, onDelete }
                     <div className="flex gap-2 items-end">
                       <div className="flex-1">
                         <label className="text-xs text-slate-600 block mb-1">Gesamtpreis €</label>
-                        <input
-                          type="number"
+                        <DecimalField
                           placeholder="300,00"
                           value={festpreis}
-                          onChange={(e) => setFestpreis(parseFloat(e.target.value) || 0)}
+                          onChange={setFestpreis}
                           className="w-full px-3 py-2 border rounded text-sm"
-                          step="0.01"
                         />
                       </div>
                       <button
@@ -380,22 +379,17 @@ export function KostenvoranschlagItem({ kostenvoranschlag, betriebId, onDelete }
                           onChange={(e) => setNewPos({ ...newPos, beschreibung: e.target.value })}
                           className="col-span-2 px-2 py-1 border rounded text-sm"
                         />
-                        <input
-                          type="number"
+                        <DecimalField
                           placeholder="Menge"
                           value={newPos.menge}
-                          onChange={(e) => setNewPos({ ...newPos, menge: parseFloat(e.target.value) || 1 })}
+                          onChange={(n) => setNewPos({ ...newPos, menge: n || 1 })}
                           className="px-2 py-1 border rounded text-sm"
-                          step="1"
-                          min="1"
                         />
-                        <input
-                          type="number"
+                        <DecimalField
                           placeholder="Einzelpreis"
                           value={newPos.preis}
-                          onChange={(e) => setNewPos({ ...newPos, preis: parseFloat(e.target.value) || 0 })}
+                          onChange={(n) => setNewPos({ ...newPos, preis: n })}
                           className="px-2 py-1 border rounded text-sm"
-                          step="0.01"
                         />
                       </div>
                       <button

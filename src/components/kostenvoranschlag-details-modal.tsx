@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { LieferscheinScanner } from './lieferschein-scanner'
 import { LieferscheinGalerie } from './lieferschein-galerie'
 import { TeileErfassungTabs } from './teile-erfassung-tabs'
+import { DecimalField } from '@/components/ui/decimal-field'
 
 interface Position {
   id?: string
@@ -281,20 +282,17 @@ export function KostenvoranschlagDetailsModal({ kostenvoranschlagId, betriebId, 
                         />
                       </td>
                       <td className="py-2">
-                        <input
-                          type="number"
+                        <DecimalField
                           value={pos.menge}
-                          onChange={(e) => handleUpdatePosition(idx, 'menge', parseFloat(e.target.value) || 0)}
+                          onChange={(n) => handleUpdatePosition(idx, 'menge', n)}
                           className="w-full px-2 py-1 border rounded text-right"
                         />
                       </td>
                       <td className="py-2">
-                        <input
-                          type="number"
+                        <DecimalField
                           value={pos.einzelpreis}
-                          onChange={(e) => handleUpdatePosition(idx, 'einzelpreis', parseFloat(e.target.value) || 0)}
+                          onChange={(n) => handleUpdatePosition(idx, 'einzelpreis', n)}
                           className="w-full px-2 py-1 border rounded text-right"
-                          step="0.01"
                         />
                       </td>
                       <td className="py-2 text-right pr-2">{(pos.gesamtpreis || 0).toFixed(2)}</td>
@@ -321,20 +319,17 @@ export function KostenvoranschlagDetailsModal({ kostenvoranschlagId, betriebId, 
                     onChange={(e) => setNewPosition({ ...newPosition, beschreibung: e.target.value })}
                     className="col-span-6 px-2 py-1 border rounded"
                   />
-                  <input
-                    type="number"
+                  <DecimalField
                     placeholder="Menge"
                     value={newPosition.menge}
-                    onChange={(e) => setNewPosition({ ...newPosition, menge: parseFloat(e.target.value) || 0 })}
+                    onChange={(n) => setNewPosition({ ...newPosition, menge: n })}
                     className="col-span-2 px-2 py-1 border rounded text-right"
                   />
-                  <input
-                    type="number"
+                  <DecimalField
                     placeholder="Preis"
                     value={newPosition.einzelpreis}
-                    onChange={(e) => setNewPosition({ ...newPosition, einzelpreis: parseFloat(e.target.value) || 0 })}
+                    onChange={(n) => setNewPosition({ ...newPosition, einzelpreis: n })}
                     className="col-span-2 px-2 py-1 border rounded text-right"
-                    step="0.01"
                   />
                   <button
                     onClick={handleAddPosition}
