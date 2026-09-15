@@ -1,6 +1,7 @@
 'use client'
+import { useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Download, Car, User, Wrench, Package, Camera, FileText, Receipt, CheckCircle, Clock, AlertTriangle, Fuel, Gauge, Paperclip } from 'lucide-react'
+import { ArrowLeft, Download, Car, User, Wrench, Package, Camera, FileText, Receipt, CheckCircle, Clock, AlertTriangle, Fuel, Gauge, Paperclip, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 const STATUS_LABEL: Record<string, string> = {
@@ -36,17 +37,44 @@ const DOKUMENT_TYP_LABEL: Record<string, string> = { lieferschein: '📦 Liefers
 interface Props {
   auftrag: any
   fotos: any[]
-  rechnung: any
+  rechnungen: any[]
   firma: Record<string, string>
+  betriebId: string
   dokumente?: any[]
   lieferantenRechnungen?: any[]
 }
 
-export function AuftragsMappe({ auftrag, fotos, rechnung, firma, dokumente = [], lieferantenRechnungen = [] }: Props) {
+export function AuftragsMappe({ auftrag, fotos, rechnungen = [], firma, betriebId, dokumente = [], lieferantenRechnungen = [] }: Props) {
   const fz = auftrag.fahrzeug
   const kunde = auftrag.kunde
   const teile: any[] = auftrag.ersatzteile ?? []
   const heute = new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  const [pdfLadendId, setPdfLadendId] = useState<string | null>(null)
+
+  const rechnungPdfLaden = async (rechnungId: string, rechnungsNr: string) => {
+    setPdfLadendId(rechnungId)
+    try {
+      const res = await fetch('/api/rechnung/pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rechnungId, betriebId }),
+      })
+      if (!res.ok) throw new Error('PDF-Export fehlgeschlagen')
+      const blob = await res.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `Rechnung_${rechnungsNr}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+    } catch (e) {
+      alert('PDF-Export fehlgeschlagen')
+    } finally {
+      setPdfLadendId(null)
+    }
+  }
 
   const fotosByKat = (kat: string) => fotos.filter((f: any) => f.kategorie === kat)
 
@@ -220,11 +248,11 @@ export function AuftragsMappe({ auftrag, fotos, rechnung, firma, dokumente = [],
           </section>
         )}
 
-        {/* ── Lieferscheine & Rechnungen (Lieferanten-Belege, aus beiden Upload-Wegen) ── */}
+        {/* ── Lieferanten-Belege (Lieferscheine & Rechnungen von Lieferanten, aus beiden Upload-Wegen) ── */}
         {alleBelege.length > 0 && (
           <section className="border rounded-xl p-4">
             <h2 className="flex items-center gap-2 font-semibold text-gray-800 mb-3 pb-2 border-b">
-              <Paperclip className="w-4 h-4 text-blue-500" />Lieferscheine &amp; Rechnungen
+              <Paperclip className="w-4 h-4 text-blue-500" />Lieferanten-Belege
               <span className="text-xs font-normal text-gray-400 ml-auto">{alleBelege.length} Dokument{alleBelege.length !== 1 ? 'e' : ''}</span>
             </h2>
             <div className="space-y-2">
@@ -243,21 +271,69 @@ export function AuftragsMappe({ auftrag, fotos, rechnung, firma, dokumente = [],
           </section>
         )}
 
-        {/* ── Rechnung ── */}
-        {rechnung && (
+        {/* ── Rechnungen (alle Rechnungen dieses Auftrags, mit allen Positionen) ── */}
+        {rechnungen.length > 0 && (
           <section className="border rounded-xl p-4">
             <h2 className="flex items-center gap-2 font-semibold text-gray-800 mb-3 pb-2 border-b">
-              <Receipt className="w-4 h-4 text-emerald-500" />Rechnung
+              <Receipt className="w-4 h-4 text-emerald-500" />Rechnungen
+              <span className="text-xs font-normal text-gray-400 ml-auto">{rechnungen.length} Rechnung{rechnungen.length !== 1 ? 'en' : ''}</span>
             </h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-              <div><span className="text-gray-400 block text-xs">Rechnungsnr.</span><strong>{rechnung.rechnungs_nr}</strong></div>
-              <div><span className="text-gray-400 block text-xs">Betrag (brutto)</span><strong>{fmtEuro(rechnung.betrag_brutto)}</strong></div>
-              <div><span className="text-gray-400 block text-xs">Status</span>
-                <span className={`inline-block text-xs px-2 py-0.5 rounded-full font-medium ${rechnung.status === 'bezahlt' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
-                  {rechnung.status === 'bezahlt' ? 'Bezahlt' : 'Offen'}
-                </span>
-              </div>
-              <div><span className="text-gray-400 block text-xs">Fällig am</span>{fmt(rechnung.faellig_am)}</div>
+            <div className="space-y-5">
+              {rechnungen.map((r: any) => {
+                const alleZeilen = [
+                  ...r.ersatzteilePositionen.map((p: any) => ({ ...p, gruppe: 'Ersatzteile' })),
+                  ...r.arbeitswertePositionen.map((p: any) => ({ ...p, gruppe: 'Arbeitszeit' })),
+                  ...(r.kleinteilNetto > 0 ? [{ beschreibung: 'Kleinteilpauschale', menge: 1, preis: r.kleinteilNetto, summe: r.kleinteilNetto, gruppe: 'Sonstiges' }] : []),
+                  ...(r.sonstigesNetto > 0 ? [{ beschreibung: r.sonstigesBeschreibung || 'Sonstige Leistungen', menge: 1, preis: r.sonstigesNetto, summe: r.sonstigesNetto, gruppe: 'Sonstiges' }] : []),
+                ]
+                return (
+                  <div key={r.id} className={`border rounded-lg p-3 ${r.status === 'storniert' ? 'opacity-60 bg-gray-50' : ''}`}>
+                    <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                      <div className="text-sm">
+                        <strong>{r.rechnungs_nr}</strong>
+                        <span className="text-gray-400 ml-2">{fmt(r.erstellt_am)}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                          r.status === 'storniert' ? 'bg-gray-200 text-gray-500' : r.status === 'bezahlt' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'
+                        }`}>
+                          {r.status === 'storniert' ? 'Storniert' : r.status === 'bezahlt' ? 'Bezahlt' : 'Offen'}
+                        </span>
+                        <button
+                          onClick={() => rechnungPdfLaden(r.id, r.rechnungs_nr)}
+                          disabled={pdfLadendId === r.id}
+                          className="no-print text-xs text-blue-600 hover:underline flex items-center gap-1"
+                        >
+                          {pdfLadendId === r.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
+                          PDF
+                        </button>
+                      </div>
+                    </div>
+
+                    {alleZeilen.length > 0 && (
+                      <table className="w-full text-xs mb-2">
+                        <tbody>
+                          {alleZeilen.map((p: any, i: number) => (
+                            <tr key={i} className="border-b border-gray-50 last:border-0">
+                              <td className="py-1 text-gray-400 w-20 align-top">{p.gruppe}</td>
+                              <td className="py-1 text-gray-700">{p.beschreibung}</td>
+                              <td className="py-1 text-gray-500 text-right w-12">{p.menge}×</td>
+                              <td className="py-1 text-gray-700 text-right w-20">{fmtEuro(p.summe)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm pt-2 border-t">
+                      <div><span className="text-gray-400 block text-xs">Netto</span>{fmtEuro(r.betrag_netto)}</div>
+                      <div><span className="text-gray-400 block text-xs">MwSt.</span>{fmtEuro(r.betrag_mwst)}</div>
+                      <div><span className="text-gray-400 block text-xs">Brutto</span><strong>{fmtEuro(r.betrag_brutto)}</strong></div>
+                      <div><span className="text-gray-400 block text-xs">Fällig am</span>{fmt(r.faellig_am)}</div>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           </section>
         )}
