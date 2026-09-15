@@ -63,10 +63,11 @@ export async function scanLieferschein(
     }
   }
 
-  // Bestimme Bildtyp
+  const isPdf = mimeType === 'application/pdf'
+
+  // Bestimme Bildtyp (nur relevant, wenn kein PDF)
   let mediaType: 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp' = 'image/jpeg'
 
-  // Wenn mimeType übergeben wurde, verwende diesen
   if (mimeType) {
     if (mimeType.includes('png')) mediaType = 'image/png'
     else if (mimeType.includes('gif')) mediaType = 'image/gif'
@@ -81,7 +82,11 @@ export async function scanLieferschein(
   }
 
   try {
-    console.log('[Lieferschein] Starting scan with Claude Vision')
+    console.log('[Lieferschein] Starting scan with Claude', isPdf ? '(PDF-Dokument)' : '(Vision)')
+
+    const documentBlock: any = isPdf
+      ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: imageData } }
+      : { type: 'image', source: { type: 'base64', media_type: mediaType, data: imageData } }
 
     const response = await client.messages.create({
       model: 'claude-opus-4-8',
@@ -90,14 +95,7 @@ export async function scanLieferschein(
         {
           role: 'user',
           content: [
-            {
-              type: 'image',
-              source: {
-                type: 'base64',
-                media_type: mediaType,
-                data: imageData,
-              },
-            },
+            documentBlock,
             {
               type: 'text',
               text: `Analysiere dieses Dokument und extrahiere ALLE Teile/Artikel mit Preisen.

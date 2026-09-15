@@ -75,7 +75,9 @@ export function LieferscheinGalerie({ kostenvoranschlagId, auftragId, refreshSig
         <p className="text-sm text-slate-500">Wird geladen...</p>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-          {uploads.map(u => (
+          {uploads.map(u => {
+            const isPdf = (u.dateiname || u.datei_url || '').toLowerCase().endsWith('.pdf')
+            return (
             <div
               key={u.id}
               role="link"
@@ -87,7 +89,11 @@ export function LieferscheinGalerie({ kostenvoranschlagId, auftragId, refreshSig
               }`}
               title={u.fehlermeldung || undefined}
             >
-              <img src={u.datei_url} alt={u.dateiname || 'Lieferschein'} className="w-full h-24 object-cover bg-slate-100" />
+              {isPdf ? (
+                <div className="w-full h-24 flex items-center justify-center bg-slate-100 text-3xl">📄</div>
+              ) : (
+                <img src={u.datei_url} alt={u.dateiname || 'Lieferschein'} className="w-full h-24 object-cover bg-slate-100" />
+              )}
               <div className="p-1.5 text-xs">
                 <p className="font-medium truncate flex items-center gap-1">
                   {u.erfolg ? (
@@ -110,7 +116,8 @@ export function LieferscheinGalerie({ kostenvoranschlagId, auftragId, refreshSig
                 <Trash2 className="w-3 h-3 text-red-600" />
               </button>
             </div>
-          ))}
+            )
+          })}
         </div>
       )}
     </div>

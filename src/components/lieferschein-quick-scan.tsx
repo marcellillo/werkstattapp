@@ -18,8 +18,8 @@ export function LieferscheinQuickScan({ auftragId, betriebId, onSuccess }: Props
   const [dokumentTyp, setDokumentTyp] = useState<'lieferschein' | 'rechnung'>('lieferschein')
 
   const handleFileSelect = async (file: File) => {
-    if (!file.type.startsWith('image/')) {
-      setError('Nur Bilder unterstützt')
+    if (!file.type.startsWith('image/') && file.type !== 'application/pdf') {
+      setError('Nur Bilder oder PDF unterstützt')
       return
     }
 
@@ -114,7 +114,7 @@ export function LieferscheinQuickScan({ auftragId, betriebId, onSuccess }: Props
         <label className="block">
           <input
             type="file"
-            accept="image/*"
+            accept="image/*,application/pdf"
             onChange={(e) => {
               if (e.target.files?.[0]) {
                 handleFileSelect(e.target.files[0])

@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
     // Datei immer archivieren (auch bei fehlgeschlagenem Scan), damit sie in der
     // Auftragsmappe sichtbar bleibt und nichts versehentlich doppelt hochgeladen wird.
     const timestamp = Date.now()
-    const ext = mimeType.includes('png') ? 'png' : mimeType.includes('webp') ? 'webp' : 'jpg'
+    const ext = mimeType.includes('pdf') ? 'pdf' : mimeType.includes('png') ? 'png' : mimeType.includes('webp') ? 'webp' : 'jpg'
     const storagePath = `${betriebId}/${timestamp}.${ext}`
 
     let dateiUrl: string | null = null

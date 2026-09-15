@@ -12,6 +12,8 @@ export async function POST(req: NextRequest) {
     const file = formData.get('file') as File
     const betriebId = formData.get('betriebId') as string
     const kostenvoranschlagId = formData.get('kostenvoranschlag_id') as string | null
+    const auftragId = formData.get('auftrag_id') as string | null
+    const dokumentTyp = (formData.get('dokument_typ') as string | null) === 'rechnung' ? 'rechnung' : 'lieferschein'
 
     if (!file) return NextResponse.json({ error: 'Keine Datei hochgeladen' }, { status: 400 })
     if (!betriebId) return NextResponse.json({ error: 'betriebId erforderlich' }, { status: 400 })
@@ -29,7 +31,7 @@ export async function POST(req: NextRequest) {
     // Datei immer archivieren (auch bei fehlgeschlagenem Scan), damit man sieht,
     // was schon hochgeladen wurde und nichts versehentlich doppelt scannt.
     const timestamp = Date.now()
-    const ext = mimeType.includes('png') ? 'png' : mimeType.includes('webp') ? 'webp' : 'jpg'
+    const ext = mimeType.includes('pdf') ? 'pdf' : mimeType.includes('png') ? 'png' : mimeType.includes('webp') ? 'webp' : 'jpg'
     const safeFileName = `${timestamp}.${ext}`
     const storagePath = `${betriebId}/${safeFileName}`
 
@@ -56,6 +58,8 @@ export async function POST(req: NextRequest) {
         await supabase.from('lieferschein_uploads').insert({
           betrieb_id: betriebId,
           kostenvoranschlag_id: kostenvoranschlagId || null,
+          auftrag_id: auftragId || null,
+          dokument_typ: dokumentTyp,
           datei_url: dateiUrl,
           dateiname: file.name,
           erfolg: false,
@@ -115,6 +119,8 @@ export async function POST(req: NextRequest) {
       await supabase.from('lieferschein_uploads').insert({
         betrieb_id: betriebId,
         kostenvoranschlag_id: kostenvoranschlagId || null,
+        auftrag_id: auftragId || null,
+        dokument_typ: dokumentTyp,
         datei_url: dateiUrl,
         dateiname: file.name,
         lieferant: scanResult.lieferant || null,

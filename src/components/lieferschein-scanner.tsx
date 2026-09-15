@@ -38,6 +38,9 @@ export function LieferscheinScanner({ betriebId, kostenvoranschlag_id, auftragId
   const [isDragging, setIsDragging] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [preview, setPreview] = useState<string | null>(null)
+  const [previewIsPdf, setPreviewIsPdf] = useState(false)
+  const [previewName, setPreviewName] = useState<string | null>(null)
+  const [dokumentTyp, setDokumentTyp] = useState<'lieferschein' | 'rechnung'>('lieferschein')
   const [result, setResult] = useState<ScanResult | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [arbeitUebernommen, setArbeitUebernommen] = useState(false)
@@ -70,24 +73,33 @@ export function LieferscheinScanner({ betriebId, kostenvoranschlag_id, auftragId
   }
 
   const scanFile = async (file: File) => {
-    if (!file.type.startsWith('image/')) {
-      setError('Nur Bilder unterstützt (JPG, PNG, etc.)')
+    const isPdf = file.type === 'application/pdf'
+    if (!file.type.startsWith('image/') && !isPdf) {
+      setError('Nur Bilder oder PDF unterstützt (JPG, PNG, PDF, etc.)')
       return
     }
 
     setError(null)
     setIsLoading(true)
 
-    // Preview anzeigen
-    const reader = new FileReader()
-    reader.onload = e => setPreview(e.target?.result as string)
-    reader.readAsDataURL(file)
+    // Preview anzeigen (PDFs lassen sich nicht als <img> darstellen, daher nur Dateiname)
+    setPreviewIsPdf(isPdf)
+    setPreviewName(file.name)
+    if (isPdf) {
+      setPreview(null)
+    } else {
+      const reader = new FileReader()
+      reader.onload = e => setPreview(e.target?.result as string)
+      reader.readAsDataURL(file)
+    }
 
     try {
       const formData = new FormData()
       formData.append('file', file)
       formData.append('betriebId', betriebId)
+      formData.append('dokument_typ', dokumentTyp)
       if (kostenvoranschlag_id) formData.append('kostenvoranschlag_id', kostenvoranschlag_id)
+      if (auftragId) formData.append('auftrag_id', auftragId)
 
       const res = await fetch('/api/lieferschein/scan', {
         method: 'POST',
@@ -163,6 +175,8 @@ export function LieferscheinScanner({ betriebId, kostenvoranschlag_id, auftragId
 
   const resetScanner = () => {
     setPreview(null)
+    setPreviewIsPdf(false)
+    setPreviewName(null)
     setResult(null)
     setError(null)
   }
@@ -259,12 +273,41 @@ export function LieferscheinScanner({ betriebId, kostenvoranschlag_id, auftragId
         className="space-y-4 text-center"
       >
         <div className="text-4xl">📸</div>
-        <h3 className="text-lg font-bold">Lieferschein einscannen</h3>
-        <p className="text-gray-600">Ziehe ein Foto des Lieferscheins hier rein oder klicke zum Hochladen</p>
+        <h3 className="text-lg font-bold">Lieferschein oder Rechnung einscannen</h3>
+        <p className="text-gray-600">Ziehe ein Foto oder PDF hier rein oder klicke zum Hochladen</p>
+
+        <div className="flex gap-2 justify-center">
+          <button
+            type="button"
+            onClick={() => setDokumentTyp('lieferschein')}
+            disabled={isLoading}
+            className={`px-4 py-1.5 rounded text-sm font-medium transition ${
+              dokumentTyp === 'lieferschein' ? 'bg-blue-600 text-white' : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-50'
+            }`}
+          >
+            📦 Lieferschein
+          </button>
+          <button
+            type="button"
+            onClick={() => setDokumentTyp('rechnung')}
+            disabled={isLoading}
+            className={`px-4 py-1.5 rounded text-sm font-medium transition ${
+              dokumentTyp === 'rechnung' ? 'bg-blue-600 text-white' : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-50'
+            }`}
+          >
+            🧾 Rechnung
+          </button>
+        </div>
 
         {preview && (
           <div className="mt-4 rounded overflow-hidden border">
             <img src={preview} alt="Preview" className="max-h-48 mx-auto" />
+          </div>
+        )}
+        {previewIsPdf && previewName && (
+          <div className="mt-4 rounded border p-3 flex items-center gap-2 justify-center bg-slate-50">
+            <span className="text-xl">📄</span>
+            <span className="text-sm text-slate-700 truncate">{previewName}</span>
           </div>
         )}
 
@@ -272,7 +315,7 @@ export function LieferscheinScanner({ betriebId, kostenvoranschlag_id, auftragId
 
         <div className="flex gap-2">
           <label className="flex-1">
-            <input type="file" accept="image/*" onChange={handleFileSelect} className="hidden" disabled={isLoading} />
+            <input type="file" accept="image/*,application/pdf" onChange={handleFileSelect} className="hidden" disabled={isLoading} />
             <Button
               asChild
               disabled={isLoading}
