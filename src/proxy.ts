@@ -23,8 +23,12 @@ export async function proxy(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
 
-  const isAuthRoute = request.nextUrl.pathname.startsWith('/login')
-  const isPublicApi = request.nextUrl.pathname.startsWith('/api/buchen') || request.nextUrl.pathname.startsWith('/status/')
+  const isAuthRoute = request.nextUrl.pathname.startsWith('/login') || request.nextUrl.pathname.startsWith('/register')
+  const isPublicApi =
+    request.nextUrl.pathname.startsWith('/api/buchen') ||
+    request.nextUrl.pathname.startsWith('/status/') ||
+    request.nextUrl.pathname.startsWith('/api/invitations/get') ||
+    request.nextUrl.pathname.startsWith('/api/invitations/accept')
   const isPublicRoute = isAuthRoute || request.nextUrl.pathname === '/' || isPublicApi
 
   if (!user && !isPublicRoute) {
