@@ -1,11 +1,12 @@
 'use client'
 import { useState } from 'react'
-import { Users, Search, Plus, Phone, MapPin, Building, Car, ClipboardList, ChevronDown, ChevronRight } from 'lucide-react'
+import { Users, Search, Plus, Phone, MapPin, Building, Car, ClipboardList, ChevronDown, ChevronRight, Pencil } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { createClient } from '@/lib/supabase/client'
 import { useBetrieb } from '@/lib/betrieb-context'
 import type { Kunde } from '@/types/database'
+import { KundeEditDialog } from './kunde-edit-dialog'
 
 type Auftrag = {
   id: string
@@ -231,6 +232,7 @@ export function KundenContent({
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
+  const [editingKunde, setEditingKunde] = useState<Kunde | null>(null)
   const [form, setForm] = useState({
     vorname: '', nachname: '', firma: '', email: '', telefon: '', mobil: '', strasse: '', plz: '', ort: ''
   })
@@ -373,6 +375,13 @@ export function KundenContent({
                         {k.telefon && <p className="text-xs text-gray-800 flex items-center gap-1 mt-0.5"><Phone className="w-3 h-3" />{k.telefon}</p>}
                         {k.ort && <p className="text-xs text-gray-800 flex items-center gap-1 mt-0.5"><MapPin className="w-3 h-3" />{k.ort}</p>}
                       </div>
+                      <button
+                        onClick={() => setEditingKunde(k)}
+                        className="p-1.5 hover:bg-gray-100 rounded-lg transition flex-shrink-0 text-gray-400 hover:text-gray-700"
+                        title="Kunde bearbeiten"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
                     </div>
                   </CardContent>
                 </Card>
@@ -383,6 +392,15 @@ export function KundenContent({
       ) : (
         <AuftragsUebersicht kunden={kundenMitAuftraegen} />
       )}
+
+      <KundeEditDialog
+        kunde={editingKunde}
+        open={!!editingKunde}
+        onClose={() => setEditingKunde(null)}
+        onSave={(updated) => {
+          setKunden(prev => prev.map(k => k.id === updated.id ? updated : k))
+        }}
+      />
     </div>
   )
 }

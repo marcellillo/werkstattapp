@@ -99,7 +99,7 @@ export async function POST(req: NextRequest) {
       gueltigkeitsTage: '30',
     } as any)
 
-    return new NextResponse(pdfBuffer, {
+    return new NextResponse(new Uint8Array(pdfBuffer), {
       headers: {
         'Content-Type': 'application/pdf',
         'Content-Disposition': `attachment; filename="Kostenvoranschlag_${kv.nummer}.pdf"`,

@@ -151,7 +151,7 @@ export async function POST(req: NextRequest) {
       firmaFooterzeile,
     } as any)
 
-    return new NextResponse(pdfBuffer, {
+    return new NextResponse(new Uint8Array(pdfBuffer), {
       headers: {
         'Content-Type': 'application/pdf',
         'Content-Disposition': `attachment; filename="Rechnung_${rechnung.rechnungs_nr}.pdf"`,
