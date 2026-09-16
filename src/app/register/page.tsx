@@ -79,21 +79,14 @@ function RegisterContent() {
     setSubmitting(true)
 
     try {
-      // Sign up with email and password
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: invitation!.email,
-        password,
-      })
-
-      if (authError) throw authError
-
-      if (!authData.user) throw new Error('Benutzer konnte nicht erstellt werden')
-
-      // Accept invitation
+      // Konto anlegen/bestätigen + Betrieb-Mitgliedschaft läuft komplett serverseitig
+      // über den Admin-Client (siehe /api/invitations/accept) -- ein eigener
+      // supabase.auth.signUp() hier würde mangels SMTP nie eine Session liefern
+      // und den neuen User als unbestätigte Karteileiche zurücklassen.
       const response = await fetch('/api/invitations/accept', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token }),
+        body: JSON.stringify({ token, password }),
       })
 
       const acceptData = await response.json()
@@ -101,6 +94,13 @@ function RegisterContent() {
       if (!response.ok) {
         throw new Error(acceptData.error || 'Fehler beim Akzeptieren der Einladung')
       }
+
+      // Jetzt einloggen, um im Browser eine echte Session zu etablieren
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: invitation!.email,
+        password,
+      })
+      if (signInError) throw signInError
 
       setSuccess(true)
       setTimeout(() => {

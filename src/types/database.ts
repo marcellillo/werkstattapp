@@ -45,6 +45,7 @@ export interface Betrieb {
   is_suspended: boolean
   suspension_reason?: string
   suspended_at?: string
+  logo_url?: string
   created_at: string
   updated_at: string
 }

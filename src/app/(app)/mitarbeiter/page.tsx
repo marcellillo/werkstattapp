@@ -38,7 +38,7 @@ export default async function MitarbeiterPage() {
   return (
     <MitarbeiterContent
       betriebId={betriebId}
-      users={betriebUsers ?? []}
+      users={(betriebUsers ?? []) as any}
       invitations={invitations ?? []}
     />
   )

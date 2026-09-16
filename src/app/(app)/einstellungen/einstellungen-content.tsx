@@ -67,14 +67,10 @@ export function EinstellungenContent({ initialConfig, betriebName, betriebId }: 
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [removingId, setRemovingId] = useState<string | null>(null)
   const supabase = createClient()
-  const { rolle: userRolle } = useRollen()
+  const { role: userRolle } = useRollen()
 
   const isKonfiguriert = !!(config.imap_email && config.imap_password)
   const isAdmin = userRolle === 'admin' || userRolle === 'superadmin'
-
-  useEffect(() => {
-    console.log('DEBUG Einstellungen:', { userRolle, isAdmin })
-  }, [userRolle, isAdmin])
 
   const ROLLEN = {
     admin: 'Admin',

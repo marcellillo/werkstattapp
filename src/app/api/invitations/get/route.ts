@@ -1,9 +1,13 @@
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = await createClient()
+    // Der Besucher ist an dieser Stelle noch nicht eingeloggt (er lädt gerade erst
+    // die Registrierungsseite über den Einladungslink) -- eine RLS-Policy kann einem
+    // anonymen Request grundsätzlich keinen Zugriff geben. Der Token selbst ist hier
+    // die Berechtigung, daher läuft die Suche bewusst über den Admin-Client.
+    const supabase = createAdminClient()
     const { token } = await req.json()
 
     if (!token) {

@@ -9,7 +9,7 @@ import { Users, Mail, Plus, Copy, Check, Loader2, Calendar, Trash2 } from 'lucid
 interface User {
   id: string
   profile_id: string
-  rolle: string
+  role: string
   profiles?: {
     full_name: string
     email: string
@@ -288,7 +288,7 @@ export function MitarbeiterContent({ betriebId, users, invitations }: Props) {
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium">
-                      {ROLLEN[user.rolle as keyof typeof ROLLEN]}
+                      {ROLLEN[user.role as keyof typeof ROLLEN]}
                     </span>
                     <button
                       onClick={() => handleRemoveMember(user.id, user.profiles?.full_name || user.profiles?.email || 'dieser Mitarbeiter')}
