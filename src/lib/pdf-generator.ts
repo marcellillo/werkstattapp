@@ -58,12 +58,31 @@ export async function generatePDF(templateName: string, data: PDFData): Promise<
   })
 
   try {
-    // puppeteer v25+ ist ein reines ESM-Paket — require() liefert kein nutzbares Modul
-    const puppeteer = (await import('puppeteer')).default
-    const browser = await puppeteer.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    })
+    // Auf Vercel gibt es kein vorinstalliertes Chrome -- das volle "puppeteer"-Paket
+    // lädt seinen Chromium-Download nur lokal beim npm install, in der Serverless-
+    // Umgebung fehlt das Binary ("Could not find Chrome"). Dort läuft stattdessen
+    // puppeteer-core mit dem für Lambda/Vercel gebauten @sparticuz/chromium-Binary.
+    // Lokal (Windows/macOS/Linux-Desktop) bleibt es beim vollen puppeteer, da
+    // @sparticuz/chromium ein reines Linux-Serverless-Binary ist.
+    const isServerless = !!(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME)
+
+    let browser
+    if (isServerless) {
+      const chromium = (await import('@sparticuz/chromium')).default
+      const puppeteerCore = (await import('puppeteer-core')).default
+      browser = await puppeteerCore.launch({
+        args: chromium.args,
+        executablePath: await chromium.executablePath(),
+        headless: true,
+      })
+    } else {
+      // puppeteer v25+ ist ein reines ESM-Paket — require() liefert kein nutzbares Modul
+      const puppeteer = (await import('puppeteer')).default
+      browser = await puppeteer.launch({
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      })
+    }
 
     const page = await browser.newPage()
     await page.setContent(html, { waitUntil: 'domcontentloaded' })

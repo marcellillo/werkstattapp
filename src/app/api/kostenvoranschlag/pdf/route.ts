@@ -3,6 +3,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { generatePDF } from '@/lib/pdf-generator'
 import { resolveFirmaSettings } from '@/lib/firma-settings'
 
+// Kaltstart von @sparticuz/chromium + Rendern braucht mehr als das Standard-Timeout
+export const maxDuration = 30
+
 export async function POST(req: NextRequest) {
   try {
     const supabase = await createClient()

@@ -2,6 +2,9 @@ import { generatePDF } from '@/lib/pdf-generator'
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 
+// Kaltstart von @sparticuz/chromium + Rendern braucht mehr als das Standard-Timeout
+export const maxDuration = 30
+
 const ERLAUBTE_TEMPLATES = ['kostenvoranschlag', 'rechnung', 'werkstattauftrag']
 
 export async function POST(req: NextRequest) {

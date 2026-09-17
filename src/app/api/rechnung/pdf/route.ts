@@ -3,6 +3,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { generatePDF } from '@/lib/pdf-generator'
 import { resolveRechnungDetail, type RechnungPosition } from '@/lib/rechnung-detail'
 
+// Kaltstart von @sparticuz/chromium + Rendern braucht mehr als das Standard-Timeout
+export const maxDuration = 30
+
 function fmt(n: number) {
   return n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
