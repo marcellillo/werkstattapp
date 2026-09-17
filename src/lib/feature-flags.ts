@@ -10,7 +10,7 @@ export const FEATURE_CATALOG: Record<FeatureName, { name: string; description: s
 export function getBetriebFeatures(betriebId: string, supabase?: any): Record<FeatureName, boolean> {
   return {
     statistiken: true,
-    kalender: false,
+    kalender: true,
     teile_bestellen: false,
     rechnungssystem: true,
   }
