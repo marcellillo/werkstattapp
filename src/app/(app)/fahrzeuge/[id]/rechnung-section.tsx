@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Plus, Printer, Trash2, Archive, ChevronDown } from 'lucide-react'
+import { Plus, Printer, Trash2, Archive, ChevronDown, Pencil, Check, X, Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 interface Props {
@@ -21,6 +21,10 @@ export function RechnungSection({ auftragId, betriebId }: Props) {
   const [loesching, setLoesching] = useState(false)
   const [stornierend, setStornierend] = useState(false)
   const [archivZeigen, setArchivZeigen] = useState(false)
+  const [editingNummerId, setEditingNummerId] = useState<string | null>(null)
+  const [nummerEntwurf, setNummerEntwurf] = useState('')
+  const [nummerSpeichern, setNummerSpeichern] = useState(false)
+  const [nummerFehler, setNummerFehler] = useState<string | null>(null)
 
   useEffect(() => {
     loadData()
@@ -111,6 +115,34 @@ export function RechnungSection({ auftragId, betriebId }: Props) {
     }
   }
 
+  const startNummerEdit = (rechnung: any) => {
+    setEditingNummerId(rechnung.id)
+    setNummerEntwurf(rechnung.rechnungs_nr)
+    setNummerFehler(null)
+  }
+
+  const handleNummerSpeichern = async (rechnungId: string) => {
+    if (!nummerEntwurf.trim()) { setNummerFehler('Nummer darf nicht leer sein'); return }
+    setNummerSpeichern(true)
+    setNummerFehler(null)
+    try {
+      const response = await fetch('/api/rechnung/update-nummer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rechnungId, betriebId, neueNummer: nummerEntwurf }),
+      })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'Speichern fehlgeschlagen')
+      setRechnungen(prev => prev.map(r => r.id === rechnungId ? { ...r, rechnungs_nr: data.rechnungs_nr } : r))
+      setEditingNummerId(null)
+    } catch (error: any) {
+      console.error('[Rechnung Nummer] Error:', error)
+      setNummerFehler(error.message)
+    } finally {
+      setNummerSpeichern(false)
+    }
+  }
+
   const handleStorno = async (rechnungId: string) => {
     setStornierend(true)
     try {
@@ -144,31 +176,74 @@ export function RechnungSection({ auftragId, betriebId }: Props) {
         {aktiveRechnungen.length > 0 && (
           <div className="space-y-3">
             {aktiveRechnungen.map(rechnung => (
-              <div key={rechnung.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                <div>
-                  <p className="font-medium">{rechnung.rechnungs_nr}</p>
-                  <p className="text-sm text-slate-600">🔧 Werkstatt • {rechnung.status}</p>
+              <div key={rechnung.id} className="p-3 bg-slate-50 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div className="flex-1 min-w-0">
+                    {editingNummerId === rechnung.id ? (
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          value={nummerEntwurf}
+                          onChange={e => setNummerEntwurf(e.target.value)}
+                          onKeyDown={e => { if (e.key === 'Enter') handleNummerSpeichern(rechnung.id); if (e.key === 'Escape') setEditingNummerId(null) }}
+                          disabled={nummerSpeichern}
+                          autoFocus
+                          className="px-2 py-1 border border-slate-300 rounded text-sm font-medium w-40 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                        />
+                        <button
+                          onClick={() => handleNummerSpeichern(rechnung.id)}
+                          disabled={nummerSpeichern}
+                          className="p-1 text-green-600 hover:bg-green-100 rounded"
+                          title="Speichern"
+                        >
+                          {nummerSpeichern ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                        </button>
+                        <button
+                          onClick={() => setEditingNummerId(null)}
+                          disabled={nummerSpeichern}
+                          className="p-1 text-slate-500 hover:bg-slate-200 rounded"
+                          title="Abbrechen"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1.5 group">
+                        <p className="font-medium">{rechnung.rechnungs_nr}</p>
+                        <button
+                          onClick={() => startNummerEdit(rechnung)}
+                          className="p-0.5 text-slate-400 hover:text-slate-700 opacity-0 group-hover:opacity-100 transition-opacity"
+                          title="Rechnungsnummer ändern"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
+                    <p className="text-sm text-slate-600">🔧 Werkstatt • {rechnung.status}</p>
+                  </div>
+                  <div className="flex gap-2 items-center">
+                    <p className="font-semibold mr-2">{(rechnung.betrag_brutto || 0).toFixed(2)} €</p>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={printingId === rechnung.id}
+                      onClick={() => handlePrint(rechnung.id)}
+                    >
+                      <Printer className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-red-600 hover:text-red-800"
+                      onClick={() => setLoeschenId(rechnung.id)}
+                      title="Rechnung stornieren/löschen"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex gap-2 items-center">
-                  <p className="font-semibold mr-2">{(rechnung.betrag_brutto || 0).toFixed(2)} €</p>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    disabled={printingId === rechnung.id}
-                    onClick={() => handlePrint(rechnung.id)}
-                  >
-                    <Printer className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="text-red-600 hover:text-red-800"
-                    onClick={() => setLoeschenId(rechnung.id)}
-                    title="Rechnung stornieren/löschen"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
+                {editingNummerId === rechnung.id && nummerFehler && (
+                  <p className="text-xs text-red-600 mt-1.5">{nummerFehler}</p>
+                )}
               </div>
             ))}
           </div>

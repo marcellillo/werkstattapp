@@ -93,6 +93,7 @@ export async function generateRechnungsNummer(
   const { data: lastRechnung } = await supabase
     .from('kunden_rechnungen')
     .select('rechnungs_nr')
+    .eq('betrieb_id', betriebId)
     .ilike('rechnungs_nr', `${prefix}-${year}%`)
     .order('erstellt_am', { ascending: false })
     .limit(1)
