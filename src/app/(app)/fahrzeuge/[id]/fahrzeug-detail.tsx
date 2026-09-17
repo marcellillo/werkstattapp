@@ -105,6 +105,7 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
   const [kundeZuweisenLoading, setKundeZuweisenLoading] = useState(false)
   const [loeschenBestaetigung, setLoeschenBestaetigung] = useState(false)
   const [loeschen, setLoeschen] = useState(false)
+  const [loeschenFehler, setLoeschenFehler] = useState<string | null>(null)
   const [linkKopiert, setLinkKopiert] = useState(false)
   const [showUebergabe, setShowUebergabe] = useState(false)
   const [uebergabeKm, setUebergabeKm] = useState('')
@@ -504,16 +505,30 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
 
   async function handleLoeschen() {
     setLoeschen(true)
+    setLoeschenFehler(null)
     try {
       // Teile löschen
-      await supabase.from('ersatzteile').delete().eq('auftrag_id', auftrag.id)
+      const { error: teileError } = await supabase.from('ersatzteile').delete().eq('auftrag_id', auftrag.id)
+      if (teileError) throw teileError
       // Fotos löschen
-      await supabase.from('auftrag_fotos').delete().eq('auftrag_id', auftrag.id)
-      // Auftrag löschen
-      await supabase.from('auftraege').delete().eq('id', auftrag.id)
+      const { error: fotosError } = await supabase.from('auftrag_fotos').delete().eq('auftrag_id', auftrag.id)
+      if (fotosError) throw fotosError
+      // Auftrag löschen -- count prüfen, weil eine RLS-Policy nicht erlaubte Zeilen
+      // einfach unsichtbar macht (0 betroffene Zeilen) statt einen Fehler zu werfen
+      const { error: auftragError, count } = await supabase
+        .from('auftraege')
+        .delete({ count: 'exact' })
+        .eq('id', auftrag.id)
+      if (auftragError) throw auftragError
+      if (!count) throw new Error('Keine Berechtigung zum Löschen dieses Auftrags.')
       router.push('/fahrzeuge')
-    } catch (err) {
+    } catch (err: any) {
       console.error('Fehler beim Löschen:', err)
+      setLoeschenFehler(
+        err?.code === '23503'
+          ? 'Dieser Auftrag kann nicht gelöscht werden, da noch Rechnungen oder andere Dokumente damit verknüpft sind.'
+          : (err?.message || 'Löschen fehlgeschlagen.')
+      )
       setLoeschen(false)
     }
   }
@@ -1028,9 +1043,14 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
               {teile.length > 0 && <p>• <strong>{teile.length} Ersatzteile</strong></p>}
               <p>• Alle Fotos und das Annahmeprotokoll</p>
             </div>
+            {loeschenFehler && (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700">
+                {loeschenFehler}
+              </div>
+            )}
             <div className="flex gap-3">
               <button
-                onClick={() => setLoeschenBestaetigung(false)}
+                onClick={() => { setLoeschenBestaetigung(false); setLoeschenFehler(null) }}
                 className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
               >
                 Abbrechen
