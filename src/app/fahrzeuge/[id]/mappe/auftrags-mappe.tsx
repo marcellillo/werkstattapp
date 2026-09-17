@@ -18,6 +18,7 @@ const TEIL_STATUS_COLOR: Record<string, string> = {
 }
 const KAT_LABEL: Record<string, string> = {
   annahme: 'Annahme', reparatur: 'Reparatur', fertig: 'Fertig', allgemein: 'Allgemein',
+  fahrzeugschein: 'Fahrzeugschein', tuev: 'TÜV-Bericht',
 }
 const ZUSTAND_LABEL: Record<string, string> = {
   sehr_gut: 'Sehr gut', gut: 'Gut', maessig: 'Mäßig', schlecht: 'Schlecht',
@@ -94,7 +95,7 @@ export function AuftragsMappe({ auftrag, fotos, rechnungen = [], firma, betriebI
       datum: r.rechnungsdatum || null,
     })),
   ]
-  const alleKats = ['annahme', 'reparatur', 'fertig', 'allgemein'].filter(k => fotosByKat(k).length > 0)
+  const alleKats = ['annahme', 'reparatur', 'fertig', 'allgemein', 'fahrzeugschein', 'tuev'].filter(k => fotosByKat(k).length > 0)
 
   return (
     <>

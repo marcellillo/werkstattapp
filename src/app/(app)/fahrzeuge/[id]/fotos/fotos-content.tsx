@@ -10,16 +10,18 @@ type Foto = {
   id: string
   url: string
   storage_path: string
-  kategorie: 'annahme' | 'reparatur' | 'fertig' | 'allgemein'
+  kategorie: 'annahme' | 'reparatur' | 'fertig' | 'allgemein' | 'fahrzeugschein' | 'tuev'
   beschreibung: string | null
   erstellt_am: string
 }
 
 const KATEGORIEN = [
-  { value: 'annahme',   label: 'Annahme',   color: 'bg-blue-100 text-blue-700 border-blue-300' },
-  { value: 'reparatur', label: 'Reparatur',  color: 'bg-orange-100 text-orange-700 border-orange-300' },
-  { value: 'fertig',    label: 'Fertig',     color: 'bg-green-100 text-green-700 border-green-300' },
-  { value: 'allgemein', label: 'Allgemein',  color: 'bg-gray-100 text-gray-700 border-gray-300' },
+  { value: 'annahme',       label: 'Annahme',        color: 'bg-blue-100 text-blue-700 border-blue-300' },
+  { value: 'reparatur',     label: 'Reparatur',       color: 'bg-orange-100 text-orange-700 border-orange-300' },
+  { value: 'fertig',        label: 'Fertig',          color: 'bg-green-100 text-green-700 border-green-300' },
+  { value: 'allgemein',     label: 'Allgemein',       color: 'bg-gray-100 text-gray-700 border-gray-300' },
+  { value: 'fahrzeugschein', label: 'Fahrzeugschein', color: 'bg-purple-100 text-purple-700 border-purple-300' },
+  { value: 'tuev',          label: 'TÜV-Bericht',     color: 'bg-yellow-100 text-yellow-700 border-yellow-300' },
 ] as const
 
 interface Props {
