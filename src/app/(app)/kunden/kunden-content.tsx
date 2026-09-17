@@ -1,6 +1,6 @@
 'use client'
 import { useState } from 'react'
-import { Users, Search, Plus, Phone, MapPin, Building, Car, ClipboardList, ChevronDown, ChevronRight, Pencil } from 'lucide-react'
+import { Users, Search, Plus, Phone, MapPin, Building, Car, ClipboardList, ChevronDown, ChevronRight, Pencil, Trash2, Loader2 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { createClient } from '@/lib/supabase/client'
@@ -233,6 +233,8 @@ export function KundenContent({
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
   const [editingKunde, setEditingKunde] = useState<Kunde | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
   const [form, setForm] = useState({
     vorname: '', nachname: '', firma: '', email: '', telefon: '', mobil: '', strasse: '', plz: '', ort: ''
   })
@@ -274,6 +276,32 @@ export function KundenContent({
       setShowForm(false)
     }
     setSaving(false)
+  }
+
+  async function handleDelete(kunde: Kunde) {
+    const name = `${kunde.vorname ?? ''} ${kunde.nachname}`.trim()
+    if (!confirm(`${name} wirklich löschen? Fahrzeuge und Aufträge dieses Kunden bleiben erhalten, verlieren aber die Zuordnung.`)) return
+    setDeleteError(null)
+    setDeletingId(kunde.id)
+    const { error, count } = await supabase
+      .from('kunden')
+      .delete({ count: 'exact' })
+      .eq('id', kunde.id)
+    setDeletingId(null)
+    if (error) {
+      console.error('Kunde löschen fehlgeschlagen:', error)
+      setDeleteError(
+        error.code === '23503'
+          ? `${name} kann nicht gelöscht werden, da noch Rechnungen oder Kostenvoranschläge mit diesem Kunden verknüpft sind.`
+          : `Kunde konnte nicht gelöscht werden: ${error.message}`
+      )
+      return
+    }
+    if (!count) {
+      setDeleteError('Keine Berechtigung zum Löschen dieses Kunden.')
+      return
+    }
+    setKunden(prev => prev.filter(k => k.id !== kunde.id))
   }
 
   return (
@@ -353,6 +381,10 @@ export function KundenContent({
               className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
           </div>
 
+          {deleteError && (
+            <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{deleteError}</div>
+          )}
+
           {filtered.length === 0 ? (
             <Card><CardContent className="py-16 text-center">
               <Users className="w-12 h-12 mx-auto mb-3 text-gray-300" />
@@ -375,13 +407,23 @@ export function KundenContent({
                         {k.telefon && <p className="text-xs text-gray-800 flex items-center gap-1 mt-0.5"><Phone className="w-3 h-3" />{k.telefon}</p>}
                         {k.ort && <p className="text-xs text-gray-800 flex items-center gap-1 mt-0.5"><MapPin className="w-3 h-3" />{k.ort}</p>}
                       </div>
-                      <button
-                        onClick={() => setEditingKunde(k)}
-                        className="p-1.5 hover:bg-gray-100 rounded-lg transition flex-shrink-0 text-gray-400 hover:text-gray-700"
-                        title="Kunde bearbeiten"
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <button
+                          onClick={() => setEditingKunde(k)}
+                          className="p-1.5 hover:bg-gray-100 rounded-lg transition text-gray-400 hover:text-gray-700"
+                          title="Kunde bearbeiten"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(k)}
+                          disabled={deletingId === k.id}
+                          className="p-1.5 hover:bg-red-50 rounded-lg transition text-gray-400 hover:text-red-600 disabled:opacity-50"
+                          title="Kunde löschen"
+                        >
+                          {deletingId === k.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                        </button>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
