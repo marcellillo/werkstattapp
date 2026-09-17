@@ -17,6 +17,11 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
   turbopack: {},
+  // @sparticuz/chromium liefert vorkompilierte Binärdateien (.br) aus, die an ihrem
+  // node_modules-Pfad liegen bleiben müssen -- der Bundler darf sie nicht anfassen/
+  // verschieben, sonst findet chromium.executablePath() sie zur Laufzeit nicht mehr
+  // ("input directory .../@sparticuz/chromium/bin does not exist").
+  serverExternalPackages: ['@sparticuz/chromium', 'puppeteer-core'],
 }
 
 export default withPWA(nextConfig)
