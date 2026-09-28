@@ -24,12 +24,17 @@ export async function proxy(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
 
   const isAuthRoute = request.nextUrl.pathname.startsWith('/login') || request.nextUrl.pathname.startsWith('/register')
+  // Passwort-Reset: der Token steckt im URL-Fragment (#access_token=...), das der
+  // Server nie sieht -- die Middleware darf hier also nicht anhand von "user
+  // vorhanden?" umleiten, sonst geht der Fragment-Teil beim Redirect verloren,
+  // bevor der Browser-Client ihn verarbeiten und die Recovery-Session herstellen kann.
+  const isPasswordReset = request.nextUrl.pathname.startsWith('/passwort-zuruecksetzen')
   const isPublicApi =
     request.nextUrl.pathname.startsWith('/api/buchen') ||
     request.nextUrl.pathname.startsWith('/status/') ||
     request.nextUrl.pathname.startsWith('/api/invitations/get') ||
     request.nextUrl.pathname.startsWith('/api/invitations/accept')
-  const isPublicRoute = isAuthRoute || request.nextUrl.pathname === '/' || isPublicApi
+  const isPublicRoute = isAuthRoute || isPasswordReset || request.nextUrl.pathname === '/' || isPublicApi
 
   if (!user && !isPublicRoute) {
     return NextResponse.redirect(new URL('/login', request.url))
