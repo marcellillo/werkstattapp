@@ -1,11 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useState, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
-export default function PasswortZuruecksetzenPage() {
+function PasswortZuruecksetzenInner() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createClient()
   const [bereit, setBereit] = useState(false)
   const [pruefeLink, setPruefeLink] = useState(true)
@@ -16,9 +17,25 @@ export default function PasswortZuruecksetzenPage() {
   const [erfolg, setErfolg] = useState(false)
 
   useEffect(() => {
-    // Der Recovery-Token steckt im URL-Fragment (#access_token=...) und wird vom
-    // Browser-Client automatisch verarbeitet -- das Event PASSWORD_RECOVERY zeigt an,
-    // dass die Session daraus erfolgreich aufgebaut wurde.
+    // Zwei mögliche Wege, wie eine Recovery-Session hier ankommt:
+    // 1) token_hash als Query-Parameter -- direkt per verifyOtp() gegen die API
+    //    geprüft, ganz ohne GoTrues Redirect-Allowlist (Query-Parameter statt
+    //    URL-Fragment, funktioniert unabhängig von der in Supabase hinterlegten
+    //    Redirect-URL-Konfiguration).
+    // 2) Klassischer E-Mail-Link mit Token im URL-Fragment (#access_token=...),
+    //    vom Browser-Client automatisch verarbeitet -- Event PASSWORD_RECOVERY.
+    const tokenHash = searchParams.get('token_hash')
+    const typ = searchParams.get('type')
+
+    if (tokenHash && typ === 'recovery') {
+      supabase.auth.verifyOtp({ token_hash: tokenHash, type: 'recovery' }).then(({ error }) => {
+        if (error) setFehler(error.message)
+        else setBereit(true)
+        setPruefeLink(false)
+      })
+      return
+    }
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'PASSWORD_RECOVERY') {
         setBereit(true)
@@ -131,5 +148,20 @@ export default function PasswortZuruecksetzenPage() {
         )}
       </div>
     </div>
+  )
+}
+
+export default function PasswortZuruecksetzenPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
+          <div className="animate-spin text-4xl mb-4">⏳</div>
+          <h1 className="text-xl font-bold text-gray-900">Wird geladen...</h1>
+        </div>
+      </div>
+    }>
+      <PasswortZuruecksetzenInner />
+    </Suspense>
   )
 }
