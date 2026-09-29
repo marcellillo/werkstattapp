@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
       fahrzeugMarke: fahrzeug?.marke || '',
       fahrzeugModell: fahrzeug?.modell || '',
       fahrzeugKennzeichen: fahrzeug?.kennzeichen || '',
-      fahrzeugFin: fahrzeug?.fin || '',
+      fahrzeugFin: fahrzeug?.fahrgestellnummer || '',
       kundeName: kunde ? `${kunde.vorname || ''} ${kunde.nachname || ''}`.trim() || 'Unbekannt' : 'Unbekannt',
       kundeAdresse: kunde?.strasse || '',
       kundeOrt: `${kunde?.plz || ''} ${kunde?.ort || ''}`,

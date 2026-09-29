@@ -14,12 +14,12 @@ export async function generateKostenvoranschlagNummer(
   if (fahrzeugId) {
     const { data: fahrzeug } = await supabase
       .from('fahrzeuge')
-      .select('fin')
+      .select('fahrgestellnummer')
       .eq('id', fahrzeugId)
       .maybeSingle()
 
-    if (fahrzeug?.fin) {
-      finTail = fahrzeug.fin.slice(-6).toUpperCase() + '-'
+    if (fahrzeug?.fahrgestellnummer) {
+      finTail = fahrzeug.fahrgestellnummer.slice(-6).toUpperCase() + '-'
     }
   }
 
@@ -57,12 +57,12 @@ export async function generateWerkstattauftragNummer(
   if (fahrzeugId) {
     const { data: fahrzeug } = await supabase
       .from('fahrzeuge')
-      .select('fin')
+      .select('fahrgestellnummer')
       .eq('id', fahrzeugId)
       .maybeSingle()
 
-    if (fahrzeug?.fin) {
-      finTail = fahrzeug.fin.slice(-6).toUpperCase() + '-'
+    if (fahrzeug?.fahrgestellnummer) {
+      finTail = fahrzeug.fahrgestellnummer.slice(-6).toUpperCase() + '-'
     }
   }
 
@@ -121,12 +121,12 @@ export async function generateVorvertragNummer(
   if (fahrzeugId) {
     const { data: fahrzeug } = await supabase
       .from('fahrzeuge')
-      .select('fin')
+      .select('fahrgestellnummer')
       .eq('id', fahrzeugId)
       .maybeSingle()
 
-    if (fahrzeug?.fin) {
-      finTail = fahrzeug.fin.slice(-6).toUpperCase() + '-'
+    if (fahrzeug?.fahrgestellnummer) {
+      finTail = fahrzeug.fahrgestellnummer.slice(-6).toUpperCase() + '-'
     }
   }
 

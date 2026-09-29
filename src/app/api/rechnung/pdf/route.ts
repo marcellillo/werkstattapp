@@ -10,12 +10,14 @@ function fmt(n: number) {
   return n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-function rowsHtml(positionen: RechnungPosition[], istPauschal: boolean): string {
-  return positionen.map(pos => istPauschal ? `
+function rowsHtml(positionen: RechnungPosition[], istPauschal: boolean, startNr = 1): string {
+  return positionen.map((pos, i) => istPauschal ? `
     <tr>
+      <td class="ta-right pos-nr">${startNr + i}</td>
       <td>${pos.beschreibung}</td>
     </tr>` : `
     <tr>
+      <td class="ta-right pos-nr">${startNr + i}</td>
       <td>${pos.beschreibung}</td>
       <td class="ta-right">${pos.menge}</td>
       <td class="ta-right">${fmt(pos.preis)} €</td>
@@ -70,14 +72,15 @@ export async function POST(req: NextRequest) {
     ]
 
     const positionsHeaderHtml = istPauschal
-      ? `<tr><th>Artikelbezeichnung</th></tr>`
+      ? `<tr><th class="ta-right pos-nr">Pos.</th><th>Artikelbezeichnung</th></tr>`
       : `<tr>
+              <th class="ta-right pos-nr">Pos.</th>
               <th>Artikelbezeichnung</th>
               <th class="ta-right">Menge</th>
               <th class="ta-right">Preis (netto)</th>
               <th class="ta-right">Summe (netto)</th>
             </tr>`
-    const summenzeileColspan = istPauschal ? 1 : 3
+    const summenzeileColspan = istPauschal ? 1 : 4
 
     const ersatzteileSectionHtml = ersatzteilePositionen.length > 0 ? `
       <div class="section-box">
@@ -87,7 +90,7 @@ export async function POST(req: NextRequest) {
             ${positionsHeaderHtml}
           </thead>
           <tbody>
-            ${rowsHtml(ersatzteilePositionen, istPauschal)}
+            ${rowsHtml(ersatzteilePositionen, istPauschal, 1)}
             <tr class="section-summe">
               <td colspan="${summenzeileColspan}" style="text-align:right;">Summe</td>
               <td class="ta-right">${fmt(detail.ersatzteileNetto)} €</td>
@@ -140,13 +143,19 @@ export async function POST(req: NextRequest) {
       fahrzeugMarke: fahrzeug?.marke || '',
       fahrzeugModell: fahrzeug?.modell || '',
       fahrzeugKennzeichen: fahrzeug?.kennzeichen || '—',
-      fahrzeugFin: fahrzeug?.fin || '—',
+      fahrzeugFin: fahrzeug?.fahrgestellnummer || '—',
+      fahrzeugFarbe: fahrzeug?.farbe || '—',
+      fahrzeugKm: fahrzeug?.kilometerstand != null ? `${fahrzeug.kilometerstand.toLocaleString('de-DE')} km` : '—',
+      fahrzeugHu: fahrzeug?.naechste_hauptuntersuchung
+        ? new Date(fahrzeug.naechste_hauptuntersuchung).toLocaleDateString('de-DE', { month: '2-digit', year: 'numeric' })
+        : '—',
       ersatzteileSectionHtml,
       arbeitswerteHeaderHtml: positionsHeaderHtml,
-      arbeitswerteRowsHtml: rowsHtml(arbeitswerteAlle, istPauschal),
+      arbeitswerteRowsHtml: rowsHtml(arbeitswerteAlle, istPauschal, ersatzteilePositionen.length + 1),
       arbeitswerteSummeColspan: summenzeileColspan,
       arbeitswerteSumme: fmt(detail.arbeitNetto + detail.kleinteilNetto + detail.sonstigesNetto),
       ersatzteileSummenzeileHtml,
+      lohnMaterialZeileHtml: `<tr><td colspan="3" style="text-align:right; color:#475569;">Lohn (netto): <strong>${fmt(detail.arbeitNetto + detail.kleinteilNetto + detail.sonstigesNetto)} €</strong> · Material (netto): <strong>${fmt(detail.ersatzteileNetto)} €</strong></td><td></td></tr>`,
       summeNetto: fmt(rechnung.betrag_netto),
       mwstZeileHtml,
       zahlungsziel,

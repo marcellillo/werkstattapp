@@ -25,11 +25,12 @@
         .adresse-wert { font-size: 10.5px; line-height: 1.6; }
         .adresse-wert strong { font-size: 11px; }
 
-        .fz-box { background: #f1f5f9; border: 1.5px solid #cbd5e1; border-radius: 7px; padding: 8px 12px; margin-bottom: 14px; display: flex; }
-        .fz-feld { flex: 1; border-right: 1px solid #e2e8f0; padding-right: 6px; }
-        .fz-feld:last-child { border-right: none; }
+        .fz-box { background: #f1f5f9; border: 1.5px solid #cbd5e1; border-radius: 7px; padding: 8px 12px; margin-bottom: 14px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px 10px; }
+        .fz-feld { border-right: 1px solid #e2e8f0; padding-right: 6px; }
+        .fz-feld:nth-child(3n) { border-right: none; }
         .fz-label { font-size: 7.5px; text-transform: uppercase; color: #64748b; letter-spacing: 0.06em; font-weight: 700; }
         .fz-wert { font-size: 10.5px; font-weight: 700; color: #0f172a; margin-top: 2px; }
+        .pos-nr { width: 24px; color: #94a3b8; font-weight: 400; }
 
         .section-box { margin-bottom: 14px; border: 1.5px solid #cbd5e1; border-radius: 7px; overflow: hidden; }
         .section-titel { background: #1e293b; color: white; font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; padding: 6px 10px; }
@@ -99,7 +100,10 @@
         <div class="fz-box">
             <div class="fz-feld"><div class="fz-label">Fahrzeug</div><div class="fz-wert">{{fahrzeugMarke}} {{fahrzeugModell}}</div></div>
             <div class="fz-feld"><div class="fz-label">Kennzeichen</div><div class="fz-wert">{{fahrzeugKennzeichen}}</div></div>
+            <div class="fz-feld"><div class="fz-label">Farbe</div><div class="fz-wert">{{fahrzeugFarbe}}</div></div>
             <div class="fz-feld"><div class="fz-label">FIN / VIN</div><div class="fz-wert">{{fahrzeugFin}}</div></div>
+            <div class="fz-feld"><div class="fz-label">KM-Stand</div><div class="fz-wert">{{fahrzeugKm}}</div></div>
+            <div class="fz-feld"><div class="fz-label">Nächste HU</div><div class="fz-wert">{{fahrzeugHu}}</div></div>
         </div>
 
         {{ersatzteileSectionHtml}}
@@ -124,6 +128,7 @@
             <tbody>
                 {{ersatzteileSummenzeileHtml}}
                 <tr><td colspan="3" style="text-align:right; color:#475569;">Arbeitsaufwand Summe:</td><td class="ta-right">{{arbeitswerteSumme}} €</td></tr>
+                {{lohnMaterialZeileHtml}}
                 <tr><td colspan="3" style="text-align:right; color:#475569;">Netto-Gesamtbetrag:</td><td class="ta-right">{{summeNetto}} €</td></tr>
                 {{mwstZeileHtml}}
             </tbody>

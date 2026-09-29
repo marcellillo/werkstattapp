@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
       fahrzeug: {
         marke: wa.fahrzeug?.marke || '',
         modell: wa.fahrzeug?.modell || '',
-        fin: wa.fahrzeug?.fin || '',
+        fin: wa.fahrzeug?.fahrgestellnummer || '',
         kennzeichen: wa.fahrzeug?.kennzeichen,
         baujahr: wa.fahrzeug?.baujahr,
         farbe: wa.fahrzeug?.farbe,
