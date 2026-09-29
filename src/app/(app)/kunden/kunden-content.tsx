@@ -248,6 +248,8 @@ export function KundenContent({
       k.nachname?.toLowerCase().includes(q) ||
       k.firma?.toLowerCase().includes(q) ||
       k.telefon?.includes(q) ||
+      k.strasse?.toLowerCase().includes(q) ||
+      k.plz?.toLowerCase().includes(q) ||
       k.ort?.toLowerCase().includes(q)
   })
 
@@ -377,7 +379,7 @@ export function KundenContent({
 
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600" />
-            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Name, Firma, Ort..."
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Name, Firma, Anschrift..."
               className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
           </div>
 
@@ -405,7 +407,12 @@ export function KundenContent({
                         <p className="font-semibold text-gray-900">{k.vorname} {k.nachname}</p>
                         {k.firma && <p className="text-xs text-gray-800 flex items-center gap-1 mt-0.5"><Building className="w-3 h-3" />{k.firma}</p>}
                         {k.telefon && <p className="text-xs text-gray-800 flex items-center gap-1 mt-0.5"><Phone className="w-3 h-3" />{k.telefon}</p>}
-                        {k.ort && <p className="text-xs text-gray-800 flex items-center gap-1 mt-0.5"><MapPin className="w-3 h-3" />{k.ort}</p>}
+                        {(k.strasse || k.plz || k.ort) && (
+                          <p className="text-xs text-gray-800 flex items-center gap-1 mt-0.5">
+                            <MapPin className="w-3 h-3 flex-shrink-0" />
+                            {[k.strasse, [k.plz, k.ort].filter(Boolean).join(' ')].filter(Boolean).join(', ')}
+                          </p>
+                        )}
                       </div>
                       <div className="flex items-center gap-1 flex-shrink-0">
                         <button
