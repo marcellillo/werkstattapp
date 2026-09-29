@@ -100,24 +100,24 @@ export async function POST(req: NextRequest) {
       </div>` : ''
 
     const ersatzteileSummenzeileHtml = ersatzteilePositionen.length > 0
-      ? `<tr><td colspan="3" style="text-align:right; color:#475569;">Ersatzteile Summe:</td><td class="ta-right">${fmt(detail.ersatzteileNetto)} €</td></tr>`
+      ? `<tr><td colspan="3" style="text-align:right; color:#333;">Ersatzteile Summe:</td><td class="ta-right">${fmt(detail.ersatzteileNetto)} €</td></tr>`
       : ''
 
     const mwstZeileHtml = !kleinunternehmer
-      ? `<tr><td colspan="3" style="text-align:right; color:#475569;">zzgl. 19% MwSt.:</td><td class="ta-right">${fmt(rechnung.betrag_mwst)} €</td></tr>
+      ? `<tr><td colspan="3" style="text-align:right; color:#333;">zzgl. 19% MwSt.:</td><td class="ta-right">${fmt(rechnung.betrag_mwst)} €</td></tr>
          <tr class="gesamt"><td colspan="3" style="text-align:right;">Gesamtbetrag (brutto):</td><td class="ta-right">${fmt(rechnung.betrag_brutto)} €</td></tr>`
       : `<tr class="gesamt"><td colspan="3" style="text-align:right;">Gesamtbetrag:</td><td class="ta-right">${fmt(rechnung.betrag_brutto)} €</td></tr>
          <tr><td colspan="4" class="mwst-hinweis">Gemäß §19 UStG wird keine Umsatzsteuer berechnet (Kleinunternehmerregelung).</td></tr>`
 
     const kundeBlock = (kunde?.vorname || kunde?.nachname)
       ? `${kunde.firma ? `<strong>${kunde.firma}</strong><br>` : ''}<strong>${kunde.vorname ?? ''} ${kunde.nachname ?? ''}</strong><br>${kunde.strasse ? kunde.strasse + '<br>' : ''}${(kunde.plz || kunde.ort) ? `${kunde.plz ?? ''} ${kunde.ort ?? ''}<br>` : ''}${kunde.telefon ? 'Tel.: ' + kunde.telefon : ''}`
-      : '<span style="color:#94a3b8">Kein Kunde hinterlegt</span>'
+      : '<span style="color:#888">Kein Kunde hinterlegt</span>'
 
     const firmaSteuerBlock = `${firma.firma_ust_id ? `USt-IdNr.: ${firma.firma_ust_id}<br>` : ''}${firma.firma_steuernummer ? `Steuernr.: ${firma.firma_steuernummer}` : ''}`
 
     const bankBlock = firma.firma_iban
       ? `${firma.firma_bank ? firma.firma_bank + '<br>' : ''}IBAN: <strong>${firma.firma_iban}</strong>${firma.firma_bic ? '<br>BIC: ' + firma.firma_bic : ''}`
-      : '<span style="color:#94a3b8">Bitte IBAN in Einstellungen eintragen</span>'
+      : '<span style="color:#888">Bitte IBAN in Einstellungen eintragen</span>'
 
     const firmaFooterzeile = [
       firma.firma_name || 'Kfz-Werkstatt',
@@ -155,7 +155,7 @@ export async function POST(req: NextRequest) {
       arbeitswerteSummeColspan: summenzeileColspan,
       arbeitswerteSumme: fmt(detail.arbeitNetto + detail.kleinteilNetto + detail.sonstigesNetto),
       ersatzteileSummenzeileHtml,
-      lohnMaterialZeileHtml: `<tr><td colspan="3" style="text-align:right; color:#475569;">Lohn (netto): <strong>${fmt(detail.arbeitNetto + detail.kleinteilNetto + detail.sonstigesNetto)} €</strong> · Material (netto): <strong>${fmt(detail.ersatzteileNetto)} €</strong></td><td></td></tr>`,
+      lohnMaterialZeileHtml: `<tr><td colspan="3" style="text-align:right; color:#333;">Lohn (netto): <strong>${fmt(detail.arbeitNetto + detail.kleinteilNetto + detail.sonstigesNetto)} €</strong> · Material (netto): <strong>${fmt(detail.ersatzteileNetto)} €</strong></td><td></td></tr>`,
       summeNetto: fmt(rechnung.betrag_netto),
       mwstZeileHtml,
       zahlungsziel,
