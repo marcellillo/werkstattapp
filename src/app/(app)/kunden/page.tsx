@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { KundenContent } from './kunden-content'
 import { getBetriebIdForUser } from '@/lib/server-betrieb'
+import { resolveFirmaSettings } from '@/lib/firma-settings'
 
 export default async function KundenPage() {
   const supabase = await createClient()
@@ -9,6 +10,7 @@ export default async function KundenPage() {
   if (!user) redirect('/login')
 
   const betriebId = await getBetriebIdForUser(supabase, user.id)
+  const firma = await resolveFirmaSettings(supabase, betriebId)
 
   const [{ data: kunden }, { data: kundenMitAuftraegen }] = await Promise.all([
     supabase
@@ -36,6 +38,7 @@ export default async function KundenPage() {
     <KundenContent
       kunden={(kunden ?? []) as any[]}
       kundenMitAuftraegen={(kundenMitAuftraegen ?? []) as any[]}
+      firma={firma}
     />
   )
 }

@@ -107,6 +107,8 @@ export interface Kunde {
   strasse?: string
   plz?: string
   ort?: string
+  lat?: number | null
+  lng?: number | null
   notizen?: string
   created_at: string
   updated_at: string
