@@ -23,6 +23,7 @@ export function KundenKarte({ kunden: initialKunden, firma }: Props) {
   const [kunden, setKunden] = useState(initialKunden)
   const [werkstattPos, setWerkstattPos] = useState<[number, number] | null>(null)
   const [geocodiereAnzahl, setGeocodiereAnzahl] = useState(0)
+  const [mapBereit, setMapBereit] = useState(false)
   const supabase = createClient()
 
   // Karte einmalig initialisieren
@@ -49,6 +50,11 @@ export function KundenKarte({ kunden: initialKunden, firma }: Props) {
 
       markerGroupRef.current = L.layerGroup().addTo(map)
       mapRef.current = map
+      // Erst jetzt ist die Karte tatsächlich bereit -- die Marker-Zeichnen-Effekte
+      // (die z.B. beim Mount VOR diesem async Import bereits gelaufen sein können,
+      // ohne etwas zu zeichnen) müssen dadurch erneut anlaufen, sonst bleibt die
+      // Karte leer, wenn sich kunden/werkstattPos danach nicht mehr ändern.
+      setMapBereit(true)
     })()
 
     return () => {
@@ -122,7 +128,7 @@ export function KundenKarte({ kunden: initialKunden, firma }: Props) {
     if (punkte.length > 0) {
       map.fitBounds(punkte, { padding: [40, 40], maxZoom: 14 })
     }
-  }, [kunden, werkstattPos, firma.firma_name, firma.firma_strasse])
+  }, [kunden, werkstattPos, firma.firma_name, firma.firma_strasse, mapBereit])
 
   return (
     <div className="space-y-2">
