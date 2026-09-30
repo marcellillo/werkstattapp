@@ -187,55 +187,55 @@ export function RechnungDruck({ rechnungId, betriebId, firma: firmaHint }: { rec
         @media print { .no-print { display: none !important; } body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
         .page { max-width: 794px; margin: 0 auto; padding: 20px; }
 
-        .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; }
-        .firma-name { font-size: 17px; font-weight: 700; color: #ea580c; }
-        .firma-details { font-size: 9.5px; color: #555; margin-top: 3px; line-height: 1.55; }
+        .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+        .firma-name { font-size: 15px; font-weight: 700; color: #111; }
+        .firma-details { font-size: 9.5px; color: #333; margin-top: 3px; line-height: 1.55; }
         .rechnung-block { text-align: right; }
-        .rechnung-titel { font-size: 20px; font-weight: 700; color: #1e293b; }
-        .rechnung-nr { font-size: 11px; color: #64748b; margin-top: 3px; }
-        .rechnung-datum { font-size: 9.5px; color: #94a3b8; margin-top: 2px; }
+        .rechnung-titel { font-size: 17px; font-weight: 700; color: #111; }
+        .rechnung-nr { font-size: 11px; color: #333; margin-top: 3px; }
+        .rechnung-datum { font-size: 9.5px; color: #555; margin-top: 2px; }
 
-        .trennlinie { border: none; border-top: 2px solid #ea580c; margin: 10px 0; }
+        .trennlinie { border: none; border-top: 1px solid #111; margin: 8px 0; }
 
-        .adressen { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 14px; }
-        .adresse-label { font-size: 8.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #94a3b8; margin-bottom: 4px; }
+        .adressen { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid #ccc; }
+        .adresse-label { font-size: 8.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #555; margin-bottom: 4px; }
         .adresse-wert { font-size: 10.5px; line-height: 1.6; }
         .adresse-wert strong { font-size: 11px; }
 
-        .fz-box { background: #f1f5f9; border: 1.5px solid #cbd5e1; border-radius: 7px; padding: 8px 12px; margin-bottom: 14px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
-        .fz-feld { border-right: 1px solid #e2e8f0; padding-right: 6px; }
-        .fz-feld:last-child { border-right: none; }
-        .fz-label { font-size: 7.5px; text-transform: uppercase; color: #64748b; letter-spacing: 0.06em; font-weight: 700; }
-        .fz-wert { font-size: 10.5px; font-weight: 700; color: #0f172a; margin-top: 2px; }
+        .fz-box { border-top: 1px solid #ccc; border-bottom: 1px solid #ccc; padding: 8px 0; margin-bottom: 12px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px 10px; }
+        .fz-feld { border-right: 1px solid #e0e0e0; padding-right: 6px; }
+        .fz-feld:nth-child(3n) { border-right: none; }
+        .fz-label { font-size: 7.5px; text-transform: uppercase; color: #555; letter-spacing: 0.04em; font-weight: 700; }
+        .fz-wert { font-size: 10.5px; font-weight: 700; color: #111; margin-top: 2px; }
+        .pos-nr { width: 24px; color: #777; font-weight: 400; }
 
-        .absenderzeile { font-size: 7.5px; font-style: italic; color: #94a3b8; margin-bottom: 8px; }
+        .absenderzeile { font-size: 7.5px; font-style: italic; color: #777; margin-bottom: 8px; }
 
-        .section-box { margin-bottom: 14px; border: 1.5px solid #cbd5e1; border-radius: 7px; overflow: hidden; }
-        .section-titel { background: #1e293b; color: white; font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; padding: 6px 10px; }
+        .section-box { margin-bottom: 12px; }
+        .section-titel { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #111; padding: 4px 0; border-bottom: 1px solid #111; }
         table { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
-        thead tr { background: #f1f5f9; }
-        th { padding: 6px 8px; text-align: left; font-size: 8.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #475569; }
+        th { padding: 5px 6px; text-align: left; font-size: 8.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: #333; border-bottom: 1px solid #111; }
         th.ta-right { text-align: right; }
-        td { padding: 5px 8px; font-size: 9.5px; border-bottom: 1px solid #f1f5f9; }
+        td { padding: 4px 6px; font-size: 9.5px; border-bottom: 1px solid #eee; }
         td.ta-right { text-align: right; }
-        tr.section-summe td { font-weight: 700; font-size: 10px; border-top: 1.5px solid #cbd5e1; background: #f8fafc; }
-        tr.summen td { padding: 4px 8px; font-size: 10.5px; }
-        tr.gesamt td { font-weight: 700; font-size: 12px; border-top: 2px solid #1e293b; background: #f8fafc; }
-        tr.mwst-hinweis td { font-size: 8.5px; color: #64748b; font-style: italic; padding: 6px 8px; }
+        tr.section-summe td { font-weight: 700; font-size: 10px; border-top: 1px solid #111; border-bottom: none; }
+        tr.summen td { padding: 3px 6px; font-size: 10.5px; }
+        tr.gesamt td { font-weight: 700; font-size: 12px; border-top: 1px solid #111; padding-top: 6px; }
+        tr.mwst-hinweis td { font-size: 8.5px; color: #555; font-style: italic; padding: 6px; }
 
-        .zahlung { display: grid; gap: 12px; margin-top: 14px; }
+        .zahlung { display: grid; gap: 24px; margin-top: 12px; padding-top: 10px; border-top: 1px solid #ccc; }
         .zahlung-2 { grid-template-columns: 1fr 1fr; }
         .zahlung-3 { grid-template-columns: 1fr 1fr auto; }
-        .zahlung-box { background: #f1f5f9; border: 1.5px solid #cbd5e1; border-radius: 7px; padding: 10px 13px; }
-        .zahlung-titel { font-size: 8.5px; font-weight: 700; text-transform: uppercase; color: #475569; letter-spacing: 0.06em; margin-bottom: 6px; border-bottom: 1px solid #cbd5e1; padding-bottom: 5px; }
+        .zahlung-box { }
+        .zahlung-titel { font-size: 8.5px; font-weight: 700; text-transform: uppercase; color: #333; letter-spacing: 0.04em; margin-bottom: 5px; }
         .zahlung-wert { font-size: 10.5px; line-height: 1.75; }
-        .zahlung-wert strong { color: #ea580c; }
-        .qr-box { background: #f1f5f9; border: 1.5px solid #cbd5e1; border-radius: 7px; padding: 10px 13px; display: flex; flex-direction: column; gap: 8px; }
+        .zahlung-wert strong { color: #111; }
+        .qr-box { display: flex; flex-direction: column; gap: 8px; }
         .qr-item { display: flex; align-items: center; gap: 8px; }
-        .qr-label { font-size: 8.5px; font-weight: 700; text-transform: uppercase; color: #475569; letter-spacing: 0.05em; }
-        .qr-hint { font-size: 7.5px; color: #94a3b8; line-height: 1.35; margin-top: 1px; }
+        .qr-label { font-size: 8.5px; font-weight: 700; text-transform: uppercase; color: #333; letter-spacing: 0.04em; }
+        .qr-hint { font-size: 7.5px; color: #777; line-height: 1.35; margin-top: 1px; }
 
-        .footer { margin-top: 14px; border-top: 1px solid #e2e8f0; padding-top: 8px; font-size: 8.5px; color: #94a3b8; text-align: center; line-height: 1.6; }
+        .footer { margin-top: 12px; border-top: 1px solid #ccc; padding-top: 8px; font-size: 8.5px; color: #666; text-align: center; line-height: 1.6; }
 
         .action-bar { position: fixed; top: 0; left: 0; right: 0; z-index: 999; display: flex; align-items: center; gap: 8px; padding: 10px 12px; padding-top: max(10px, env(safe-area-inset-top)); background: rgba(255,255,255,0.96); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border-bottom: 1px solid #e2e8f0; }
         .action-bar button, .action-bar a { padding: 8px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; text-decoration: none; white-space: nowrap; }
@@ -306,7 +306,7 @@ export function RechnungDruck({ rechnungId, betriebId, firma: firmaHint }: { rec
                   {kd.telefon && <>Tel.: {kd.telefon}<br /></>}
                   {kd.email && <>{kd.email}</>}
                 </>
-              ) : <span style={{color:'#94a3b8'}}>Kein Kunde hinterlegt</span>}
+              ) : <span style={{color:'#888'}}>Kein Kunde hinterlegt</span>}
             </div>
           </div>
           <div className="adresse-box">
@@ -324,8 +324,10 @@ export function RechnungDruck({ rechnungId, betriebId, firma: firmaHint }: { rec
         <div className="fz-box">
           <div className="fz-feld"><div className="fz-label">Fahrzeug</div><div className="fz-wert">{fz?.marke} {fz?.modell}</div></div>
           <div className="fz-feld"><div className="fz-label">Kennzeichen</div><div className="fz-wert">{fz?.kennzeichen || '—'}</div></div>
+          <div className="fz-feld"><div className="fz-label">Farbe</div><div className="fz-wert">{fz?.farbe || '—'}</div></div>
           <div className="fz-feld"><div className="fz-label">FIN / VIN</div><div className="fz-wert">{fz?.fin || fz?.fahrgestellnummer || '—'}</div></div>
-          <div className="fz-feld"><div className="fz-label">Kilometerstand</div><div className="fz-wert">{fz?.kilometerstand ? fz.kilometerstand.toLocaleString('de-DE') + ' km' : '—'}</div></div>
+          <div className="fz-feld"><div className="fz-label">KM-Stand</div><div className="fz-wert">{fz?.kilometerstand ? fz.kilometerstand.toLocaleString('de-DE') + ' km' : '—'}</div></div>
+          <div className="fz-feld"><div className="fz-label">Nächste HU</div><div className="fz-wert">{fz?.naechste_hauptuntersuchung ? new Date(fz.naechste_hauptuntersuchung).toLocaleDateString('de-DE', { month: '2-digit', year: 'numeric' }) : '—'}</div></div>
         </div>
 
         {/* Ersatzteile — eigene Box */}
@@ -335,6 +337,7 @@ export function RechnungDruck({ rechnungId, betriebId, firma: firmaHint }: { rec
             <table>
               <thead>
                 <tr>
+                  <th className="ta-right pos-nr">Pos.</th>
                   <th>Artikelbezeichnung</th>
                   {!istPauschal && <th className="ta-right">Menge</th>}
                   {!istPauschal && <th className="ta-right">Preis (netto)</th>}
@@ -344,6 +347,7 @@ export function RechnungDruck({ rechnungId, betriebId, firma: firmaHint }: { rec
               <tbody>
                 {ersatzteilePositionen.map((pos, i) => (
                   <tr key={i}>
+                    <td className="ta-right pos-nr">{i + 1}</td>
                     <td>{pos.beschreibung}</td>
                     {!istPauschal && <td className="ta-right">{pos.menge}x</td>}
                     {!istPauschal && <td className="ta-right">{fmtEuro(pos.preis)}</td>}
@@ -351,7 +355,7 @@ export function RechnungDruck({ rechnungId, betriebId, firma: firmaHint }: { rec
                   </tr>
                 ))}
                 <tr className="section-summe">
-                  <td colSpan={istPauschal ? 1 : 3} style={{textAlign: 'right'}}>Summe</td>
+                  <td colSpan={istPauschal ? 2 : 4} style={{textAlign: 'right'}}>Summe</td>
                   <td className="ta-right">{fmtEuro(detail.ersatzteileNetto)}</td>
                 </tr>
               </tbody>
@@ -365,6 +369,7 @@ export function RechnungDruck({ rechnungId, betriebId, firma: firmaHint }: { rec
           <table>
             <thead>
               <tr>
+                <th className="ta-right pos-nr">Pos.</th>
                 <th>Bezeichnung</th>
                 {!istPauschal && <th className="ta-right">Menge</th>}
                 {!istPauschal && <th className="ta-right">Einzelpreis</th>}
@@ -373,10 +378,11 @@ export function RechnungDruck({ rechnungId, betriebId, firma: firmaHint }: { rec
             </thead>
             <tbody>
               {arbeitswertePositionen.length === 0 && detail.kleinteilNetto <= 0 && detail.sonstigesNetto <= 0 ? (
-                <tr><td colSpan={istPauschal ? 1 : 4} style={{color: '#94a3b8', fontStyle: 'italic'}}>Keine Arbeitszeit erfasst</td></tr>
+                <tr><td colSpan={istPauschal ? 2 : 5} style={{color: '#888', fontStyle: 'italic'}}>Keine Arbeitszeit erfasst</td></tr>
               ) : (
                 arbeitswertePositionen.map((pos, i) => (
                   <tr key={i}>
+                    <td className="ta-right pos-nr">{ersatzteilePositionen.length + i + 1}</td>
                     <td>{pos.beschreibung}</td>
                     {!istPauschal && <td className="ta-right">{pos.menge}</td>}
                     {!istPauschal && <td className="ta-right">{fmtEuro(pos.preis)}</td>}
@@ -386,6 +392,7 @@ export function RechnungDruck({ rechnungId, betriebId, firma: firmaHint }: { rec
               )}
               {detail.kleinteilNetto > 0 && (
                 <tr>
+                  <td className="ta-right pos-nr">{ersatzteilePositionen.length + arbeitswertePositionen.length + 1}</td>
                   <td>Kleinteilpauschale (Schrauben, Dichtungen, Kleinmaterial)</td>
                   {!istPauschal && <td className="ta-right">1</td>}
                   {!istPauschal && <td className="ta-right">{fmtEuro(detail.kleinteilNetto)}</td>}
@@ -394,6 +401,7 @@ export function RechnungDruck({ rechnungId, betriebId, firma: firmaHint }: { rec
               )}
               {detail.sonstigesNetto > 0 && (
                 <tr>
+                  <td className="ta-right pos-nr">{ersatzteilePositionen.length + arbeitswertePositionen.length + (detail.kleinteilNetto > 0 ? 1 : 0) + 1}</td>
                   <td>{detail.sonstigesBeschreibung || 'Sonstige Leistungen'}</td>
                   {!istPauschal && <td className="ta-right">1</td>}
                   {!istPauschal && <td className="ta-right">{fmtEuro(detail.sonstigesNetto)}</td>}
@@ -401,7 +409,7 @@ export function RechnungDruck({ rechnungId, betriebId, firma: firmaHint }: { rec
                 </tr>
               )}
               <tr className="section-summe">
-                <td colSpan={istPauschal ? 1 : 3} style={{textAlign: 'right'}}>Summe</td>
+                <td colSpan={istPauschal ? 2 : 4} style={{textAlign: 'right'}}>Summe</td>
                 <td className="ta-right">{fmtEuro(detail.arbeitNetto + detail.kleinteilNetto + detail.sonstigesNetto)}</td>
               </tr>
             </tbody>
@@ -413,22 +421,28 @@ export function RechnungDruck({ rechnungId, betriebId, firma: firmaHint }: { rec
           <tbody>
             {ersatzteilePositionen.length > 0 && (
               <tr className="summen">
-                <td colSpan={3} style={{textAlign:'right', color:'#475569'}}>Ersatzteile Summe:</td>
+                <td colSpan={3} style={{textAlign:'right', color:'#333'}}>Ersatzteile Summe:</td>
                 <td className="ta-right">{fmtEuro(detail.ersatzteileNetto)}</td>
               </tr>
             )}
             <tr className="summen">
-              <td colSpan={3} style={{textAlign:'right', color:'#475569'}}>Arbeitsaufwand Summe:</td>
+              <td colSpan={3} style={{textAlign:'right', color:'#333'}}>Arbeitsaufwand Summe:</td>
               <td className="ta-right">{fmtEuro(detail.arbeitNetto + detail.kleinteilNetto + detail.sonstigesNetto)}</td>
             </tr>
             <tr className="summen">
-              <td colSpan={3} style={{textAlign:'right', color:'#475569'}}>Netto-Gesamtbetrag:</td>
+              <td colSpan={3} style={{textAlign:'right', color:'#333'}}>
+                Lohn (netto): <strong>{fmtEuro(detail.arbeitNetto + detail.kleinteilNetto + detail.sonstigesNetto)}</strong> · Material (netto): <strong>{fmtEuro(detail.ersatzteileNetto)}</strong>
+              </td>
+              <td></td>
+            </tr>
+            <tr className="summen">
+              <td colSpan={3} style={{textAlign:'right', color:'#333'}}>Netto-Gesamtbetrag:</td>
               <td className="ta-right">{fmtEuro(rechnung.betrag_netto)}</td>
             </tr>
             {!kleinunternehmer ? (
               <>
                 <tr className="summen">
-                  <td colSpan={3} style={{textAlign:'right', color:'#475569'}}>zzgl. {mwstSatz}% MwSt.:</td>
+                  <td colSpan={3} style={{textAlign:'right', color:'#333'}}>zzgl. {mwstSatz}% MwSt.:</td>
                   <td className="ta-right">{fmtEuro(rechnung.betrag_mwst)}</td>
                 </tr>
                 <tr className="gesamt">
@@ -465,7 +479,7 @@ export function RechnungDruck({ rechnungId, betriebId, firma: firmaHint }: { rec
               {firma.firma_bank && <>{firma.firma_bank}<br /></>}
               {firma.firma_iban && <>IBAN: <strong>{firma.firma_iban}</strong><br /></>}
               {firma.firma_bic && <>BIC: {firma.firma_bic}</>}
-              {!firma.firma_iban && <span style={{color:'#94a3b8'}}>Bitte IBAN in Einstellungen eintragen</span>}
+              {!firma.firma_iban && <span style={{color:'#888'}}>Bitte IBAN in Einstellungen eintragen</span>}
             </div>
           </div>
           {(giroQr || paypalQr || sumupQr || stripeQr) && (
