@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { ChevronDown, Plus, Trash2, CheckCircle, Clock, Printer } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { DecimalField } from '@/components/ui/decimal-field'
 import { createClient } from '@/lib/supabase/client'
 
 interface Props {
@@ -317,26 +318,20 @@ export function WerkstattauftragItem({ werkstattauftrag, betriebId, onDelete }: 
                   <div className="grid grid-cols-3 gap-3">
                     <div>
                       <label className="text-xs text-slate-600">Stunden</label>
-                      <input
-                        type="number"
+                      <DecimalField
                         placeholder="1,5"
                         value={newPos.stunden}
-                        onChange={(e) => setNewPos({ ...newPos, stunden: parseFloat(e.target.value) || 0 })}
+                        onChange={(n) => setNewPos({ ...newPos, stunden: n })}
                         className="w-full px-2 py-1 border rounded text-sm"
-                        step="0.5"
-                        min="0"
                       />
                     </div>
                     <div>
                       <label className="text-xs text-slate-600">€/Std</label>
-                      <input
-                        type="number"
+                      <DecimalField
                         placeholder="55,00"
                         value={newPos.stundensatz}
-                        onChange={(e) => setNewPos({ ...newPos, stundensatz: parseFloat(e.target.value) || 0 })}
+                        onChange={(n) => setNewPos({ ...newPos, stundensatz: n })}
                         className="w-full px-2 py-1 border rounded text-sm"
-                        step="0.01"
-                        min="0"
                       />
                     </div>
                     <button

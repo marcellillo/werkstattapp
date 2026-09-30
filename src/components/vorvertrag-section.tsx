@@ -66,8 +66,8 @@ export function VorvertragSection({
           kaeufer_plz: formData.kaeuferPlz,
           kaeufer_ort: formData.kaeuferOrt,
           kaeufer_telefon: formData.kaeuferTelefon,
-          kaufpreis: parseFloat(formData.kaufpreis),
-          anzahlung: formData.anzahlung ? parseFloat(formData.anzahlung) : null,
+          kaufpreis: parseFloat(formData.kaufpreis.replace(',', '.')),
+          anzahlung: formData.anzahlung ? parseFloat(formData.anzahlung.replace(',', '.')) : null,
         }),
       })
 
@@ -164,17 +164,19 @@ export function VorvertragSection({
               className="px-2 py-1 text-sm border rounded"
             />
             <input
-              type="number"
+              type="text"
+              inputMode="decimal"
               placeholder="Kaufpreis (€)"
               value={formData.kaufpreis}
-              onChange={e => handleChange('kaufpreis', e.target.value)}
+              onChange={e => handleChange('kaufpreis', e.target.value.replace(/[^0-9,.\-]/g, ''))}
               className="px-2 py-1 text-sm border rounded"
             />
             <input
-              type="number"
+              type="text"
+              inputMode="decimal"
               placeholder="Anzahlung (€) (optional)"
               value={formData.anzahlung}
-              onChange={e => handleChange('anzahlung', e.target.value)}
+              onChange={e => handleChange('anzahlung', e.target.value.replace(/[^0-9,.\-]/g, ''))}
               className="px-2 py-1 text-sm border rounded col-span-2"
             />
           </div>

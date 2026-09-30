@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Plus, Trash2, Upload } from 'lucide-react'
 import { LieferscheinScanner } from '@/components/lieferschein-scanner'
 import { LieferscheinGalerie } from '@/components/lieferschein-galerie'
+import { DecimalField } from '@/components/ui/decimal-field'
 import { mitAufschlag } from '@/lib/ersatzteil-aufschlag'
 
 interface Teil {
@@ -180,23 +181,17 @@ export function TeileErfassungTabs({
                 className="w-full px-3 py-2 border rounded text-sm"
               />
               <div className="grid grid-cols-3 gap-2">
-                <input
-                  type="number"
+                <DecimalField
                   placeholder="Menge"
                   value={newTeilMitPreis.menge}
-                  onChange={(e) => setNewTeilMitPreis({ ...newTeilMitPreis, menge: parseFloat(e.target.value) || 0 })}
+                  onChange={(n) => setNewTeilMitPreis({ ...newTeilMitPreis, menge: n })}
                   className="px-2 py-1 border rounded text-sm"
-                  min="0"
-                  step="0.1"
                 />
-                <input
-                  type="number"
+                <DecimalField
                   placeholder="Preis (€)"
                   value={newTeilMitPreis.preis}
-                  onChange={(e) => setNewTeilMitPreis({ ...newTeilMitPreis, preis: parseFloat(e.target.value) || 0 })}
+                  onChange={(n) => setNewTeilMitPreis({ ...newTeilMitPreis, preis: n })}
                   className="px-2 py-1 border rounded text-sm"
-                  min="0"
-                  step="0.01"
                 />
                 <Button
                   onClick={handleAddTeilMitPreis}
@@ -251,14 +246,11 @@ export function TeileErfassungTabs({
                 className="w-full px-3 py-2 border rounded text-sm"
               />
               <div className="grid grid-cols-2 gap-2">
-                <input
-                  type="number"
+                <DecimalField
                   placeholder="Menge"
                   value={newTeilOhnePreis.menge}
-                  onChange={(e) => setNewTeilOhnePreis({ ...newTeilOhnePreis, menge: parseFloat(e.target.value) || 0 })}
+                  onChange={(n) => setNewTeilOhnePreis({ ...newTeilOhnePreis, menge: n })}
                   className="px-2 py-1 border rounded text-sm"
-                  min="0"
-                  step="0.1"
                 />
                 <Button
                   onClick={handleAddTeilOhnePreis}
