@@ -19,7 +19,7 @@ export function KostenvoranschlagItem({ kostenvoranschlag, betriebId, onDelete }
   const [loading, setLoading] = useState(false)
   const [modus, setModus] = useState<'festpreis' | 'einzeln'>('festpreis')
   const [festpreis, setFestpreis] = useState<number>(0)
-  const [newPos, setNewPos] = useState({ beschreibung: '', menge: 1, preis: 0 })
+  const [newPos, setNewPos] = useState({ beschreibung: '', menge: 1, preis: 0, einkaufspreis: 0 })
   const [printing, setPrinting] = useState(false)
 
   const handlePrint = async () => {
@@ -114,12 +114,13 @@ export function KostenvoranschlagItem({ kostenvoranschlag, betriebId, onDelete }
           menge,
           einzelpreis: newPos.preis,
           gesamtpreis: menge * newPos.preis,
+          einkaufspreis: newPos.einkaufspreis || null,
         })
         .select()
 
       if (error) throw error
       setPositionen([...positionen, data[0]])
-      setNewPos({ beschreibung: '', menge: 1, preis: 0 })
+      setNewPos({ beschreibung: '', menge: 1, preis: 0, einkaufspreis: 0 })
     } catch (error) {
       console.error('Fehler beim Hinzufügen:', error)
       alert('Fehler beim Hinzufügen')
@@ -386,10 +387,16 @@ export function KostenvoranschlagItem({ kostenvoranschlag, betriebId, onDelete }
                           className="px-2 py-1 border rounded text-sm"
                         />
                         <DecimalField
-                          placeholder="Einzelpreis"
+                          placeholder="Einzelpreis (VK)"
                           value={newPos.preis}
                           onChange={(n) => setNewPos({ ...newPos, preis: n })}
                           className="px-2 py-1 border rounded text-sm"
+                        />
+                        <DecimalField
+                          placeholder="Einkaufspreis (optional)"
+                          value={newPos.einkaufspreis}
+                          onChange={(n) => setNewPos({ ...newPos, einkaufspreis: n })}
+                          className="col-span-2 px-2 py-1 border rounded text-sm"
                         />
                       </div>
                       <button

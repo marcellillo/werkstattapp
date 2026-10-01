@@ -16,7 +16,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid input' }, { status: 400 })
     }
 
-    // Füge jedes Teil zur Tabelle hinzu (mit 45% Aufschlag auf Preis wenn vorhanden)
+    // Füge jedes Teil zur Tabelle hinzu (mit 45% Aufschlag auf Preis wenn vorhanden).
+    // Der ursprüngliche Einkaufspreis (teil.preis) wird zusätzlich gespeichert --
+    // für die Gewinn-Berechnung in den Statistiken (VK - EK), die sonst nach dem
+    // Aufschlag nicht mehr rekonstruierbar wäre.
     const positionen = teile.map(teil => {
       const einzelpreis = teil.preis ? mitAufschlag(teil.preis) : undefined
       const gesamtpreis = einzelpreis ? einzelpreis * (teil.menge || 1) : undefined
@@ -28,6 +31,7 @@ export async function POST(req: NextRequest) {
         menge: teil.menge || 1,
         ...(einzelpreis && { einzelpreis }),
         ...(gesamtpreis && { gesamtpreis }),
+        ...(teil.preis && { einkaufspreis: teil.preis }),
       }
     })
 

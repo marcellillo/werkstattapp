@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { syncAuftragEinnahmen } from '@/lib/auftrag-einnahmen'
 
 export async function POST(req: NextRequest) {
   try {
@@ -26,7 +27,7 @@ export async function POST(req: NextRequest) {
 
     const { data: rechnung, error: rechnungError } = await supabase
       .from('kunden_rechnungen')
-      .select('id')
+      .select('id, auftrag_id')
       .eq('id', rechnungId)
       .eq('betrieb_id', betriebId)
       .maybeSingle()
@@ -57,6 +58,8 @@ export async function POST(req: NextRequest) {
       .eq('id', rechnungId)
       .eq('betrieb_id', betriebId)
     if (updateError) throw updateError
+
+    await syncAuftragEinnahmen(supabase, rechnung.auftrag_id, betriebId)
 
     return NextResponse.json({ erfolg: true })
   } catch (error: any) {

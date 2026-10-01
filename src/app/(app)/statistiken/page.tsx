@@ -34,7 +34,7 @@ export default async function StatistikenPage() {
     // Werkstatt-Aufträge (fremde Fahrzeuge)
     supabase
       .from('auftraege')
-      .select('id, einnahmen, fertiggestellt_am, ersatzteile(einzelpreis, menge)')
+      .select('id, einnahmen, fertiggestellt_am, kostenvoranschlaege(rechnung_id, kostenvoranschlag_position(einkaufspreis, menge))')
       .eq('betrieb_id', betriebId)
       .eq('status', 'fertig')
       .not('fahrzeug', 'is', null)
@@ -50,10 +50,19 @@ export default async function StatistikenPage() {
       .not('fahrzeug', 'is', null),
   ])
 
-  // Berechne Ersatzteile-Kosten für Werkstatt
+  // Ersatzteile-Kosten für Werkstatt = Summe der echten Einkaufspreise (EK) aller
+  // in Rechnung gestellten Kostenvoranschlag-Positionen -- nicht die lose über
+  // auftrag_id verknüpfte ersatzteile-Tabelle (Bestellstatus-Tracking), die mit
+  // dem tatsächlich abgerechneten Material nichts zu tun haben muss. Nur
+  // Kostenvoranschläge zählen, die bereits einer Rechnung zugeordnet sind
+  // (rechnung_id gesetzt) -- passend zu auftraege.einnahmen, das ebenfalls nur
+  // tatsächlich gestellte Rechnungen berücksichtigt.
   const werkstattWithKosten = (werkstattRaw ?? []).map((w: any) => ({
     ...w,
-    ersatzteile_kosten: (w.ersatzteile ?? []).reduce((sum: number, e: any) => sum + ((e.einzelpreis || 0) * (e.menge || 1)), 0),
+    ersatzteile_kosten: (w.kostenvoranschlaege ?? [])
+      .filter((kv: any) => kv.rechnung_id)
+      .flatMap((kv: any) => kv.kostenvoranschlag_position ?? [])
+      .reduce((sum: number, p: any) => sum + ((p.einkaufspreis || 0) * (p.menge || 1)), 0),
   }))
 
   return (

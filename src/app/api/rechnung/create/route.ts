@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { generateRechnungsNummer } from '@/lib/nummernvergabe'
+import { syncAuftragEinnahmen } from '@/lib/auftrag-einnahmen'
 
 export async function POST(req: NextRequest) {
   try {
@@ -159,6 +160,8 @@ export async function POST(req: NextRequest) {
     if (validWaIds.length > 0) {
       await supabase.from('werkstattauftraege').update({ rechnung_id: rechnung.id }).in('id', validWaIds)
     }
+
+    await syncAuftragEinnahmen(supabase, auftragId, betriebId)
 
     console.log('[Rechnung] ✅ Erstellt:', rechnungsNummer)
 
