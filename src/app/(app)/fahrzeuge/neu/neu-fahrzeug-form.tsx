@@ -123,6 +123,9 @@ export function NeuFahrzeugForm({ kunden, hebebuehnen }: Props) {
   const [kFirma, setKFirma] = useState('')
   const [kTelefon, setKTelefon] = useState('')
   const [kMobil, setKMobil] = useState('')
+  const [kStrasse, setKStrasse] = useState('')
+  const [kPlz, setKPlz] = useState('')
+  const [kOrt, setKOrt] = useState('')
 
   // Annahme-Protokoll (optional, direkt bei Anlage)
   const [annahmeErfassen, setAnnahmeErfassen] = useState(false)
@@ -312,6 +315,9 @@ export function NeuFahrzeugForm({ kunden, hebebuehnen }: Props) {
           firma: kFirma || null,
           telefon: kTelefon || null,
           mobil: kMobil || null,
+          strasse: kStrasse || null,
+          plz: kPlz || null,
+          ort: kOrt || null,
         }).select().single()
         finalKundenId = newK?.id ?? null
       }
@@ -639,6 +645,21 @@ export function NeuFahrzeugForm({ kunden, hebebuehnen }: Props) {
                 <div>
                   <label className="text-xs text-gray-800 mb-1 block">Mobil</label>
                   <input value={kMobil} onChange={e => setKMobil(e.target.value)} placeholder="0171 9876543"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
+                </div>
+                <div className="col-span-2">
+                  <label className="text-xs text-gray-800 mb-1 block">Straße</label>
+                  <input value={kStrasse} onChange={e => setKStrasse(e.target.value)} placeholder="Musterstraße 12"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-800 mb-1 block">PLZ</label>
+                  <input value={kPlz} onChange={e => setKPlz(e.target.value)} placeholder="38350"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-800 mb-1 block">Ort</label>
+                  <input value={kOrt} onChange={e => setKOrt(e.target.value)} placeholder="Helmstedt"
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
                 </div>
               </div>
