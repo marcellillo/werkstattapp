@@ -12,7 +12,7 @@ interface StatistikenProps {
 
 export function StatistikenContent({ verkauft, werkstatt = [], lager = [] }: StatistikenProps) {
   const [tab, setTab] = useState<'verkauf' | 'werkstatt' | 'lager'>('verkauf')
-  const [period, setPeriod] = useState<'week' | 'month' | 'year' | 'all'>('month')
+  const [period, setPeriod] = useState<'week' | 'month' | 'year' | 'all'>('year')
 
   const formatCurrency = (val: number) => {
     return new Intl.NumberFormat('de-DE', {
@@ -40,7 +40,8 @@ export function StatistikenContent({ verkauft, werkstatt = [], lager = [] }: Sta
   const verkauftFiltered = filterByPeriod(verkauft, 'verkauft_am')
   const verkaufUmsatz = verkauftFiltered.reduce((sum, v) => sum + (v.einnahmen || 0), 0)
   const verkaufGewinn = verkauftFiltered.reduce((sum, v) => {
-    const verkaufspreis = v.fahrzeug?.verkaufspreis || v.einnahmen || 0
+    // Tatsächlich erzielter Verkaufspreis (einnahmen) hat Vorrang vor dem Inserat-Preis
+    const verkaufspreis = v.einnahmen || v.fahrzeug?.verkaufspreis || 0
     const einkaufspreis = v.fahrzeug?.einkaufspreis || 0
     return sum + (verkaufspreis - einkaufspreis)
   }, 0)
@@ -72,13 +73,12 @@ export function StatistikenContent({ verkauft, werkstatt = [], lager = [] }: Sta
     .slice(0, 5)
 
   // ===== WERKSTATT TAB =====
-  const werkstattFiltered = filterByPeriod(werkstatt, 'fertiggestellt_am')
+  // Eine Zeile = eine ausgestellte (nicht stornierte) Rechnung, Beträge netto
+  const werkstattFiltered = filterByPeriod(werkstatt, 'datum')
   const werkstattUmsatz = werkstattFiltered.reduce((sum, v) => sum + (v.einnahmen || 0), 0)
-  const werkstattGewinn = werkstattFiltered.reduce((sum, v) => {
-    const einnahmen = v.einnahmen || 0
-    const kosten = v.ersatzteile_kosten || 0
-    return sum + (einnahmen - kosten)
-  }, 0)
+  const werkstattKosten = werkstattFiltered.reduce((sum, v) => sum + (v.ersatzteile_kosten || 0), 0)
+  const werkstattKostenGeschaetzt = werkstattFiltered.reduce((sum, v) => sum + (v.kosten_geschaetzt || 0), 0)
+  const werkstattGewinn = werkstattUmsatz - werkstattKosten
 
   // ===== LAGER TAB =====
   // Lager kommt als auftraege mit nested fahrzeuge
@@ -87,6 +87,8 @@ export function StatistikenContent({ verkauft, werkstatt = [], lager = [] }: Sta
     .filter(Boolean)
   const lagerBestand = lagerFahrzeuge.length
   const lagerWert = lagerFahrzeuge.reduce((sum, v) => sum + (v?.einkaufspreis || 0), 0)
+  const lagerOhneEk = lagerFahrzeuge.filter((v) => !v?.einkaufspreis).length
+  const verkaufOhneEk = verkauftFiltered.filter((v) => !v.fahrzeug?.einkaufspreis).length
   const lagerDurchschnitt = lagerBestand > 0 ? lagerWert / lagerBestand : 0
 
   // Render content based on active tab
@@ -106,6 +108,9 @@ export function StatistikenContent({ verkauft, werkstatt = [], lager = [] }: Sta
             <p className="text-sm text-green-600 font-medium">Gewinn</p>
             <p className="text-3xl font-bold text-green-900 mt-2">{formatCurrency(verkaufGewinn)}</p>
             <p className="text-xs text-green-600 mt-2">{verkaufUmsatz > 0 ? ((verkaufGewinn / verkaufUmsatz) * 100).toFixed(1) : 0}% Quote</p>
+            {verkaufOhneEk > 0 && (
+              <p className="text-xs text-amber-700 mt-1">{verkaufOhneEk} Verkauf{verkaufOhneEk !== 1 ? 'e' : ''} ohne Einkaufspreis (Gewinn dort = voller Verkaufspreis)</p>
+            )}
           </CardContent>
         </Card>
 
@@ -165,25 +170,29 @@ export function StatistikenContent({ verkauft, werkstatt = [], lager = [] }: Sta
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="border-2 border-blue-200 bg-blue-50">
           <CardContent className="p-6">
-            <p className="text-sm text-blue-600 font-medium">Umsatz</p>
+            <p className="text-sm text-blue-600 font-medium">Umsatz (netto)</p>
             <p className="text-3xl font-bold text-blue-900 mt-2">{formatCurrency(werkstattUmsatz)}</p>
-            <p className="text-xs text-blue-600 mt-2">{werkstattFiltered.length} Aufträge</p>
+            <p className="text-xs text-blue-600 mt-2">{werkstattFiltered.length} Rechnung{werkstattFiltered.length !== 1 ? 'en' : ''}</p>
           </CardContent>
         </Card>
 
         <Card className="border-2 border-green-200 bg-green-50">
           <CardContent className="p-6">
-            <p className="text-sm text-green-600 font-medium">Deckungsbeitrag</p>
+            <p className="text-sm text-green-600 font-medium">Deckungsbeitrag (netto)</p>
             <p className="text-3xl font-bold text-green-900 mt-2">{formatCurrency(werkstattGewinn)}</p>
             <p className="text-xs text-green-600 mt-2">{werkstattUmsatz > 0 ? ((werkstattGewinn / werkstattUmsatz) * 100).toFixed(1) : 0}% Quote</p>
+            <p className="text-xs text-green-700 mt-1">
+              Material (Einkauf): {formatCurrency(werkstattKosten)}
+              {werkstattKostenGeschaetzt > 0 && ` · davon geschätzt ${formatCurrency(werkstattKostenGeschaetzt)}`}
+            </p>
           </CardContent>
         </Card>
 
         <Card className="border-2 border-purple-200 bg-purple-50">
           <CardContent className="p-6">
-            <p className="text-sm text-purple-600 font-medium">Durchschnitt pro Auftrag</p>
+            <p className="text-sm text-purple-600 font-medium">Durchschnitt pro Rechnung</p>
             <p className="text-3xl font-bold text-purple-900 mt-2">{formatCurrency(werkstattFiltered.length > 0 ? werkstattUmsatz / werkstattFiltered.length : 0)}</p>
-            <p className="text-xs text-purple-600 mt-2">Umsatz</p>
+            <p className="text-xs text-purple-600 mt-2">Umsatz netto</p>
           </CardContent>
         </Card>
       </div>
@@ -191,10 +200,19 @@ export function StatistikenContent({ verkauft, werkstatt = [], lager = [] }: Sta
       {werkstattFiltered.length === 0 && (
         <Card>
           <CardContent className="p-6 text-center">
-            <p className="text-slate-500">Keine abgeschlossenen Werkstatt-Aufträge in diesem Zeitraum</p>
+            <p className="text-slate-500">Keine Rechnungen in diesem Zeitraum</p>
           </CardContent>
         </Card>
       )}
+
+      <Card>
+        <CardContent className="p-6 text-sm text-slate-700 space-y-1">
+          <h3 className="font-semibold text-slate-900 mb-2">So wird gerechnet</h3>
+          <p><strong>Umsatz</strong> = Summe der Nettobeträge aller ausgestellten Rechnungen (stornierte zählen nicht), nach Rechnungsdatum.</p>
+          <p><strong>Material (Einkauf)</strong> = Einkaufspreis × Menge der abgerechneten Teile. Liegt kein gespeicherter Einkaufspreis vor (Altdaten, manuell erfasste Teile), wird er als Verkaufspreis ÷ 1,45 geschätzt – diese Anteile sind oben als „geschätzt“ ausgewiesen.</p>
+          <p><strong>Deckungsbeitrag</strong> = Umsatz − Material. Lohn und Kleinteilpauschale haben hier keine Einkaufskosten.</p>
+        </CardContent>
+      </Card>
     </div>
   )
 
@@ -214,6 +232,9 @@ export function StatistikenContent({ verkauft, werkstatt = [], lager = [] }: Sta
             <p className="text-sm text-green-600 font-medium">Lagerwert</p>
             <p className="text-3xl font-bold text-green-900 mt-2">{formatCurrency(lagerWert)}</p>
             <p className="text-xs text-green-600 mt-2">Gesamteinkaufspreis</p>
+            {lagerOhneEk > 0 && (
+              <p className="text-xs text-amber-700 mt-1">{lagerOhneEk} von {lagerBestand} Fahrzeugen ohne hinterlegten Einkaufspreis</p>
+            )}
           </CardContent>
         </Card>
 
