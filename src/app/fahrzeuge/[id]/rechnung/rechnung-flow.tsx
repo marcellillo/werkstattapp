@@ -1,10 +1,16 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { Receipt, ChevronRight, Percent, Calculator, Loader2 } from 'lucide-react'
+import { Receipt, ChevronRight, Percent, Calculator, Loader2, Droplets } from 'lucide-react'
 import { RechnungDruck } from './rechnung-druck'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import { mitAufschlag } from '@/lib/ersatzteil-aufschlag'
+import { DecimalField } from '@/components/ui/decimal-field'
+import { ladeBetriebsstoffeMitBestand, formatMenge, rundeBetrag, type BetriebsstoffMitBestand } from '@/lib/betriebsstoffe'
+
+// Komma- und Punkt-Eingabe ("4,5" / "4.5") zulassen; native type="number"-Felder blockieren das Komma
+const zahl = (s: string) => parseFloat(s.replace(',', '.')) || 0
+const nurZahlZeichen = (s: string) => s.replace(/[^0-9,.]/g, '')
 
 interface Props {
   auftrag: any
@@ -39,6 +45,9 @@ export function RechnungFlow({ auftrag, firma, betriebId }: Props) {
   const [kleinteilFest, setKleinteilFest] = useState('11')
   const [sonstigesBeschreibung, setSonstigesBeschreibung] = useState('')
   const [sonstiges, setSonstiges] = useState('')
+
+  const [betriebsstoffe, setBetriebsstoffe] = useState<BetriebsstoffMitBestand[]>([])
+  const [bsMengen, setBsMengen] = useState<Record<string, number>>({})
 
   const [erstellenLaeuft, setErstellenLaeuft] = useState(false)
   const [rechnungId, setRechnungId] = useState<string | null>(null)
@@ -112,6 +121,8 @@ export function RechnungFlow({ auftrag, firma, betriebId }: Props) {
                   kostenvoranschlag_id: zielKvId, betrieb_id: betriebId, ersatzteil_id: t.id,
                   beschreibung: t.bezeichnung || '', menge: t.menge || 1,
                   ...(einzelpreis && { einzelpreis }), ...(gesamtpreis && { gesamtpreis }),
+                  // Der Einkaufspreis aus dem Lieferschein geht sonst nach dem Aufschlag verloren
+                  ...(t.einzelpreis && { einkaufspreis: t.einzelpreis }),
                 }
               })
               await supabase.from('kostenvoranschlag_position').insert(positionen)
@@ -182,6 +193,12 @@ export function RechnungFlow({ auftrag, firma, betriebId }: Props) {
         }
       }
 
+      try {
+        setBetriebsstoffe(await ladeBetriebsstoffeMitBestand(supabase, betriebId, { nurAktive: true }))
+      } catch (bsError) {
+        console.error('[RechnungFlow] Betriebsstoffe konnten nicht geladen werden:', bsError)
+      }
+
       setOffeneKvs(kvs)
       setOffeneWas(was)
       setSelectedKvIds(new Set(kvs.map(k => k.id)))
@@ -221,18 +238,21 @@ export function RechnungFlow({ auftrag, firma, betriebId }: Props) {
 
   const ersatzteileNetto = offeneKvs.filter(k => selectedKvIds.has(k.id)).reduce((s, k) => s + k.summe, 0)
   const arbeitNetto = offeneWas.filter(w => selectedWaIds.has(w.id)).reduce((s, w) => s + w.summe, 0)
-  const sonstigesNetto = parseFloat(sonstiges) || 0
+  const sonstigesNetto = zahl(sonstiges)
   const kleinteilNetto = kleinteilAktiv
     ? (kleinteilModus === 'prozent'
-        ? ersatzteileNetto * (parseFloat(kleinteilProzent) || 0) / 100
-        : parseFloat(kleinteilFest) || 0)
+        ? ersatzteileNetto * zahl(kleinteilProzent) / 100
+        : zahl(kleinteilFest))
     : 0
 
-  const gesamtNetto = ersatzteileNetto + arbeitNetto + sonstigesNetto + kleinteilNetto
+  const betriebsstoffeNetto = betriebsstoffe.reduce(
+    (s, b) => s + rundeBetrag((bsMengen[b.id] || 0) * b.preis_pro_einheit), 0)
+
+  const gesamtNetto = ersatzteileNetto + arbeitNetto + sonstigesNetto + kleinteilNetto + betriebsstoffeNetto
   const mwst = kleinunternehmer ? 0 : gesamtNetto * 0.19
   const gesamtBrutto = gesamtNetto + mwst
 
-  const nichtsAusgewaehlt = selectedKvIds.size === 0 && selectedWaIds.size === 0 && kleinteilNetto <= 0 && sonstigesNetto <= 0
+  const nichtsAusgewaehlt = selectedKvIds.size === 0 && selectedWaIds.size === 0 && kleinteilNetto <= 0 && sonstigesNetto <= 0 && betriebsstoffeNetto <= 0
 
   async function rechnungErstellen() {
     setErstellenLaeuft(true)
@@ -249,6 +269,9 @@ export function RechnungFlow({ auftrag, firma, betriebId }: Props) {
           kleinteilpauschaleBetrag: kleinteilNetto > 0 ? kleinteilNetto : undefined,
           sonstigesBeschreibung: sonstigesNetto > 0 ? (sonstigesBeschreibung || undefined) : undefined,
           sonstigesBetrag: sonstigesNetto > 0 ? sonstigesNetto : undefined,
+          betriebsstoffe: betriebsstoffe
+            .filter(b => (bsMengen[b.id] || 0) > 0)
+            .map(b => ({ betriebsstoffId: b.id, menge: bsMengen[b.id] })),
           anzeigeModus,
         }),
       })
@@ -338,12 +361,12 @@ export function RechnungFlow({ auftrag, firma, betriebId }: Props) {
                       {wa.auto && (
                         <div className="flex items-center gap-2 mt-1.5 pl-6">
                           <label className="text-xs text-gray-500">Stunden:</label>
-                          <input type="number" value={wa.stunden ?? 1} min="0" step="0.25"
-                            onChange={e => updateAutoPosition(wa, { stunden: parseFloat(e.target.value) || 0 })}
+                          <DecimalField value={wa.stunden ?? 1}
+                            onChange={n => updateAutoPosition(wa, { stunden: n })}
                             className="w-16 px-2 py-1 border border-gray-200 rounded-lg text-xs" />
                           <label className="text-xs text-gray-500">€/Std:</label>
-                          <input type="number" value={wa.satz ?? 0} min="0" step="1"
-                            onChange={e => updateAutoPosition(wa, { satz: parseFloat(e.target.value) || 0 })}
+                          <DecimalField value={wa.satz ?? 0}
+                            onChange={n => updateAutoPosition(wa, { satz: n })}
                             className="w-20 px-2 py-1 border border-gray-200 rounded-lg text-xs" />
                           {!wa.satz && <span className="text-xs text-amber-600">Stundensatz fehlt — bitte eintragen oder unter Einstellungen hinterlegen</span>}
                         </div>
@@ -353,6 +376,65 @@ export function RechnungFlow({ auftrag, firma, betriebId }: Props) {
                   <div className="flex items-center justify-between px-4 py-2.5 bg-gray-50 text-sm font-semibold">
                     <span className="text-gray-600">Arbeitszeit ausgewählt (netto)</span>
                     <span className="text-gray-900 tabular-nums">{arbeitNetto.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Betriebsstoffe (Motoröl, Wischwasser, ...) */}
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+              <div className="flex items-center gap-2 px-4 py-3 bg-gray-50 border-b border-gray-100">
+                <Droplets className="w-4 h-4 text-sky-500" />
+                <span className="text-sm font-semibold text-gray-700">Betriebsstoffe (eingefüllt)</span>
+                <span className="ml-auto text-xs text-gray-400">Liter eintragen</span>
+              </div>
+              {betriebsstoffe.length === 0 ? (
+                <p className="px-4 py-4 text-sm text-gray-400 italic">
+                  Noch keine Betriebsstoffe angelegt — unter „Betriebsstoffe“ im Menü Motoröl, Wischwasser usw. mit Literpreis anlegen.
+                </p>
+              ) : (
+                <div className="divide-y divide-gray-50">
+                  {betriebsstoffe.map(b => {
+                    const menge = bsMengen[b.id] || 0
+                    const zuViel = menge > b.rest
+                    return (
+                      <div key={b.id} className="px-4 py-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-gray-800">{b.name}</p>
+                            <p className="text-xs text-gray-500">
+                              {b.preis_pro_einheit.toLocaleString('de-DE', { minimumFractionDigits: 2 })} € / {b.einheit} netto
+                              {' · '}Bestand: <span className={cn('font-medium', b.rest <= 0 ? 'text-red-600' : 'text-gray-700')}>{formatMenge(b.rest, b.einheit)}</span>
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <DecimalField
+                              placeholder="0"
+                              value={menge}
+                              onChange={n => setBsMengen(prev => ({ ...prev, [b.id]: n < 0 ? 0 : n }))}
+                              className="w-20 px-2 py-2 border border-gray-200 rounded-lg text-sm text-right focus:outline-none focus:ring-2 focus:ring-sky-400"
+                            />
+                            <span className="text-xs text-gray-500 w-4">{b.einheit}</span>
+                          </div>
+                        </div>
+                        {menge > 0 && (
+                          <div className="flex items-center justify-between mt-1.5 text-xs">
+                            <span className={zuViel ? 'text-amber-600' : 'text-gray-400'}>
+                              {zuViel
+                                ? `Achtung: laut Bestand nur noch ${formatMenge(Math.max(b.rest, 0), b.einheit)} da — wird trotzdem berechnet`
+                                : `danach noch ${formatMenge(rundeBetrag(b.rest - menge), b.einheit)}`}
+                            </span>
+                            <span className="font-medium text-gray-700 tabular-nums">
+                              {rundeBetrag(menge * b.preis_pro_einheit).toLocaleString('de-DE', { minimumFractionDigits: 2 })} €
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                  <div className="flex items-center justify-between px-4 py-2.5 bg-gray-50 text-sm font-semibold">
+                    <span className="text-gray-600">Betriebsstoffe (netto)</span>
+                    <span className="text-gray-900 tabular-nums">{betriebsstoffeNetto.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €</span>
                   </div>
                 </div>
               )}
@@ -382,7 +464,7 @@ export function RechnungFlow({ auftrag, firma, betriebId }: Props) {
                       <div className="flex-1">
                         <label className="text-xs font-medium text-gray-600 mb-1 block">Prozentsatz</label>
                         <div className="flex items-center border border-teal-200 rounded-xl bg-teal-50 overflow-hidden">
-                          <input type="number" value={kleinteilProzent} onChange={e => setKleinteilProzent(e.target.value)} min="0" max="100" step="1" className="flex-1 px-4 py-3 bg-transparent text-xl font-bold text-teal-700 text-center focus:outline-none" />
+                          <input type="text" inputMode="decimal" value={kleinteilProzent} onChange={e => setKleinteilProzent(nurZahlZeichen(e.target.value))} className="flex-1 px-4 py-3 bg-transparent text-xl font-bold text-teal-700 text-center focus:outline-none" />
                           <span className="pr-3 text-teal-500 font-bold">%</span>
                         </div>
                       </div>
@@ -397,7 +479,7 @@ export function RechnungFlow({ auftrag, firma, betriebId }: Props) {
                   ) : (
                     <div>
                       <label className="text-xs font-medium text-gray-600 mb-1 block">Festbetrag netto (€)</label>
-                      <input type="number" value={kleinteilFest} onChange={e => setKleinteilFest(e.target.value)} placeholder="z.B. 15.00" min="0" step="0.50" className="w-full px-4 py-3 border border-teal-200 rounded-xl text-xl font-bold text-center text-teal-700 bg-teal-50 focus:outline-none focus:ring-2 focus:ring-teal-400" />
+                      <input type="text" inputMode="decimal" value={kleinteilFest} onChange={e => setKleinteilFest(nurZahlZeichen(e.target.value))} placeholder="z.B. 15,00" className="w-full px-4 py-3 border border-teal-200 rounded-xl text-xl font-bold text-center text-teal-700 bg-teal-50 focus:outline-none focus:ring-2 focus:ring-teal-400" />
                     </div>
                   )}
                 </div>
@@ -420,12 +502,11 @@ export function RechnungFlow({ auftrag, firma, betriebId }: Props) {
                   className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
                 />
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="decimal"
                   value={sonstiges}
-                  onChange={e => setSonstiges(e.target.value)}
+                  onChange={e => setSonstiges(nurZahlZeichen(e.target.value))}
                   placeholder="Betrag netto (€)"
-                  min="0"
-                  step="0.01"
                   className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
                 />
               </div>
@@ -462,6 +543,12 @@ export function RechnungFlow({ auftrag, firma, betriebId }: Props) {
                   <span>Arbeitszeit (netto)</span>
                   <span className="tabular-nums">{arbeitNetto.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €</span>
                 </div>
+                {betriebsstoffeNetto > 0 && (
+                  <div className="flex justify-between text-gray-600">
+                    <span>Betriebsstoffe (netto)</span>
+                    <span className="tabular-nums">{betriebsstoffeNetto.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €</span>
+                  </div>
+                )}
                 {kleinteilNetto > 0 && (
                   <div className="flex justify-between text-gray-600">
                     <span>Kleinteilpauschale (netto)</span>

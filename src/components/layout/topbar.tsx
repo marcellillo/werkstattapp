@@ -17,6 +17,7 @@ const PAGE_SUBTITLES: Record<string, string> = {
   '/fahrzeuge':          'Alle Aufträge verwalten',
   '/hebebuehnen':        'Hebebühnen-Belegung',
   '/teile':              'Ersatzteile & Lagerbestand',
+  '/betriebsstoffe':     'Öl, Wischwasser & Co. — Bestand',
   '/kalender':           'Fertigstellungstermine',
   '/termine':            'Kundenbesuche & Abgaben',
   '/kunden':             'Kundenstamm',

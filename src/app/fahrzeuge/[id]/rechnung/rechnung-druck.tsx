@@ -11,6 +11,9 @@ function fmt(date?: string | null) {
 function fmtEuro(n: number) {
   return n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
 }
+function fmtMenge(n: number) {
+  return n.toLocaleString('de-DE', { maximumFractionDigits: 2 })
+}
 
 type EmailStatus = 'idle' | 'senden' | 'ok' | 'fehler'
 
@@ -363,6 +366,39 @@ export function RechnungDruck({ rechnungId, betriebId, firma: firmaHint }: { rec
           </div>
         )}
 
+        {/* Betriebsstoffe (Motoröl, Wischwasser, ...) — eigene Box */}
+        {detail.betriebsstoffePositionen.length > 0 && (
+          <div className="section-box">
+            <div className="section-titel">Betriebsstoffe</div>
+            <table>
+              <thead>
+                <tr>
+                  <th className="ta-right pos-nr">Pos.</th>
+                  <th>Bezeichnung</th>
+                  {!istPauschal && <th className="ta-right">Menge</th>}
+                  {!istPauschal && <th className="ta-right">Preis (netto)</th>}
+                  {!istPauschal && <th className="ta-right">Summe (netto)</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {detail.betriebsstoffePositionen.map((pos, i) => (
+                  <tr key={i}>
+                    <td className="ta-right pos-nr">{ersatzteilePositionen.length + i + 1}</td>
+                    <td>{istPauschal ? `${pos.bezeichnung} (${fmtMenge(pos.menge)} ${pos.einheit})` : pos.bezeichnung}</td>
+                    {!istPauschal && <td className="ta-right">{fmtMenge(pos.menge)} {pos.einheit}</td>}
+                    {!istPauschal && <td className="ta-right">{fmtEuro(pos.preis)} / {pos.einheit}</td>}
+                    {!istPauschal && <td className="ta-right">{fmtEuro(pos.summe)}</td>}
+                  </tr>
+                ))}
+                <tr className="section-summe">
+                  <td colSpan={istPauschal ? 2 : 4} style={{textAlign: 'right'}}>Summe</td>
+                  <td className="ta-right">{fmtEuro(detail.betriebsstoffeNetto)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        )}
+
         {/* Arbeitswerte — eigene Box */}
         <div className="section-box">
           <div className="section-titel">Arbeitswerte</div>
@@ -382,7 +418,7 @@ export function RechnungDruck({ rechnungId, betriebId, firma: firmaHint }: { rec
               ) : (
                 arbeitswertePositionen.map((pos, i) => (
                   <tr key={i}>
-                    <td className="ta-right pos-nr">{ersatzteilePositionen.length + i + 1}</td>
+                    <td className="ta-right pos-nr">{ersatzteilePositionen.length + detail.betriebsstoffePositionen.length + i + 1}</td>
                     <td>{pos.beschreibung}</td>
                     {!istPauschal && <td className="ta-right">{pos.menge}</td>}
                     {!istPauschal && <td className="ta-right">{fmtEuro(pos.preis)}</td>}
@@ -392,7 +428,7 @@ export function RechnungDruck({ rechnungId, betriebId, firma: firmaHint }: { rec
               )}
               {detail.kleinteilNetto > 0 && (
                 <tr>
-                  <td className="ta-right pos-nr">{ersatzteilePositionen.length + arbeitswertePositionen.length + 1}</td>
+                  <td className="ta-right pos-nr">{ersatzteilePositionen.length + detail.betriebsstoffePositionen.length + arbeitswertePositionen.length + 1}</td>
                   <td>Kleinteilpauschale (Schrauben, Dichtungen, Kleinmaterial)</td>
                   {!istPauschal && <td className="ta-right">1</td>}
                   {!istPauschal && <td className="ta-right">{fmtEuro(detail.kleinteilNetto)}</td>}
@@ -401,7 +437,7 @@ export function RechnungDruck({ rechnungId, betriebId, firma: firmaHint }: { rec
               )}
               {detail.sonstigesNetto > 0 && (
                 <tr>
-                  <td className="ta-right pos-nr">{ersatzteilePositionen.length + arbeitswertePositionen.length + (detail.kleinteilNetto > 0 ? 1 : 0) + 1}</td>
+                  <td className="ta-right pos-nr">{ersatzteilePositionen.length + detail.betriebsstoffePositionen.length + arbeitswertePositionen.length + (detail.kleinteilNetto > 0 ? 1 : 0) + 1}</td>
                   <td>{detail.sonstigesBeschreibung || 'Sonstige Leistungen'}</td>
                   {!istPauschal && <td className="ta-right">1</td>}
                   {!istPauschal && <td className="ta-right">{fmtEuro(detail.sonstigesNetto)}</td>}
@@ -425,6 +461,12 @@ export function RechnungDruck({ rechnungId, betriebId, firma: firmaHint }: { rec
                 <td className="ta-right">{fmtEuro(detail.ersatzteileNetto)}</td>
               </tr>
             )}
+            {detail.betriebsstoffePositionen.length > 0 && (
+              <tr className="summen">
+                <td colSpan={3} style={{textAlign:'right', color:'#333'}}>Betriebsstoffe Summe:</td>
+                <td className="ta-right">{fmtEuro(detail.betriebsstoffeNetto)}</td>
+              </tr>
+            )}
             <tr className="summen">
               <td colSpan={3} style={{textAlign:'right', color:'#333'}}>Arbeitsaufwand Summe:</td>
               <td className="ta-right">{fmtEuro(detail.arbeitNetto + detail.kleinteilNetto + detail.sonstigesNetto)}</td>
@@ -432,6 +474,7 @@ export function RechnungDruck({ rechnungId, betriebId, firma: firmaHint }: { rec
             <tr className="summen">
               <td colSpan={3} style={{textAlign:'right', color:'#333'}}>
                 Lohn (netto): <strong>{fmtEuro(detail.arbeitNetto + detail.kleinteilNetto + detail.sonstigesNetto)}</strong> · Material (netto): <strong>{fmtEuro(detail.ersatzteileNetto)}</strong>
+                {detail.betriebsstoffePositionen.length > 0 && <> · Betriebsstoffe (netto): <strong>{fmtEuro(detail.betriebsstoffeNetto)}</strong></>}
               </td>
               <td></td>
             </tr>

@@ -66,6 +66,21 @@ async function buildRechnungHtml(detail: RechnungDetail): Promise<string> {
         <td style="padding:5px 8px;font-size:11px;text-align:right;">${fmtEuro(pos.summe)}</td>
       </tr>`).join('')
 
+  const fmtMengeMail = (n: number) => n.toLocaleString('de-DE', { maximumFractionDigits: 2 })
+  const betriebsstoffePositionen = detail.betriebsstoffePositionen
+  const betriebsstoffeRows = betriebsstoffePositionen.map((pos, i) => istPauschal ? `
+      <tr style="border-bottom:1px solid #f1f5f9;">
+        <td style="padding:5px 8px;font-size:11px;">${i + 1}</td>
+        <td style="padding:5px 8px;font-size:11px;">${pos.bezeichnung} (${fmtMengeMail(pos.menge)} ${pos.einheit})</td>
+      </tr>` : `
+      <tr style="border-bottom:1px solid #f1f5f9;">
+        <td style="padding:5px 8px;font-size:11px;">${i + 1}</td>
+        <td style="padding:5px 8px;font-size:11px;">${pos.bezeichnung}</td>
+        <td style="padding:5px 8px;font-size:11px;text-align:right;">${fmtMengeMail(pos.menge)} ${pos.einheit}</td>
+        <td style="padding:5px 8px;font-size:11px;text-align:right;">${fmtEuro(pos.preis)} / ${pos.einheit}</td>
+        <td style="padding:5px 8px;font-size:11px;text-align:right;">${fmtEuro(pos.summe)}</td>
+      </tr>`).join('')
+
   const arbeitswerteAlle = [
     ...arbeitswertePositionen,
     ...(detail.kleinteilNetto > 0 ? [{ beschreibung: 'Kleinteilpauschale (Schrauben, Dichtungen, Kleinmaterial)', menge: 1, preis: detail.kleinteilNetto, summe: detail.kleinteilNetto }] : []),
@@ -184,6 +199,21 @@ async function buildRechnungHtml(detail: RechnungDetail): Promise<string> {
     </table>
     ` : ''}
 
+    ${betriebsstoffePositionen.length > 0 ? `
+    <!-- Betriebsstoffe -->
+    <div style="font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:0.05em;margin:16px 0 4px;">Betriebsstoffe</div>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:8px;border:1.5px solid #cbd5e1;border-radius:8px;overflow:hidden;">
+      <thead>${positionsHeaderHtml}</thead>
+      <tbody>
+        ${betriebsstoffeRows}
+        <tr style="background:#f8fafc;border-top:1.5px solid #cbd5e1;">
+          <td colspan="${summenzeileColspan}" style="padding:6px 8px;font-size:11px;font-weight:700;text-align:right;">Summe</td>
+          <td style="padding:6px 8px;font-size:11px;font-weight:700;text-align:right;">${fmtEuro(detail.betriebsstoffeNetto)}</td>
+        </tr>
+      </tbody>
+    </table>
+    ` : ''}
+
     <!-- Arbeitswerte -->
     <div style="font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:0.05em;margin:16px 0 4px;">Arbeitswerte</div>
     <table style="width:100%;border-collapse:collapse;margin-bottom:8px;border:1.5px solid #cbd5e1;border-radius:8px;overflow:hidden;">
@@ -204,6 +234,11 @@ async function buildRechnungHtml(detail: RechnungDetail): Promise<string> {
         <tr>
           <td style="padding:5px 8px;font-size:12px;text-align:right;color:#475569;">Ersatzteile Summe:</td>
           <td style="padding:5px 8px;font-size:12px;text-align:right;width:110px;">${fmtEuro(detail.ersatzteileNetto)}</td>
+        </tr>` : ''}
+        ${betriebsstoffePositionen.length > 0 ? `
+        <tr>
+          <td style="padding:5px 8px;font-size:12px;text-align:right;color:#475569;">Betriebsstoffe Summe:</td>
+          <td style="padding:5px 8px;font-size:12px;text-align:right;width:110px;">${fmtEuro(detail.betriebsstoffeNetto)}</td>
         </tr>` : ''}
         <tr>
           <td style="padding:5px 8px;font-size:12px;text-align:right;color:#475569;">Arbeitsaufwand Summe:</td>

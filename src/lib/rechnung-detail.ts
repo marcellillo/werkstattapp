@@ -8,6 +8,14 @@ export interface RechnungPosition {
   summe: number
 }
 
+export interface BetriebsstoffPosition {
+  bezeichnung: string
+  einheit: string
+  menge: number
+  preis: number
+  summe: number
+}
+
 export interface RechnungDetail {
   rechnung: {
     id: string
@@ -28,8 +36,10 @@ export interface RechnungDetail {
   kleinunternehmer: boolean
   ersatzteilePositionen: RechnungPosition[]
   arbeitswertePositionen: RechnungPosition[]
+  betriebsstoffePositionen: BetriebsstoffPosition[]
   ersatzteileNetto: number
   arbeitNetto: number
+  betriebsstoffeNetto: number
   kleinteilNetto: number
   sonstigesNetto: number
   sonstigesBeschreibung: string | null
@@ -142,8 +152,29 @@ export async function resolveRechnungDetail(
     }
   }
 
+  // Betriebsstoffe (Motoröl, Wischwasser, ...): Schnappschuss der Zeilen zum Zeitpunkt der Rechnung
+  const { data: betriebsstoffRows } = await supabase
+    .from('rechnung_betriebsstoffe')
+    .select('bezeichnung, einheit, menge, preis_pro_einheit')
+    .eq('rechnung_id', rechnungId)
+    .eq('betrieb_id', betriebId)
+    .order('erstellt_am', { ascending: true })
+
+  const betriebsstoffePositionen: BetriebsstoffPosition[] = (betriebsstoffRows || []).map((r: any) => {
+    const menge = Number(r.menge) || 0
+    const preis = Number(r.preis_pro_einheit) || 0
+    return {
+      bezeichnung: r.bezeichnung,
+      einheit: r.einheit || 'L',
+      menge,
+      preis,
+      summe: Math.round(menge * preis * 100) / 100,
+    }
+  })
+
   const ersatzteileNetto = ersatzteilePositionen.reduce((s, p) => s + p.summe, 0)
   const arbeitNetto = arbeitswertePositionen.reduce((s, p) => s + p.summe, 0)
+  const betriebsstoffeNetto = betriebsstoffePositionen.reduce((s, p) => s + p.summe, 0)
   const kleinteilNetto = rechnung.kleinteilpauschale_betrag || 0
   const sonstigesNetto = rechnung.sonstiges_betrag || 0
 
@@ -167,8 +198,10 @@ export async function resolveRechnungDetail(
     kleinunternehmer,
     ersatzteilePositionen,
     arbeitswertePositionen,
+    betriebsstoffePositionen,
     ersatzteileNetto,
     arbeitNetto,
+    betriebsstoffeNetto,
     kleinteilNetto,
     sonstigesNetto,
     sonstigesBeschreibung: rechnung.sonstiges_beschreibung || null,

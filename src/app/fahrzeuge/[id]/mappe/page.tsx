@@ -41,6 +41,7 @@ export default async function MappePage({ params }: { params: Promise<{ id: stri
         ...r,
         ersatzteilePositionen: detail?.ersatzteilePositionen ?? [],
         arbeitswertePositionen: detail?.arbeitswertePositionen ?? [],
+        betriebsstoffePositionen: detail?.betriebsstoffePositionen ?? [],
         kleinteilNetto: detail?.kleinteilNetto ?? 0,
         sonstigesNetto: detail?.sonstigesNetto ?? 0,
         sonstigesBeschreibung: detail?.sonstigesBeschreibung ?? null,

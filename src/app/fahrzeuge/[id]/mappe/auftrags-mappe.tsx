@@ -283,6 +283,12 @@ export function AuftragsMappe({ auftrag, fotos, rechnungen = [], firma, betriebI
               {rechnungen.map((r: any) => {
                 const alleZeilen = [
                   ...r.ersatzteilePositionen.map((p: any) => ({ ...p, gruppe: 'Ersatzteile' })),
+                  ...(r.betriebsstoffePositionen ?? []).map((p: any) => ({
+                    ...p,
+                    beschreibung: p.bezeichnung,
+                    mengeText: `${p.menge.toLocaleString('de-DE', { maximumFractionDigits: 2 })} ${p.einheit}`,
+                    gruppe: 'Betriebsstoffe',
+                  })),
                   ...r.arbeitswertePositionen.map((p: any) => ({ ...p, gruppe: 'Arbeitszeit' })),
                   ...(r.kleinteilNetto > 0 ? [{ beschreibung: 'Kleinteilpauschale', menge: 1, preis: r.kleinteilNetto, summe: r.kleinteilNetto, gruppe: 'Sonstiges' }] : []),
                   ...(r.sonstigesNetto > 0 ? [{ beschreibung: r.sonstigesBeschreibung || 'Sonstige Leistungen', menge: 1, preis: r.sonstigesNetto, summe: r.sonstigesNetto, gruppe: 'Sonstiges' }] : []),
@@ -318,7 +324,7 @@ export function AuftragsMappe({ auftrag, fotos, rechnungen = [], firma, betriebI
                             <tr key={i} className="border-b border-gray-50 last:border-0">
                               <td className="py-1 text-gray-400 w-20 align-top">{p.gruppe}</td>
                               <td className="py-1 text-gray-700">{p.beschreibung}</td>
-                              <td className="py-1 text-gray-500 text-right w-12">{p.menge}×</td>
+                              <td className="py-1 text-gray-500 text-right w-16">{p.mengeText ?? `${p.menge}×`}</td>
                               <td className="py-1 text-gray-700 text-right w-20">{fmtEuro(p.summe)}</td>
                             </tr>
                           ))}

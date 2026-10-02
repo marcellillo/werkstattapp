@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
 
     const {
       auftragId, betriebId, fahrzeugId, kostenvoranschlagIds, werkstattauftragIds,
-      kleinteilpauschaleBetrag, sonstigesBeschreibung, sonstigesBetrag, anzeigeModus,
+      kleinteilpauschaleBetrag, sonstigesBeschreibung, sonstigesBetrag, anzeigeModus, betriebsstoffe,
     } = await req.json()
     const anzeigeModusWert = anzeigeModus === 'pauschal' ? 'pauschal' : 'detailliert'
 
@@ -39,11 +39,50 @@ export async function POST(req: NextRequest) {
     const kleinteilBetrag: number = parseFloat(kleinteilpauschaleBetrag) || 0
     const sonstigesBetragZahl: number = parseFloat(sonstigesBetrag) || 0
 
-    if (waIds.length === 0 && kvIds.length === 0 && kleinteilBetrag <= 0 && sonstigesBetragZahl <= 0) {
+    // Betriebsstoffe (Motoröl, Wischwasser, ...): Liter je Stoff. Doppelte Einträge desselben
+    // Stoffs werden zusammengefasst; der Literpreis kommt immer aus der Datenbank.
+    const betriebsstoffMengen = new Map<string, number>()
+    for (const b of Array.isArray(betriebsstoffe) ? betriebsstoffe : []) {
+      const id = String(b?.betriebsstoffId ?? '')
+      const menge = Math.round((Number(b?.menge) || 0) * 100) / 100
+      if (id && menge > 0) betriebsstoffMengen.set(id, (betriebsstoffMengen.get(id) ?? 0) + menge)
+    }
+
+    if (waIds.length === 0 && kvIds.length === 0 && kleinteilBetrag <= 0 && sonstigesBetragZahl <= 0 && betriebsstoffMengen.size === 0) {
       return NextResponse.json(
-        { error: 'Bitte mindestens einen Kostenvoranschlag, Werkstattauftrag oder Zusatzposten auswählen' },
+        { error: 'Bitte mindestens einen Kostenvoranschlag, Werkstattauftrag, Betriebsstoff oder Zusatzposten auswählen' },
         { status: 400 }
       )
+    }
+
+    let betriebsstoffZeilen: any[] = []
+    let betriebsstoffeSumme = 0
+    if (betriebsstoffMengen.size > 0) {
+      const { data: stoffe, error: stoffError } = await supabase
+        .from('betriebsstoffe')
+        .select('id, name, einheit, preis_pro_einheit, einkaufspreis_pro_einheit')
+        .in('id', Array.from(betriebsstoffMengen.keys()))
+        .eq('betrieb_id', betriebId)
+        .eq('aktiv', true)
+      if (stoffError) throw stoffError
+
+      for (const [stoffId, menge] of betriebsstoffMengen) {
+        const stoff = (stoffe || []).find((s: any) => s.id === stoffId)
+        if (!stoff) {
+          return NextResponse.json({ error: 'Ein ausgewählter Betriebsstoff existiert nicht (mehr) oder ist deaktiviert' }, { status: 400 })
+        }
+        const preis = Number(stoff.preis_pro_einheit) || 0
+        betriebsstoffeSumme += Math.round(menge * preis * 100) / 100
+        betriebsstoffZeilen.push({
+          betrieb_id: betriebId,
+          betriebsstoff_id: stoff.id,
+          bezeichnung: stoff.name,
+          einheit: stoff.einheit,
+          menge,
+          preis_pro_einheit: preis,
+          einkaufspreis_pro_einheit: stoff.einkaufspreis_pro_einheit,
+        })
+      }
     }
 
     // Sicherstellen, dass die ausgewählten KV/WA zu diesem Auftrag/Betrieb gehören und noch nicht abgerechnet sind
@@ -99,7 +138,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const summeNetto = arbeitszeitenSumme + ersatzteileSumme + kleinteilBetrag + sonstigesBetragZahl
+    const summeNetto = arbeitszeitenSumme + ersatzteileSumme + kleinteilBetrag + sonstigesBetragZahl + betriebsstoffeSumme
 
     // Kleinunternehmerregelung (§19 UStG) berücksichtigen
     const { data: kleinunternehmerSetting } = await supabase
@@ -150,6 +189,20 @@ export async function POST(req: NextRequest) {
     }
     if (!rechnung) {
       return NextResponse.json({ error: 'Rechnung konnte nicht erstellt werden' }, { status: 500 })
+    }
+
+    // Betriebsstoff-Zeilen der Rechnung speichern (sie sind zugleich der Verkaufsnachweis für
+    // den Bestand). Scheitert das, wird die gerade angelegte Rechnung wieder entfernt -- sonst
+    // stünde ein Gesamtbetrag ohne die zugehörigen Positionen in der Datenbank.
+    if (betriebsstoffZeilen.length > 0) {
+      const { error: zeilenError } = await supabase
+        .from('rechnung_betriebsstoffe')
+        .insert(betriebsstoffZeilen.map(z => ({ ...z, rechnung_id: rechnung.id })))
+      if (zeilenError) {
+        console.error('[Rechnung] Betriebsstoffe speichern fehlgeschlagen:', zeilenError)
+        await supabase.from('kunden_rechnungen').delete().eq('id', rechnung.id)
+        throw new Error(`Betriebsstoffe konnten nicht gespeichert werden: ${zeilenError.message}`)
+      }
     }
 
     // Ausgewählte Kostenvoranschläge/Werkstattaufträge als "abgerechnet" markieren,

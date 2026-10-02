@@ -1,13 +1,35 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { generatePDF } from '@/lib/pdf-generator'
-import { resolveRechnungDetail, type RechnungPosition } from '@/lib/rechnung-detail'
+import { resolveRechnungDetail, type RechnungPosition, type BetriebsstoffPosition } from '@/lib/rechnung-detail'
 
 // Kaltstart von @sparticuz/chromium + Rendern braucht mehr als das Standard-Timeout
 export const maxDuration = 30
 
 function fmt(n: number) {
   return n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+function esc(s: string) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+function fmtMenge(n: number) {
+  return n.toLocaleString('de-DE', { maximumFractionDigits: 2 })
+}
+
+function betriebsstoffRowsHtml(positionen: BetriebsstoffPosition[], istPauschal: boolean, startNr: number): string {
+  return positionen.map((pos, i) => istPauschal ? `
+    <tr>
+      <td class="ta-right pos-nr">${startNr + i}</td>
+      <td>${esc(pos.bezeichnung)} (${fmtMenge(pos.menge)} ${esc(pos.einheit)})</td>
+    </tr>` : `
+    <tr>
+      <td class="ta-right pos-nr">${startNr + i}</td>
+      <td>${esc(pos.bezeichnung)}</td>
+      <td class="ta-right">${fmtMenge(pos.menge)} ${esc(pos.einheit)}</td>
+      <td class="ta-right">${fmt(pos.preis)} € / ${esc(pos.einheit)}</td>
+      <td class="ta-right">${fmt(pos.summe)} €</td>
+    </tr>`).join('')
 }
 
 function rowsHtml(positionen: RechnungPosition[], istPauschal: boolean, startNr = 1): string {
@@ -103,6 +125,31 @@ export async function POST(req: NextRequest) {
       ? `<tr><td colspan="3" style="text-align:right; color:#333;">Ersatzteile Summe:</td><td class="ta-right">${fmt(detail.ersatzteileNetto)} €</td></tr>`
       : ''
 
+    const betriebsstoffePositionen = detail.betriebsstoffePositionen
+    const betriebsstoffeSectionHtml = betriebsstoffePositionen.length > 0 ? `
+      <div class="section-box">
+        <div class="section-titel">Betriebsstoffe</div>
+        <table>
+          <thead>
+            ${positionsHeaderHtml}
+          </thead>
+          <tbody>
+            ${betriebsstoffRowsHtml(betriebsstoffePositionen, istPauschal, ersatzteilePositionen.length + 1)}
+            <tr class="section-summe">
+              <td colspan="${summenzeileColspan}" style="text-align:right;">Summe</td>
+              <td class="ta-right">${fmt(detail.betriebsstoffeNetto)} €</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>` : ''
+
+    const betriebsstoffeSummenzeileHtml = betriebsstoffePositionen.length > 0
+      ? `<tr><td colspan="3" style="text-align:right; color:#333;">Betriebsstoffe Summe:</td><td class="ta-right">${fmt(detail.betriebsstoffeNetto)} €</td></tr>`
+      : ''
+    const lohnMaterialBetriebsstoffe =
+      `Lohn (netto): <strong>${fmt(detail.arbeitNetto + detail.kleinteilNetto + detail.sonstigesNetto)} €</strong> · Material (netto): <strong>${fmt(detail.ersatzteileNetto)} €</strong>` +
+      (betriebsstoffePositionen.length > 0 ? ` · Betriebsstoffe (netto): <strong>${fmt(detail.betriebsstoffeNetto)} €</strong>` : '')
+
     const mwstZeileHtml = !kleinunternehmer
       ? `<tr><td colspan="3" style="text-align:right; color:#333;">zzgl. 19% MwSt.:</td><td class="ta-right">${fmt(rechnung.betrag_mwst)} €</td></tr>
          <tr class="gesamt"><td colspan="3" style="text-align:right;">Gesamtbetrag (brutto):</td><td class="ta-right">${fmt(rechnung.betrag_brutto)} €</td></tr>`
@@ -150,12 +197,14 @@ export async function POST(req: NextRequest) {
         ? new Date(fahrzeug.naechste_hauptuntersuchung).toLocaleDateString('de-DE', { month: '2-digit', year: 'numeric' })
         : '—',
       ersatzteileSectionHtml,
+      betriebsstoffeSectionHtml,
       arbeitswerteHeaderHtml: positionsHeaderHtml,
-      arbeitswerteRowsHtml: rowsHtml(arbeitswerteAlle, istPauschal, ersatzteilePositionen.length + 1),
+      arbeitswerteRowsHtml: rowsHtml(arbeitswerteAlle, istPauschal, ersatzteilePositionen.length + betriebsstoffePositionen.length + 1),
       arbeitswerteSummeColspan: summenzeileColspan,
       arbeitswerteSumme: fmt(detail.arbeitNetto + detail.kleinteilNetto + detail.sonstigesNetto),
       ersatzteileSummenzeileHtml,
-      lohnMaterialZeileHtml: `<tr><td colspan="3" style="text-align:right; color:#333;">Lohn (netto): <strong>${fmt(detail.arbeitNetto + detail.kleinteilNetto + detail.sonstigesNetto)} €</strong> · Material (netto): <strong>${fmt(detail.ersatzteileNetto)} €</strong></td><td></td></tr>`,
+      betriebsstoffeSummenzeileHtml,
+      lohnMaterialZeileHtml: `<tr><td colspan="3" style="text-align:right; color:#333;">${lohnMaterialBetriebsstoffe}</td><td></td></tr>`,
       summeNetto: fmt(rechnung.betrag_netto),
       mwstZeileHtml,
       zahlungsziel,

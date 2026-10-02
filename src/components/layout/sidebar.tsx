@@ -6,7 +6,7 @@ import {
   LayoutDashboard, Car, Users, Package, Calendar,
   Bell, Settings, LogOut, BarChart2,
   Mail, CalendarClock, Layers, Receipt, History, BookOpen,
-  ShieldAlert, Wrench, ClipboardCheck, Lock, ChevronDown
+  ShieldAlert, Wrench, ClipboardCheck, Lock, ChevronDown, Droplets
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
@@ -39,6 +39,7 @@ const navGroupsTemplate = [
     items: [
       { href: '/kunden', label: 'Kunden', icon: Users,   key: 'kunden' },
       { href: '/teile',  label: 'Lager',  icon: Package, key: 'teile' },
+      { href: '/betriebsstoffe', label: 'Betriebsstoffe', icon: Droplets, key: 'betriebsstoffe' },
     ],
   },
   {

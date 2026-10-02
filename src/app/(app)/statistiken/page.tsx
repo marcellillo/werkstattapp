@@ -48,7 +48,7 @@ export default async function StatistikenPage() {
   if (!userBetriebe?.[0]?.betrieb_id) redirect('/login')
   const betriebId = userBetriebe[0].betrieb_id
 
-  const [verkauft, rechnungen, kostenvoranschlaege, lager] = await Promise.all([
+  const [verkauft, rechnungen, kostenvoranschlaege, lager, betriebsstoffeZeilen] = await Promise.all([
     // Verkäufe (Eigenfahrzeuge). Verkaufte Autos wechseln nach der Übergabe auf
     // 'ausgeliefert' und müssen weiterhin zählen.
     supabase
@@ -81,10 +81,15 @@ export default async function StatistikenPage() {
       .neq('status', 'storniert')
       .neq('status', 'verkauft')
       .eq('fahrzeug.fahrzeug_typ', 'eigen'),
+    // Betriebsstoffe (Öl, Wischwasser, ...) je Rechnung, mit dem beim Verkauf festgehaltenen Einkaufspreis
+    supabase
+      .from('rechnung_betriebsstoffe')
+      .select('rechnung_id, menge, einkaufspreis_pro_einheit')
+      .eq('betrieb_id', betriebId),
   ])
 
   // Abfragefehler dürfen nicht stillschweigend zu "0 €" werden
-  for (const [name, res] of Object.entries({ verkauft, rechnungen, kostenvoranschlaege, lager })) {
+  for (const [name, res] of Object.entries({ verkauft, rechnungen, kostenvoranschlaege, lager, betriebsstoffeZeilen })) {
     if (res.error) console.error(`[Statistiken] Abfrage "${name}" fehlgeschlagen:`, res.error)
   }
 
@@ -93,13 +98,22 @@ export default async function StatistikenPage() {
     ;(kvProRechnung[kv.rechnung_id] ||= []).push(kv)
   }
 
+  // Einkauf der Betriebsstoffe: Liter × hinterlegter Einkaufspreis (ohne EK-Preis keine Kosten
+  // ansetzbar -- dann bleibt der Umsatz dieser Zeile komplett im Deckungsbeitrag)
+  const betriebsstoffKostenProRechnung: Record<string, number> = {}
+  for (const z of betriebsstoffeZeilen.data ?? []) {
+    if (z.einkaufspreis_pro_einheit == null) continue
+    betriebsstoffKostenProRechnung[z.rechnung_id] =
+      (betriebsstoffKostenProRechnung[z.rechnung_id] ?? 0) + Number(z.menge) * Number(z.einkaufspreis_pro_einheit)
+  }
+
   const werkstatt = (rechnungen.data ?? []).map((r: any) => {
     const { beleg, geschaetzt } = materialKosten(kvProRechnung[r.id] ?? [])
     return {
       id: r.id,
       datum: r.erstellt_am,
       einnahmen: r.betrag_netto || 0,
-      ersatzteile_kosten: beleg + geschaetzt,
+      ersatzteile_kosten: beleg + geschaetzt + (betriebsstoffKostenProRechnung[r.id] ?? 0),
       kosten_geschaetzt: geschaetzt,
     }
   })

@@ -22,6 +22,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/fahrzeuge/uebergeben': 'Übergebene Fahrzeuge',
   '/hebebuehnen': 'Hebebühnen verwalten',
   '/teile': 'Lager',
+  '/betriebsstoffe': 'Betriebsstoffe',
   '/kalender': 'Kalender',
   '/termine': 'Termine',
   '/kunden': 'Kunden',
