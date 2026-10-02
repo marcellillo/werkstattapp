@@ -109,6 +109,11 @@ Formatiere die Ausgabe GENAU so:
   2 Bremsbeläge | 45.00
   10 x Dichtungen | 0
 
+WICHTIG zum PREIS:
+- PREIS ist IMMER der NETTO-EINZELPREIS PRO STÜCK (ohne MwSt., nach Abzug von Rabatt) -- die Spalte "Netto-Preis" bzw. "Einzelpreis", NICHT der Brutto-/Listenpreis und NICHT die Zeilensumme ("Gesamt"/"Betrag").
+- Bei Menge größer 1 steht in der Spalte "Gesamt"/"Betrag" die Zeilensumme (Einzelpreis × Menge). Die darfst du NICHT verwenden. Beispiel: Menge 2, Netto-Preis 62,04, Gesamt 124,08 → richtig ist "2 x Bremsscheibe | 62.04".
+- Dezimalpunkt statt Komma verwenden (62.04).
+
 Nur die Teile mit Mengen und Preisen extrahieren. KEINE Gesamtsummen, KEINE anderen Informationen.
 
 Analysiere zusätzlich als erfahrener Kfz-Meister, welche Arbeit anhand dieser Teile wahrscheinlich durchgeführt wird (z.B. Ölfilter + Luftfilter + Innenraumfilter → "Ölservice / Inspektion durchführen"; Bremsscheiben + Bremsbeläge → "Bremsanlage vorne/hinten erneuern"; Zahnriemen + Wasserpumpe → "Zahnriemen- und Wasserpumpenwechsel").
