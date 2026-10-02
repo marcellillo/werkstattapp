@@ -3,23 +3,24 @@ import { redirect } from 'next/navigation'
 import { StatistikenContent } from './statistiken-content'
 import { ERSATZTEIL_AUFSCHLAG } from '@/lib/ersatzteil-aufschlag'
 
-// Materialkosten (Einkauf) der Teile, die auf einer Rechnung abgerechnet wurden.
-// - Position mit gespeichertem Einkaufspreis (aus gescanntem Lieferschein): echter EK.
-// - Position ohne EK (Altdaten / manuell erfasst): Schätzung = Verkaufspreis ÷ Aufschlagsfaktor,
-//   weil der Verkaufspreis aus dem EK per mitAufschlag() entstanden ist.
-// - Kostenvoranschlag im Festpreis-Modus ohne erfasste Einzelteile: Festpreis ÷ Aufschlagsfaktor.
+// Materialkosten (Einkauf) der Teile, die AUF DER RECHNUNG stehen. Nur was auf der
+// ausgestellten Rechnung erscheint, wird gerechnet -- Teile von Lieferscheinen, die dort
+// nicht auftauchen, zählen nicht.
+// - Kostenvoranschlag im Einzel-Modus: jede Position steht auf der Rechnung.
+//   Mit gespeichertem Einkaufspreis (aus gescanntem Lieferschein) = echter EK;
+//   ohne (Altdaten / von Hand erfasst) = Schätzung Verkaufspreis ÷ Aufschlagsfaktor.
+// - Kostenvoranschlag im Festpreis-Modus: Auf der Rechnung steht nur der Pauschalbetrag,
+//   die erfassten Einzelteile erscheinen dort nicht -> sie zählen nicht; Schätzung
+//   Festpreis ÷ Aufschlagsfaktor.
 function materialKosten(kostenvoranschlaege: any[]) {
   let beleg = 0
   let geschaetzt = 0
   for (const kv of kostenvoranschlaege) {
-    const positionen: any[] = kv.kostenvoranschlag_position ?? []
-    if (positionen.length === 0) {
-      if (kv.ersatzteile_modus === 'festpreis') {
-        geschaetzt += (kv.ersatzteile_festpreis || 0) / ERSATZTEIL_AUFSCHLAG
-      }
+    if (kv.ersatzteile_modus === 'festpreis') {
+      geschaetzt += (kv.ersatzteile_festpreis || 0) / ERSATZTEIL_AUFSCHLAG
       continue
     }
-    for (const p of positionen) {
+    for (const p of kv.kostenvoranschlag_position ?? []) {
       const menge = p.menge || 1
       if (p.einkaufspreis != null) {
         beleg += p.einkaufspreis * menge

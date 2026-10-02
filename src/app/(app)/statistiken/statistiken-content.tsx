@@ -209,7 +209,8 @@ export function StatistikenContent({ verkauft, werkstatt = [], lager = [] }: Sta
         <CardContent className="p-6 text-sm text-slate-700 space-y-1">
           <h3 className="font-semibold text-slate-900 mb-2">So wird gerechnet</h3>
           <p><strong>Umsatz</strong> = Summe der Nettobeträge aller ausgestellten Rechnungen (stornierte zählen nicht), nach Rechnungsdatum.</p>
-          <p><strong>Material (Einkauf)</strong> = Einkaufspreis × Menge der abgerechneten Teile. Liegt kein gespeicherter Einkaufspreis vor (Altdaten, manuell erfasste Teile), wird er als Verkaufspreis ÷ 1,45 geschätzt – diese Anteile sind oben als „geschätzt“ ausgewiesen.</p>
+          <p><strong>Material (Einkauf)</strong> = Einkaufspreis (laut Lieferschein) × Menge der Teile, die auf der Rechnung stehen. Teile, die nicht auf der Rechnung erscheinen, zählen nicht. Liegt kein gespeicherter Einkaufspreis vor (Altdaten, von Hand erfasste Teile) oder steht nur ein Festpreis auf der Rechnung, wird der Einkauf als Verkaufspreis ÷ 1,45 geschätzt – diese Anteile sind oben als „geschätzt“ ausgewiesen.</p>
+          <p><strong>Marge:</strong> Was über dem üblichen Aufschlag liegt, bleibt im Deckungsbeitrag – verglichen wird der abgerechnete Betrag mit dem echten Einkauf.</p>
           <p><strong>Deckungsbeitrag</strong> = Umsatz − Material. Lohn und Kleinteilpauschale haben hier keine Einkaufskosten.</p>
         </CardContent>
       </Card>
