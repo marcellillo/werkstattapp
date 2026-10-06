@@ -456,40 +456,26 @@ export function RechnungenContent({
               <div key={r.id} className={cn('bg-white border rounded-xl overflow-hidden transition-all',
                 ueberfaelligR ? 'border-red-300' : r.bezahlt ? 'border-green-200' : 'border-slate-200'
               )}>
-                <div className="flex items-center gap-3 px-4 py-3.5 flex-wrap sm:flex-nowrap">
-                  {/* Status: eindeutig Offen | Bezahlt */}
-                  <div className="inline-flex rounded-lg border border-slate-200 overflow-hidden flex-shrink-0 text-xs font-medium" role="group" aria-label="Zahlstatus">
-                    <button onClick={() => setzeStatus(r, false)} title="Als offen markieren"
-                      className={cn('px-2.5 py-1.5 transition-colors',
-                        !r.bezahlt ? (ueberfaelligR ? 'bg-red-500 text-white' : 'bg-amber-400 text-white') : 'bg-white text-slate-400 hover:bg-slate-50')}>
-                      Offen
-                    </button>
-                    <button onClick={() => setzeStatus(r, true)} title="Als bezahlt markieren"
-                      className={cn('px-2.5 py-1.5 border-l border-slate-200 transition-colors',
-                        r.bezahlt ? 'bg-green-500 text-white' : 'bg-white text-slate-400 hover:bg-green-50 hover:text-green-700')}>
-                      Bezahlt
-                    </button>
-                  </div>
-
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3 px-4 py-3.5">
                   {/* Klickbare Zeile — kein Button-in-Button */}
-                  <div onClick={() => setExpandedId(open ? null : r.id)} className="flex-1 flex items-center gap-3 cursor-pointer min-w-0">
+                  <div onClick={() => setExpandedId(open ? null : r.id)} className="order-1 sm:order-2 flex-1 flex items-start sm:items-center gap-3 cursor-pointer min-w-0">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <p className="font-semibold text-slate-900 text-sm truncate">{r.lieferant ?? 'Unbekannter Lieferant'}</p>
+                        <p className="font-semibold text-slate-900 text-sm break-words sm:truncate">{r.lieferant ?? 'Unbekannter Lieferant'}</p>
                         {ueberfaelligR && <span className="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full font-medium status-pulse">Überfällig</span>}
                         {r.bezahlt && r.bezahlt_am && <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-medium">bezahlt am {fmt(r.bezahlt_am)}</span>}
                         {r.pruefen && <span className="text-xs bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded-full font-medium" title="Die automatische Auslesung war unsicher – bitte Daten kontrollieren">Bitte prüfen</span>}
                       </div>
                       <p className="text-xs text-slate-500 mt-0.5">
                         {r.rechnungsnummer && <span className="font-mono mr-2">{r.rechnungsnummer}</span>}
-                        {r.datum && <span>{fmt(r.datum)}</span>}
-                        {r.faellig_am && !r.bezahlt && <span className={cn('ml-2', ueberfaelligR ? 'text-red-600 font-medium' : 'text-slate-400')}>· fällig {fmt(r.faellig_am)}</span>}
-                        {r.quelle === 'email' && <span className="ml-2 text-slate-400">· per E-Mail</span>}
+                        {r.datum && <span className="whitespace-nowrap">{fmt(r.datum)}</span>}
+                        {r.faellig_am && !r.bezahlt && <span className={cn('ml-2 whitespace-nowrap', ueberfaelligR ? 'text-red-600 font-medium' : 'text-slate-400')}>· fällig {fmt(r.faellig_am)}</span>}
+                        {r.quelle === 'email' && <span className="ml-2 text-slate-400 whitespace-nowrap">· per E-Mail</span>}
                       </p>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
                       {r.gesamt != null && (
-                        <p className={cn('font-bold text-sm', r.bezahlt ? 'text-green-600' : ueberfaelligR ? 'text-red-600' : 'text-slate-900')}>
+                        <p className={cn('font-bold text-sm whitespace-nowrap', r.bezahlt ? 'text-green-600' : ueberfaelligR ? 'text-red-600' : 'text-slate-900')}>
                           {euro(r.gesamt)}
                         </p>
                       )}
@@ -497,15 +483,32 @@ export function RechnungenContent({
                     </div>
                   </div>
 
-                  {/* PDF direkt aus der Liste */}
-                  {r.datei_pfad ? (
-                    <a href={`/api/rechnung-import/datei?id=${r.id}`} target="_blank" rel="noopener noreferrer"
-                      className="p-1.5 rounded-lg text-slate-600 hover:text-orange-600 hover:bg-orange-50 transition-colors flex-shrink-0" title="PDF ansehen">
-                      <FileText className="w-5 h-5" />
-                    </a>
-                  ) : (
-                    <span className="p-1.5 text-slate-200 flex-shrink-0" title="Keine Datei hinterlegt"><FileText className="w-5 h-5" /></span>
-                  )}
+                  {/* Handy: eigene Zeile unter den Angaben; Desktop: Status links, PDF rechts neben der Zeile */}
+                  <div className="order-2 sm:contents flex items-center justify-between gap-3">
+                    {/* Status: eindeutig Offen | Bezahlt */}
+                    <div className="sm:order-1 inline-flex rounded-lg border border-slate-200 overflow-hidden flex-shrink-0 text-xs font-medium" role="group" aria-label="Zahlstatus">
+                      <button onClick={() => setzeStatus(r, false)} title="Als offen markieren"
+                        className={cn('px-3 py-2 sm:px-2.5 sm:py-1.5 transition-colors',
+                          !r.bezahlt ? (ueberfaelligR ? 'bg-red-500 text-white' : 'bg-amber-400 text-white') : 'bg-white text-slate-400 hover:bg-slate-50')}>
+                        Offen
+                      </button>
+                      <button onClick={() => setzeStatus(r, true)} title="Als bezahlt markieren"
+                        className={cn('px-3 py-2 sm:px-2.5 sm:py-1.5 border-l border-slate-200 transition-colors',
+                          r.bezahlt ? 'bg-green-500 text-white' : 'bg-white text-slate-400 hover:bg-green-50 hover:text-green-700')}>
+                        Bezahlt
+                      </button>
+                    </div>
+
+                    {/* PDF direkt aus der Liste */}
+                    {r.datei_pfad ? (
+                      <a href={`/api/rechnung-import/datei?id=${r.id}`} target="_blank" rel="noopener noreferrer"
+                        className="sm:order-3 inline-flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-slate-600 hover:text-orange-600 hover:bg-orange-50 transition-colors flex-shrink-0 text-xs font-medium" title="PDF ansehen">
+                        <FileText className="w-5 h-5" /><span className="sm:hidden">PDF ansehen</span>
+                      </a>
+                    ) : (
+                      <span className="sm:order-3 p-1.5 text-slate-200 flex-shrink-0" title="Keine Datei hinterlegt"><FileText className="w-5 h-5" /></span>
+                    )}
+                  </div>
                 </div>
 
                 {open && (
