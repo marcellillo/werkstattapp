@@ -78,7 +78,7 @@ export interface GraphMessage {
   from: { emailAddress: { address: string; name: string } }
   receivedDateTime: string
   bodyPreview: string
-  body: { content: string; contentType: string }
+  body?: { content: string; contentType: string } // nur nach fetchMessageBody()
   hasAttachments: boolean
   isRead: boolean
   webLink?: string
@@ -93,7 +93,7 @@ export function nachrichtenSchluessel(msg: GraphMessage): string {
 // 50 pro Seite). Ob eine Mail schon verarbeitet wurde, entscheidet der Aufrufer (email_verarbeitet).
 export async function fetchMessages(accessToken: string, tage = 14, max = 200): Promise<GraphMessage[]> {
   const seit = new Date(Date.now() - tage * 24 * 60 * 60 * 1000).toISOString()
-  const select = 'id,internetMessageId,subject,from,receivedDateTime,bodyPreview,body,hasAttachments,isRead,webLink'
+  const select = 'id,internetMessageId,subject,from,receivedDateTime,bodyPreview,hasAttachments,isRead,webLink'
   let url: string | null =
     `${GRAPH_BASE}/me/mailFolders/inbox/messages?$filter=receivedDateTime ge ${seit}&$top=50&$select=${select}&$orderby=receivedDateTime desc`
 
@@ -109,6 +109,14 @@ export async function fetchMessages(accessToken: string, tage = 14, max = 200): 
     url = data['@odata.nextLink'] ?? null
   }
   return alle.slice(0, max)
+}
+
+// Mailtext einzeln nachladen (die Liste enthält ihn aus Platzgründen nicht)
+export async function fetchMessageBody(accessToken: string, messageId: string): Promise<{ content: string; contentType: string }> {
+  const res = await fetch(`${GRAPH_BASE}/me/messages/${encodeURIComponent(messageId)}?$select=body`, { headers: { Authorization: `Bearer ${accessToken}` } })
+  if (!res.ok) throw new Error(`Mailtext konnte nicht geladen werden: ${res.status}`)
+  const data = await res.json()
+  return data.body ?? { content: '', contentType: 'text' }
 }
 
 export interface GraphAttachment {

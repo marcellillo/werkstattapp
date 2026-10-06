@@ -300,9 +300,9 @@ export function RechnungenContent({
         </div>
         {email.verbunden && !email.fehler && (
           <div className="flex items-center gap-2 flex-shrink-0">
-            <button onClick={() => emailAbrufen(90, false)} disabled={syncing}
-              className="text-xs text-slate-500 hover:text-slate-800 underline disabled:opacity-50" title="Auch ältere E-Mails der letzten 90 Tage einlesen">
-              ältere laden (90 Tage)
+            <button onClick={() => emailAbrufen(120, false)} disabled={syncing}
+              className="text-xs text-slate-500 hover:text-slate-800 underline disabled:opacity-50" title="Auch ältere E-Mails der letzten 120 Tage einlesen">
+              ältere laden (120 Tage)
             </button>
             <Button onClick={() => emailAbrufen(14, false)} disabled={syncing}>
               {syncing ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Prüfe…</> : <><Mail className="w-4 h-4 mr-2" />E-Mails prüfen</>}

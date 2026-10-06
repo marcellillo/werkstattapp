@@ -68,7 +68,7 @@ export function MicrosoftPostfachCard({ status }: { status: GraphStatus }) {
   async function jetztPruefen() {
     setPrueft(true); setMeldung(null)
     try {
-      const res = await fetch('/api/email-sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tage: 90 }) })
+      const res = await fetch('/api/email-sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tage: 120 }) })
       const data = await res.json()
       if (!res.ok || !data.erfolg) throw new Error(data.error ?? 'Abruf fehlgeschlagen')
       const text = `${data.emailsGeprueft} E-Mails geprüft – ${data.rechnungenImportiert} Rechnung(en) importiert` +
@@ -147,7 +147,7 @@ export function MicrosoftPostfachCard({ status }: { status: GraphStatus }) {
           {status.verbunden && (
             <button onClick={jetztPruefen} disabled={prueft}
               className="flex items-center gap-2 px-4 py-2 border border-slate-300 hover:bg-slate-50 rounded-lg text-sm font-medium disabled:opacity-50">
-              {prueft ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />} Jetzt prüfen (letzte 90 Tage)
+              {prueft ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />} Jetzt prüfen (letzte 120 Tage)
             </button>
           )}
           {!zugangsdatenOffen && (

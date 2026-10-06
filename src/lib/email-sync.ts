@@ -7,7 +7,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createAdminClient } from '@/lib/supabase/admin'
 import {
-  refreshAccessToken, fetchMessages, fetchAttachments, nachrichtenSchluessel,
+  refreshAccessToken, fetchMessages, fetchMessageBody, fetchAttachments, nachrichtenSchluessel,
   type GraphMessage,
 } from '@/lib/graph-client'
 import {
@@ -78,6 +78,7 @@ function freundlicherGraphFehler(msg: string): string {
 }
 
 function klartext(msg: GraphMessage, max: number): string {
+  if (!msg.body) return (msg.bodyPreview ?? '').slice(0, max)
   return msg.body.contentType === 'html'
     ? msg.body.content.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max)
     : msg.body.content.slice(0, max)
@@ -209,7 +210,8 @@ export async function syncBetrieb(
   }
 
   // 2) Nachrichten holen, bereits verarbeitete aussortieren
-  const messages = await fetchMessages(accessToken, tage)
+  // Lange Rückblicke (Nachladen älterer Rechnungen) dürfen mehr Mails umfassen
+  const messages = await fetchMessages(accessToken, tage, tage > 30 ? 500 : 200)
   ergebnis.emailsGeprueft = messages.length
   const bekannt = await ladeBereitsVerarbeitete(supabase, betriebId, messages.map(nachrichtenSchluessel))
   const offen = messages.filter(m => !bekannt.has(nachrichtenSchluessel(m)))
@@ -289,6 +291,15 @@ export async function syncBetrieb(
     if (zeitUeberschritten()) { ergebnis.verbleibend++; continue }
 
     try {
+      // Der Mailtext steckt nicht in der Liste -- nur für wirklich relevante Mails nachladen
+      if (!msg.body) {
+        try {
+          msg.body = await fetchMessageBody(accessToken, msg.id)
+        } catch (e: any) {
+          ergebnis.fehler.push(`Mailtext "${(msg.subject ?? '').slice(0, 30)}": ${e.message}`)
+          continue
+        }
+      }
       let analyse: MailAnalyse | null = null
 
       if (anthropic) {
