@@ -73,6 +73,7 @@ export async function refreshAccessToken(
 
 export interface GraphMessage {
   id: string
+  internetMessageId?: string
   subject: string
   from: { emailAddress: { address: string; name: string } }
   receivedDateTime: string
@@ -80,29 +81,34 @@ export interface GraphMessage {
   body: { content: string; contentType: string }
   hasAttachments: boolean
   isRead: boolean
+  webLink?: string
 }
 
-export async function fetchUnreadMessages(accessToken: string, top = 50): Promise<GraphMessage[]> {
-  // Letzte 14 Tage abrufen (nicht nur ungelesen) — Duplikat-Check in route.ts verhindert doppelte Imports
-  const seit = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString()
-  const res = await fetch(
-    `${GRAPH_BASE}/me/mailFolders/inbox/messages?$filter=receivedDateTime ge ${seit}&$top=${top}&$select=id,subject,from,receivedDateTime,bodyPreview,body,hasAttachments,isRead&$orderby=receivedDateTime desc`,
-    { headers: { Authorization: `Bearer ${accessToken}` } },
-  )
-  if (!res.ok) {
-    const err = await res.json()
-    throw new Error(err.error?.message ?? `Graph API Fehler: ${res.status}`)
+// Eindeutiger Schlüssel einer Nachricht, der auch beim Verschieben zwischen Ordnern gleich bleibt
+export function nachrichtenSchluessel(msg: GraphMessage): string {
+  return msg.internetMessageId || msg.id
+}
+
+// Nachrichten der letzten `tage` Tage aus dem Posteingang, seitenweise (Graph liefert höchstens
+// 50 pro Seite). Ob eine Mail schon verarbeitet wurde, entscheidet der Aufrufer (email_verarbeitet).
+export async function fetchMessages(accessToken: string, tage = 14, max = 200): Promise<GraphMessage[]> {
+  const seit = new Date(Date.now() - tage * 24 * 60 * 60 * 1000).toISOString()
+  const select = 'id,internetMessageId,subject,from,receivedDateTime,bodyPreview,body,hasAttachments,isRead,webLink'
+  let url: string | null =
+    `${GRAPH_BASE}/me/mailFolders/inbox/messages?$filter=receivedDateTime ge ${seit}&$top=50&$select=${select}&$orderby=receivedDateTime desc`
+
+  const alle: GraphMessage[] = []
+  while (url && alle.length < max) {
+    const res: Response = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      throw new Error(err.error?.message ?? `Graph API Fehler: ${res.status}`)
+    }
+    const data: { value?: GraphMessage[]; '@odata.nextLink'?: string } = await res.json()
+    alle.push(...(data.value ?? []))
+    url = data['@odata.nextLink'] ?? null
   }
-  const data = await res.json()
-  return data.value ?? []
-}
-
-export async function markMessageAsRead(accessToken: string, messageId: string): Promise<void> {
-  await fetch(`${GRAPH_BASE}/me/messages/${messageId}`, {
-    method: 'PATCH',
-    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ isRead: true }),
-  })
+  return alle.slice(0, max)
 }
 
 export interface GraphAttachment {
@@ -113,32 +119,47 @@ export interface GraphAttachment {
   size: number
 }
 
+const MIN_BILD_BYTES = 50 * 1024 // kleinere Bilder sind fast immer Signatur-Logos
+const MAX_ANHANG_BYTES = 20 * 1024 * 1024
+
+// Nur Anhänge, die eine Rechnung sein können: PDFs und echte (nicht eingebettete) Fotos/Scans.
 export async function fetchAttachments(accessToken: string, messageId: string): Promise<GraphAttachment[]> {
-  const res = await fetch(
-    `${GRAPH_BASE}/me/messages/${messageId}/attachments`,
-    { headers: { Authorization: `Bearer ${accessToken}` } },
-  )
+  const basis = `${GRAPH_BASE}/me/messages/${encodeURIComponent(messageId)}/attachments`
+  const res = await fetch(basis, { headers: { Authorization: `Bearer ${accessToken}` } })
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))
     throw new Error(`Anhänge-Fehler: ${res.status} ${err.error?.message ?? ''}`)
   }
   const data = await res.json()
-  return (data.value ?? []).filter((a: any) => {
-    const ct: string = a.contentType ?? ''
-    const name: string = (a.name ?? '').toLowerCase()
-    return ct === 'application/pdf' ||
-      ct === 'application/octet-stream' ||
-      ct.startsWith('image/') ||
-      name.endsWith('.pdf') ||
-      name.endsWith('.jpg') ||
-      name.endsWith('.jpeg') ||
-      name.endsWith('.png')
-  }).map((a: any) => {
-    // Korrigiere contentType anhand Dateiname falls nötig
-    const name: string = (a.name ?? '').toLowerCase()
-    if (a.contentType === 'application/octet-stream' && name.endsWith('.pdf')) {
-      return { ...a, contentType: 'application/pdf' }
+
+  const ergebnis: GraphAttachment[] = []
+  for (const a of data.value ?? []) {
+    if (a['@odata.type'] && a['@odata.type'] !== '#microsoft.graph.fileAttachment') continue
+    if (a.isInline) continue
+    const name: string = a.name ?? ''
+    const lower = name.toLowerCase()
+    const ct: string = (a.contentType ?? '').toLowerCase()
+    const size: number = a.size ?? 0
+    if (size > MAX_ANHANG_BYTES) continue
+
+    const istPdf = ct === 'application/pdf' || lower.endsWith('.pdf')
+    const istBild = /\.(jpe?g|png|webp|gif)$/.test(lower) || ['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(ct)
+    if (!istPdf && !(istBild && size >= MIN_BILD_BYTES)) continue
+
+    let bytes: string | undefined = a.contentBytes
+    if (!bytes) {
+      // Große Anhänge liefert die Liste ohne Inhalt: einzeln als Binärdaten holen
+      const r = await fetch(`${basis}/${encodeURIComponent(a.id)}/$value`, { headers: { Authorization: `Bearer ${accessToken}` } })
+      if (!r.ok) continue
+      bytes = Buffer.from(await r.arrayBuffer()).toString('base64')
     }
-    return a
-  })
+    ergebnis.push({
+      id: a.id,
+      name,
+      contentType: istPdf ? 'application/pdf' : ct || 'application/octet-stream',
+      contentBytes: bytes,
+      size,
+    })
+  }
+  return ergebnis
 }

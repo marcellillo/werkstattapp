@@ -2,13 +2,14 @@
 import { useState, useEffect } from 'react'
 import {
   Settings, Mail, Bell, Users, Database, Building2,
-  CheckCircle, ExternalLink, Save, Loader2, Bot, Eye, EyeOff, Wifi, WifiOff, Receipt, Shield, Plus, Copy, Check, Trash2
+  CheckCircle, ExternalLink, Save, Loader2, Bot, Eye, EyeOff, Wifi, Receipt, Shield, Plus, Copy, Check, Trash2
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { createClient } from '@/lib/supabase/client'
 import { useRollen } from '@/lib/rollen-context'
 import { PushSettings } from '@/components/push-settings'
+import { MicrosoftPostfachCard, type GraphStatus } from './microsoft-postfach'
 
 interface Config {
   imap_email: string
@@ -43,8 +44,9 @@ interface Config {
   firma_stripe: string
 }
 
-export function EinstellungenContent({ initialConfig, betriebName, betriebId }: {
+export function EinstellungenContent({ initialConfig, graphStatus, betriebName, betriebId }: {
   initialConfig: Config
+  graphStatus: GraphStatus
   betriebName: string
   betriebId: string
 }) {
@@ -52,9 +54,6 @@ export function EinstellungenContent({ initialConfig, betriebName, betriebId }: 
   const [logoUploading, setLogoUploading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
-  const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'ok' | 'fehler'>('idle')
-  const [testMsg, setTestMsg] = useState('')
-  const [showPassword, setShowPassword] = useState(false)
   const [showApiKey, setShowApiKey] = useState(false)
   const [showResendKey, setShowResendKey] = useState(false)
   const [activeTab, setActiveTab] = useState<'general' | 'mitarbeiter'>('general')
@@ -69,7 +68,6 @@ export function EinstellungenContent({ initialConfig, betriebName, betriebId }: 
   const supabase = createClient()
   const { role: userRolle } = useRollen()
 
-  const isKonfiguriert = !!(config.imap_email && config.imap_password)
   const isAdmin = userRolle === 'admin' || userRolle === 'superadmin'
 
   const ROLLEN = {
@@ -198,26 +196,6 @@ export function EinstellungenContent({ initialConfig, betriebName, betriebId }: 
       alert(`Fehler: ${error.message}`)
     } finally {
       setSaving(false)
-    }
-  }
-
-  async function verbindungTesten() {
-    if (!isKonfiguriert) return
-    setTestStatus('testing')
-    setTestMsg('')
-    try {
-      const res = await fetch('/api/imap-test', { method: 'POST', body: JSON.stringify(config) })
-      const data = await res.json()
-      if (res.ok && data.ok) {
-        setTestStatus('ok')
-        setTestMsg('Verbindung erfolgreich!')
-      } else {
-        setTestStatus('fehler')
-        setTestMsg(data.error ?? 'Verbindung fehlgeschlagen')
-      }
-    } catch (e: any) {
-      setTestStatus('fehler')
-      setTestMsg(e.message)
     }
   }
 
@@ -499,80 +477,8 @@ export function EinstellungenContent({ initialConfig, betriebName, betriebId }: 
             </CardContent>
           </Card>
 
-          {/* Email-Sync */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2">
-                <Mail className="w-5 h-5 text-red-600" /> Email-Synchronisation
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-sm text-slate-600">Verbinden Sie Ihr Email-Postfach.</p>
-
-              <div className="space-y-3">
-                <div>
-                  <label className="text-sm font-medium text-slate-900 mb-1 block">Email-Adresse</label>
-                  <input
-                    type="email"
-                    value={config.imap_email}
-                    onChange={e => setConfig(c => ({ ...c, imap_email: e.target.value }))}
-                    placeholder="your@email.com"
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium text-slate-900 mb-1 block">Passwort</label>
-                  <div className="relative">
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      value={config.imap_password}
-                      onChange={e => setConfig(c => ({ ...c, imap_password: e.target.value }))}
-                      placeholder="••••••••"
-                      className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500 pr-10"
-                    />
-                    <button
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500"
-                    >
-                      {showPassword ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <button
-                onClick={verbindungTesten}
-                disabled={!isKonfiguriert || testStatus === 'testing'}
-                className="flex items-center gap-2 px-4 py-2 border border-slate-300 hover:bg-slate-50 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
-              >
-                {testStatus === 'testing' ? (
-                  <><Loader2 className="w-4 h-4 animate-spin" />Wird getestet...</>
-                ) : testStatus === 'ok' ? (
-                  <><CheckCircle className="w-4 h-4 text-green-600" />Verbunden</>
-                ) : testStatus === 'fehler' ? (
-                  <><WifiOff className="w-4 h-4 text-red-600" />Fehler</>
-                ) : (
-                  <><Wifi className="w-4 h-4" />Verbindung testen</>
-                )}
-              </button>
-
-              {testMsg && (
-                <div className={`p-3 rounded-lg text-sm ${testStatus === 'ok' ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'}`}>
-                  {testMsg}
-                </div>
-              )}
-
-              <button
-                onClick={speichern}
-                disabled={saving}
-                className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
-              >
-                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                {saved ? 'Gespeichert!' : 'Speichern'}
-              </button>
-            </CardContent>
-          </Card>
+          {/* E-Mail-Postfach (Microsoft) */}
+          {isAdmin && <MicrosoftPostfachCard status={graphStatus} />}
 
           {/* Benachrichtigungen */}
           <Card>

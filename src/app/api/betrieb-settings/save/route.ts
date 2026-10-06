@@ -25,12 +25,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Only admins can update settings' }, { status: 403 })
     }
 
+    // Microsoft-Postfach und E-Mail-Sync-Zustand werden NUR über /api/graph/* und den Sync selbst
+    // geschrieben. Die Einstellungsseite schickt beim Speichern ihren ganzen (evtl. veralteten)
+    // Stand mit -- der darf eine frisch hergestellte Verbindung nicht überschreiben.
+    const GESCHUETZT = /^graph_|^(email_sync_aktiv|letzter_email_sync|teile_updates_ausstehend)$/
+
     // Upsert settings as key-value pairs
-    const updates = Object.entries(config).map(([schluessel, wert]) => ({
-      betrieb_id: betriebId,
-      schluessel,
-      wert: String(wert),
-    }))
+    const updates = Object.entries(config)
+      .filter(([schluessel]) => !GESCHUETZT.test(schluessel))
+      .map(([schluessel, wert]) => ({
+        betrieb_id: betriebId,
+        schluessel,
+        wert: String(wert),
+      }))
+    if (updates.length === 0) return NextResponse.json({ success: true })
 
     const { error } = await supabase
       .from('betrieb_einstellungen')

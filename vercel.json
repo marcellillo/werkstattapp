@@ -3,6 +3,9 @@
   "outputDirectory": ".next",
   "cleanUrls": true,
   "trailingSlash": false,
+  "crons": [
+    { "path": "/api/cron/email-sync", "schedule": "0 5 * * *" }
+  ],
   "headers": [
     {
       "source": "/(.*)",

@@ -1,139 +1,64 @@
+export const runtime = 'nodejs'
+export const maxDuration = 60
+
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { getBetriebIdForUser } from '@/lib/server-betrieb'
+import { verarbeiteRechnungsDatei } from '@/lib/eingangsrechnung'
 
+// Manueller Upload einer Lieferantenrechnung (PDF/Foto): wird ausgelesen, in der App abgelegt
+// und als Eingangsrechnung angelegt. Pro Aufruf eine Datei.
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Nicht angemeldet' }, { status: 401 })
 
-  const { data: userBetrieb } = await supabase
-    .from('betrieb_users')
-    .select('betrieb_id')
-    .eq('profile_id', user.id)
-    .order('is_primary', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-  const betriebId = userBetrieb?.betrieb_id
-  if (!betriebId) return NextResponse.json({ error: 'Kein Betrieb zugeordnet' }, { status: 403 })
-
-  // API Key aus DB lesen, Fallback auf .env.local
-  const { data: keyRow } = await supabase
-    .from('betrieb_einstellungen')
-    .select('wert')
-    .eq('betrieb_id', betriebId)
-    .eq('schluessel', 'anthropic_api_key')
-    .maybeSingle()
-  const apiKey = keyRow?.wert || process.env.ANTHROPIC_API_KEY
-  if (!apiKey) return NextResponse.json({ error: 'Anthropic API Key fehlt. Bitte unter Einstellungen → KI-Integration eintragen.' }, { status: 400 })
-
-  const anthropic = new Anthropic({ apiKey })
-
-  const formData = await req.formData()
-  const file = formData.get('datei') as File | null
-  if (!file) return NextResponse.json({ error: 'Keine Datei' }, { status: 400 })
-
-  // Datei als Base64
-  const buffer = Buffer.from(await file.arrayBuffer())
-  const base64 = buffer.toString('base64')
-  const isPdf = file.type === 'application/pdf'
-  const mediaType = isPdf ? 'application/pdf' : (file.type as 'image/jpeg' | 'image/png' | 'image/webp')
-
-  // Claude analysiert die Rechnung
-  const message = await anthropic.messages.create({
-    model: 'claude-opus-4-8',
-    max_tokens: 4096,
-    thinking: { type: 'adaptive' },
-    messages: [
-      {
-        role: 'user',
-        content: [
-          isPdf
-            ? { type: 'document' as const, source: { type: 'base64' as const, media_type: 'application/pdf' as const, data: base64 } }
-            : { type: 'image' as const, source: { type: 'base64' as const, media_type: mediaType as 'image/jpeg' | 'image/png' | 'image/webp', data: base64 } },
-          {
-            type: 'text',
-            text: `Analysiere diese Lieferantenrechnung und extrahiere alle relevanten Daten.
-
-Antworte NUR mit einem JSON-Objekt in diesem Format (kein Markdown, kein Text darum herum):
-{
-  "lieferant": "Firmenname des Lieferanten",
-  "rechnungsnummer": "Rechnungsnummer oder null",
-  "datum": "YYYY-MM-DD oder null",
-  "gesamt": 123.45,
-  "positionen": [
-    {
-      "bezeichnung": "Artikelbezeichnung",
-      "teilenummer": "Teilenummer oder null",
-      "menge": 1,
-      "einzelpreis": 49.99,
-      "gesamtpreis": 49.99
-    }
-  ]
-}
-
-Wichtig:
-- Alle Preise als Zahlen ohne Währungssymbol
-- Mengen als Zahlen (z.B. 2 statt "2 Stück")
-- Wenn ein Wert nicht lesbar ist: null
-- Teilenummern/OEM-Nummern unbedingt mit übernehmen`,
-          },
-        ],
-      },
-    ],
-  })
-
-  // JSON aus der Antwort extrahieren
-  const textBlock = message.content.find(b => b.type === 'text')
-  if (!textBlock || textBlock.type !== 'text') {
-    return NextResponse.json({ error: 'Keine Antwort von Claude' }, { status: 500 })
-  }
-
-  let extrakt: any
+  let betriebId: string
   try {
-    const cleaned = textBlock.text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
-    extrakt = JSON.parse(cleaned)
+    betriebId = await getBetriebIdForUser(supabase, user.id)
   } catch {
-    return NextResponse.json({ error: 'Claude Antwort konnte nicht geparst werden', raw: textBlock.text }, { status: 500 })
+    return NextResponse.json({ error: 'Kein Betrieb zugeordnet' }, { status: 403 })
   }
 
-  // Dedup-Check vor dem Speichern
-  if (extrakt.rechnungsnummer) {
-    const { data: exist } = await supabase.from('rechnungen')
-      .select('id').eq('betrieb_id', betriebId).eq('rechnungsnummer', extrakt.rechnungsnummer).maybeSingle()
-    if (exist) return NextResponse.json({ erfolg: true, rechnungId: exist.id, extrakt, duplikat: true })
+  // API Key aus DB lesen, Fallback auf Umgebungsvariable
+  const { data: keyRow } = await supabase
+    .from('betrieb_einstellungen').select('wert')
+    .eq('betrieb_id', betriebId).eq('schluessel', 'anthropic_api_key').maybeSingle()
+  const apiKey = keyRow?.wert || process.env.ANTHROPIC_API_KEY
+  if (!apiKey) {
+    return NextResponse.json({ error: 'Anthropic API Key fehlt. Bitte unter Einstellungen → KI-Integration eintragen.' }, { status: 400 })
   }
 
-  // Rechnung speichern
-  const { data: rechnung, error: rErr } = await supabase
-    .from('rechnungen')
-    .insert({
-      betrieb_id: betriebId,
-      lieferant: extrakt.lieferant,
-      rechnungsnummer: extrakt.rechnungsnummer,
-      datum: extrakt.datum,
-      gesamt: extrakt.gesamt,
-    })
-    .select('id')
-    .single()
+  const formData = await req.formData().catch(() => null)
+  const file = formData?.get('datei')
+  if (!file || typeof file === 'string') return NextResponse.json({ error: 'Keine Datei' }, { status: 400 })
 
-  if (rErr || !rechnung) {
-    return NextResponse.json({ error: 'Rechnung konnte nicht gespeichert werden', detail: rErr?.message }, { status: 500 })
-  }
+  const buffer = Buffer.from(await file.arrayBuffer())
 
-  // Positionen speichern
-  if (extrakt.positionen?.length) {
-    await supabase.from('rechnung_positionen').insert(
-      extrakt.positionen.map((p: any) => ({
-        rechnung_id: rechnung.id,
-        bezeichnung: p.bezeichnung,
-        teilenummer: p.teilenummer,
-        menge: p.menge,
-        einzelpreis: p.einzelpreis,
-        gesamtpreis: p.gesamtpreis,
-      }))
-    )
-  }
+  const res = await verarbeiteRechnungsDatei(
+    { supabase: createAdminClient(), anthropic: new Anthropic({ apiKey }) },
+    {
+      betriebId,
+      datei: { name: file.name || 'rechnung', contentType: file.type, buffer },
+      quelle: 'upload',
+      erzwingen: true,
+    },
+  )
 
-  return NextResponse.json({ erfolg: true, rechnungId: rechnung.id, extrakt })
+  if (res.status === 'ungueltig') return NextResponse.json({ error: res.fehler }, { status: 400 })
+  if (res.status === 'fehler') return NextResponse.json({ error: res.fehler ?? 'Rechnung konnte nicht verarbeitet werden' }, { status: 500 })
+
+  return NextResponse.json({
+    erfolg: true,
+    rechnungId: res.rechnungId,
+    duplikat: res.status === 'duplikat',
+    dateiErgaenzt: res.status === 'datei_ergaenzt',
+    extrakt: {
+      lieferant: res.analyse?.lieferant ?? null,
+      rechnungsnummer: res.analyse?.rechnungsnummer ?? null,
+      gesamt: res.analyse?.gesamt ?? null,
+    },
+  })
 }

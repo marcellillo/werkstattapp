@@ -43,9 +43,9 @@ export default async function EinstellungenPage() {
     imap_password: settings?.imap_password ?? '',
     graph_client_id: settings?.graph_client_id ?? '',
     graph_tenant_id: settings?.graph_tenant_id ?? '',
-    graph_client_secret: settings?.graph_client_secret ?? '',
+    graph_client_secret: '', // nie an den Browser ausliefern
     graph_email: settings?.graph_email ?? '',
-    graph_refresh_token: settings?.graph_refresh_token ?? '',
+    graph_refresh_token: '', // nie an den Browser ausliefern
     anthropic_api_key: settings?.anthropic_api_key ?? '',
     resend_api_key: settings?.resend_api_key ?? '',
     firma_absender_email: settings?.firma_absender_email ?? '',
@@ -74,6 +74,16 @@ export default async function EinstellungenPage() {
   return (
     <EinstellungenContent
       initialConfig={initialConfig}
+      graphStatus={{
+        clientId: settings.graph_client_id ?? '',
+        tenantId: settings.graph_tenant_id ?? '',
+        hatSecret: !!settings.graph_client_secret,
+        verbunden: !!settings.graph_refresh_token,
+        email: settings.graph_email ?? '',
+        aktiv: settings.email_sync_aktiv === 'true',
+        letzterSync: settings.letzter_email_sync ?? null,
+        fehler: settings.graph_fehler ?? '',
+      }}
       betriebName={betrieb?.name ?? 'Werkstatt'}
       betriebId={betriebId}
     />

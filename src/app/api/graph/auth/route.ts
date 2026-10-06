@@ -1,21 +1,29 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getOAuthUrl } from '@/lib/graph-client'
+import { getBetriebIdForUser } from '@/lib/server-betrieb'
+import { erzeugeState, GRAPH_NONCE_COOKIE } from '@/lib/graph-state'
 
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://werkstatt-app-umber.vercel.app'
+
+// Startet die Microsoft-Anmeldung für das E-Mail-Postfach (nur Admins).
 export async function GET() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Nicht angemeldet' }, { status: 401 })
+  if (!user) return NextResponse.redirect(new URL('/login', APP_URL))
 
-  const { data: userBetrieb } = await supabase
-    .from('betrieb_users')
-    .select('betrieb_id')
-    .eq('profile_id', user.id)
-    .order('is_primary', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-  const betriebId = userBetrieb?.betrieb_id
-  if (!betriebId) return NextResponse.json({ error: 'Kein Betrieb zugeordnet' }, { status: 403 })
+  let betriebId: string
+  try {
+    betriebId = await getBetriebIdForUser(supabase, user.id)
+  } catch {
+    return NextResponse.json({ error: 'Kein Betrieb zugeordnet' }, { status: 403 })
+  }
+
+  const { data: mitglied } = await supabase
+    .from('betrieb_users').select('role').eq('betrieb_id', betriebId).eq('profile_id', user.id).maybeSingle()
+  if (mitglied?.role !== 'admin' && mitglied?.role !== 'superadmin') {
+    return NextResponse.redirect(new URL('/einstellungen?error=Nur+Administratoren+k%C3%B6nnen+das+Postfach+verbinden', APP_URL))
+  }
 
   const { data: rows } = await supabase
     .from('betrieb_einstellungen')
@@ -24,16 +32,16 @@ export async function GET() {
     .in('schluessel', ['graph_client_id', 'graph_tenant_id'])
 
   const cfg: Record<string, string> = {}
-  for (const r of rows ?? []) cfg[r.schluessel] = r.wert
+  for (const r of rows ?? []) if (r.wert) cfg[r.schluessel] = r.wert
 
   if (!cfg.graph_client_id || !cfg.graph_tenant_id) {
-    return NextResponse.redirect(
-      new URL('/einstellungen?error=graph_nicht_konfiguriert', process.env.NEXT_PUBLIC_APP_URL ?? 'https://werkstatt-app-umber.vercel.app')
-    )
+    return NextResponse.redirect(new URL('/einstellungen?error=Azure-Zugangsdaten+fehlen.+Bitte+zuerst+Anwendungs-ID+und+Verzeichnis-ID+eintragen', APP_URL))
   }
 
-  // betriebId als OAuth state durchreichen, damit der Callback (der ohne
-  // Session-Cookie laeuft) weiss, welchem Betrieb die Tokens gehoeren.
-  const url = getOAuthUrl(cfg.graph_client_id, cfg.graph_tenant_id, betriebId)
-  return NextResponse.redirect(url)
+  const { state, nonce } = erzeugeState(betriebId)
+  const res = NextResponse.redirect(getOAuthUrl(cfg.graph_client_id, cfg.graph_tenant_id, state))
+  res.cookies.set(GRAPH_NONCE_COOKIE, nonce, {
+    httpOnly: true, secure: true, sameSite: 'lax', path: '/api/graph', maxAge: 600,
+  })
+  return res
 }

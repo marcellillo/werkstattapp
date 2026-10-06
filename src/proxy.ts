@@ -33,7 +33,9 @@ export async function proxy(request: NextRequest) {
     request.nextUrl.pathname.startsWith('/api/buchen') ||
     request.nextUrl.pathname.startsWith('/status/') ||
     request.nextUrl.pathname.startsWith('/api/invitations/get') ||
-    request.nextUrl.pathname.startsWith('/api/invitations/accept')
+    request.nextUrl.pathname.startsWith('/api/invitations/accept') ||
+    // Cron-Aufrufe haben keine Nutzer-Session; die Route prüft das CRON_SECRET selbst
+    request.nextUrl.pathname.startsWith('/api/cron/')
   const isPublicRoute = isAuthRoute || isPasswordReset || request.nextUrl.pathname === '/' || isPublicApi
 
   if (!user && !isPublicRoute) {

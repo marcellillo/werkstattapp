@@ -16,15 +16,41 @@ export default async function RechnungenPage() {
 
   if (!userBetriebe?.[0]?.betrieb_id) redirect('/login')
   const betriebId = userBetriebe[0].betrieb_id
-  const isAdmin = userBetriebe[0].role === 'admin'
+  const rolle = userBetriebe[0].role
+  const isAdmin = rolle === 'admin' || rolle === 'superadmin'
 
-  const { data: rechnungen } = await supabase
-    .from('rechnungen')
-    .select('*, positionen:rechnung_positionen(*)')
-    .eq('betrieb_id', betriebId)
-    .order('erstellt_am', { ascending: false })
+  const [rechnungen, einstellungen] = await Promise.all([
+    supabase
+      .from('rechnungen')
+      .select('*, positionen:rechnung_positionen(*)')
+      .eq('betrieb_id', betriebId)
+      .order('erstellt_am', { ascending: false }),
+    supabase
+      .from('betrieb_einstellungen')
+      .select('schluessel, wert')
+      .eq('betrieb_id', betriebId)
+      .in('schluessel', ['graph_refresh_token', 'email_sync_aktiv', 'letzter_email_sync', 'graph_fehler', 'graph_email']),
+  ])
+
+  // Abfragefehler dürfen nicht stillschweigend zu "keine Rechnungen" werden
+  if (rechnungen.error) console.error('[Rechnungen] Abfrage fehlgeschlagen:', rechnungen.error)
+  if (einstellungen.error) console.error('[Rechnungen] Einstellungen nicht lesbar:', einstellungen.error)
+
+  const cfg: Record<string, string> = {}
+  for (const r of einstellungen.data ?? []) if (r.wert) cfg[r.schluessel] = r.wert
 
   return (
-    <RechnungenContent rechnungen={(rechnungen ?? []) as any[]} isAdmin={isAdmin} />
+    <RechnungenContent
+      rechnungen={(rechnungen.data ?? []) as any[]}
+      isAdmin={isAdmin}
+      ladefehler={rechnungen.error ? 'Die Rechnungen konnten nicht geladen werden. Bitte Seite neu laden.' : null}
+      email={{
+        verbunden: !!cfg.graph_refresh_token,
+        aktiv: cfg.email_sync_aktiv === 'true',
+        letzterSync: cfg.letzter_email_sync ?? null,
+        fehler: cfg.graph_fehler ?? '',
+        adresse: cfg.graph_email ?? '',
+      }}
+    />
   )
 }

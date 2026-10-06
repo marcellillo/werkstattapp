@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { exchangeCodeForTokens } from '@/lib/graph-client'
+import { pruefeState, GRAPH_NONCE_COOKIE } from '@/lib/graph-state'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://werkstatt-app-umber.vercel.app'
 
-// Service-Role-Client umgeht RLS — kein Session-Cookie nötig
-function adminClient() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  )
+function zurueck(pfad: string) {
+  const res = NextResponse.redirect(new URL(pfad, APP_URL))
+  res.cookies.delete({ name: GRAPH_NONCE_COOKIE, path: '/api/graph' })
+  return res
 }
 
 export async function GET(req: NextRequest) {
@@ -17,25 +17,30 @@ export async function GET(req: NextRequest) {
   const code = searchParams.get('code')
   const error = searchParams.get('error')
   const errorDesc = searchParams.get('error_description')
-  const betriebId = searchParams.get('state')
 
   if (error || !code) {
-    const msg = errorDesc ?? error ?? 'kein_code'
-    return NextResponse.redirect(new URL(`/einstellungen?error=${encodeURIComponent(msg)}`, APP_URL))
+    return zurueck(`/einstellungen?error=${encodeURIComponent(errorDesc ?? error ?? 'kein_code')}`)
   }
 
-  const supabase = adminClient()
-
+  // Der Rückweg muss zu dem Browser gehören, der die Anmeldung gestartet hat
+  const betriebId = pruefeState(searchParams.get('state'), req.cookies.get(GRAPH_NONCE_COOKIE)?.value)
   if (!betriebId) {
-    return NextResponse.redirect(new URL('/einstellungen?error=fehlender_betrieb_kontext', APP_URL))
-  }
-  const { data: betrieb } = await supabase.from('betriebe').select('id').eq('id', betriebId).maybeSingle()
-  if (!betrieb) {
-    return NextResponse.redirect(new URL('/einstellungen?error=ungueltiger_betrieb_kontext', APP_URL))
+    return zurueck('/einstellungen?error=Die+Anmeldung+ist+abgelaufen+oder+ung%C3%BCltig.+Bitte+erneut+auf+%22Mit+Microsoft+verbinden%22+klicken')
   }
 
-  // Client-Credentials aus DB lesen (betrieb-gescopt: werkstatt_einstellungen
-  // war global und erlaubte jedem eingeloggten Nutzer Zugriff auf jeden Betrieb)
+  // ... und der angemeldete Nutzer muss Admin dieses Betriebs sein
+  const sessionClient = await createClient()
+  const { data: { user } } = await sessionClient.auth.getUser()
+  if (!user) return zurueck('/login')
+  const { data: mitglied } = await sessionClient
+    .from('betrieb_users').select('role').eq('betrieb_id', betriebId).eq('profile_id', user.id).maybeSingle()
+  if (mitglied?.role !== 'admin' && mitglied?.role !== 'superadmin') {
+    return zurueck('/einstellungen?error=Keine+Berechtigung')
+  }
+
+  // Service-Role: Tokens schreiben (Einstellungen sind nicht für alle Rollen beschreibbar)
+  const supabase = createAdminClient()
+
   const { data: rows } = await supabase
     .from('betrieb_einstellungen')
     .select('schluessel, wert')
@@ -46,17 +51,12 @@ export async function GET(req: NextRequest) {
   for (const r of rows ?? []) if (r.wert) cfg[r.schluessel] = r.wert
 
   if (!cfg.graph_client_id || !cfg.graph_tenant_id || !cfg.graph_client_secret) {
-    return NextResponse.redirect(
-      new URL('/einstellungen?error=Azure-Zugangsdaten+fehlen+in+den+Einstellungen', APP_URL)
-    )
+    return zurueck('/einstellungen?error=Azure-Zugangsdaten+fehlen+in+den+Einstellungen')
   }
 
   try {
     const { accessToken, refreshToken } = await exchangeCodeForTokens(
-      code,
-      cfg.graph_client_id,
-      cfg.graph_tenant_id,
-      cfg.graph_client_secret,
+      code, cfg.graph_client_id, cfg.graph_tenant_id, cfg.graph_client_secret,
     )
 
     // E-Mail-Adresse des verbundenen Kontos holen
@@ -66,17 +66,16 @@ export async function GET(req: NextRequest) {
     const me = await meRes.json()
     const email = me.mail ?? me.userPrincipalName ?? ''
 
-    // Tokens speichern — service role umgeht RLS
-    await supabase.from('betrieb_einstellungen').upsert([
+    const { error: saveErr } = await supabase.from('betrieb_einstellungen').upsert([
       { betrieb_id: betriebId, schluessel: 'graph_refresh_token', wert: refreshToken },
       { betrieb_id: betriebId, schluessel: 'graph_email',         wert: email },
-      { betrieb_id: betriebId, schluessel: 'graph_access_token',  wert: accessToken },
+      { betrieb_id: betriebId, schluessel: 'graph_fehler',        wert: '' },
+      { betrieb_id: betriebId, schluessel: 'email_sync_aktiv',    wert: 'true' },
     ], { onConflict: 'betrieb_id,schluessel' })
+    if (saveErr) throw new Error(`Verbindung konnte nicht gespeichert werden: ${saveErr.message}`)
 
-    return NextResponse.redirect(new URL('/einstellungen?success=graph_verbunden', APP_URL))
+    return zurueck('/einstellungen?success=graph_verbunden')
   } catch (e: any) {
-    return NextResponse.redirect(
-      new URL(`/einstellungen?error=${encodeURIComponent(e.message)}`, APP_URL)
-    )
+    return zurueck(`/einstellungen?error=${encodeURIComponent(e.message)}`)
   }
 }
