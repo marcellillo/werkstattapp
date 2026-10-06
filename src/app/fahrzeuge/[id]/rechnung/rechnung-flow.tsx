@@ -397,22 +397,27 @@ export function RechnungFlow({ auftrag, firma, betriebId }: Props) {
                   {betriebsstoffe.map(b => {
                     const menge = bsMengen[b.id] || 0
                     const zuViel = menge > b.rest
+                    const ohnePreis = b.preis_pro_einheit <= 0
                     return (
-                      <div key={b.id} className="px-4 py-3">
+                      <div key={b.id} className={cn('px-4 py-3', ohnePreis && 'bg-gray-50/60')}>
                         <div className="flex items-center justify-between gap-3">
                           <div className="min-w-0">
                             <p className="text-sm font-medium text-gray-800">{b.name}</p>
-                            <p className="text-xs text-gray-500">
-                              {b.preis_pro_einheit.toLocaleString('de-DE', { minimumFractionDigits: 2 })} € / {b.einheit} netto
-                              {' · '}Bestand: <span className={cn('font-medium', b.rest <= 0 ? 'text-red-600' : 'text-gray-700')}>{formatMenge(b.rest, b.einheit)}</span>
-                            </p>
+                            {ohnePreis ? (
+                              <p className="text-xs text-amber-600">Preis fehlt — unter „Betriebsstoffe“ im Menü festlegen</p>
+                            ) : (
+                              <p className="text-xs text-gray-500">
+                                {b.preis_pro_einheit.toLocaleString('de-DE', { minimumFractionDigits: 2 })} € / {b.einheit} netto
+                                {' · '}Bestand: <span className={cn('font-medium', b.rest <= 0 ? 'text-red-600' : 'text-gray-700')}>{formatMenge(b.rest, b.einheit)}</span>
+                              </p>
+                            )}
                           </div>
                           <div className="flex items-center gap-2 flex-shrink-0">
                             <DecimalField
                               placeholder="0"
                               value={menge}
-                              onChange={n => setBsMengen(prev => ({ ...prev, [b.id]: n < 0 ? 0 : n }))}
-                              className="w-20 px-2 py-2 border border-gray-200 rounded-lg text-sm text-right focus:outline-none focus:ring-2 focus:ring-sky-400"
+                              onChange={n => setBsMengen(prev => ({ ...prev, [b.id]: ohnePreis || n < 0 ? 0 : n }))}
+                              className={cn('w-20 px-2 py-2 border border-gray-200 rounded-lg text-sm text-right focus:outline-none focus:ring-2 focus:ring-sky-400', ohnePreis && 'opacity-40 pointer-events-none')}
                             />
                             <span className="text-xs text-gray-500 w-4">{b.einheit}</span>
                           </div>

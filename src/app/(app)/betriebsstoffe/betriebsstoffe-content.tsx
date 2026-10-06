@@ -26,6 +26,7 @@ export function BetriebsstoffeContent({ betriebId, initialStoffe, initialBewegun
 
   const [stoffe, setStoffe] = useState(initialStoffe)
   const [bewegungen, setBewegungen] = useState(initialBewegungen)
+  const [tab, setTab] = useState<string>('alle')
   const [fehler, setFehler] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
 
@@ -124,6 +125,11 @@ export function BetriebsstoffeContent({ betriebId, initialStoffe, initialBewegun
     await neuLaden()
   }
 
+  // Reiter: "Alle" oder ein einzelner Stoff (fällt auf "Alle" zurück, falls der Stoff nicht mehr existiert)
+  const aktiverTab = tab !== 'alle' && stoffe.some(s => s.id === tab) ? tab : 'alle'
+  const sichtbareStoffe = aktiverTab === 'alle' ? stoffe : stoffe.filter(s => s.id === aktiverTab)
+  const sichtbareBewegungen = aktiverTab === 'alle' ? bewegungen : bewegungen.filter(b => b.betriebsstoffId === aktiverTab)
+
   return (
     <div className="space-y-5 max-w-4xl">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
@@ -181,6 +187,28 @@ export function BetriebsstoffeContent({ betriebId, initialStoffe, initialBewegun
         </Card>
       )}
 
+      {stoffe.length > 0 && (
+        <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1" role="tablist" aria-label="Betriebsstoffe">
+          {[{ id: 'alle', name: 'Alle', rest: null as number | null, einheit: '', aktiv: true }, ...stoffe].map(s => {
+            const ausgewaehlt = aktiverTab === s.id
+            const leer = s.rest != null && s.rest <= 0
+            return (
+              <button key={s.id} role="tab" aria-selected={ausgewaehlt} onClick={() => setTab(s.id)}
+                className={`flex-shrink-0 px-3 py-2 rounded-xl border text-left transition-colors ${
+                  ausgewaehlt ? 'bg-sky-600 border-sky-600 text-white' : 'bg-white border-gray-200 text-gray-700 hover:border-sky-300'
+                } ${s.aktiv ? '' : 'opacity-60'}`}>
+                <span className="block text-sm font-medium whitespace-nowrap">{s.name}</span>
+                {s.rest != null && (
+                  <span className={`block text-xs tabular-nums ${ausgewaehlt ? 'text-sky-100' : leer ? 'text-red-600' : 'text-gray-500'}`}>
+                    {formatMenge(s.rest, s.einheit)}
+                  </span>
+                )}
+              </button>
+            )
+          })}
+        </div>
+      )}
+
       {stoffe.length === 0 && (
         <Card><CardContent className="py-12 text-center text-gray-500">
           <Droplets className="w-10 h-10 mx-auto mb-2 text-gray-300" />
@@ -189,7 +217,7 @@ export function BetriebsstoffeContent({ betriebId, initialStoffe, initialBewegun
       )}
 
       <div className="space-y-4">
-        {stoffe.map(s => {
+        {sichtbareStoffe.map(s => {
           const anteilRest = s.zugang > 0 ? Math.max(0, Math.min(100, (s.rest / s.zugang) * 100)) : 0
           const leer = s.rest <= 0
           return (
@@ -220,7 +248,9 @@ export function BetriebsstoffeContent({ betriebId, initialStoffe, initialBewegun
                       </div>
                     ) : (
                       <p className="text-sm text-gray-600 mt-0.5 flex items-center gap-2 flex-wrap">
-                        <span><strong>{eur(s.preis_pro_einheit)}</strong> / {s.einheit} netto</span>
+                        {s.preis_pro_einheit > 0
+                          ? <span><strong>{eur(s.preis_pro_einheit)}</strong> / {s.einheit} netto</span>
+                          : <span className="text-amber-600 font-medium">Preis fehlt — mit dem Stift eintragen</span>}
                         {s.einkaufspreis_pro_einheit != null && <span className="text-gray-400">· EK {eur(s.einkaufspreis_pro_einheit)}</span>}
                         <button
                           onClick={() => { setPreisOffen(s.id); setPreisVk(s.preis_pro_einheit); setPreisEk(s.einkaufspreis_pro_einheit ?? 0) }}
@@ -286,12 +316,12 @@ export function BetriebsstoffeContent({ betriebId, initialStoffe, initialBewegun
         })}
       </div>
 
-      {bewegungen.length > 0 && (
+      {sichtbareBewegungen.length > 0 && (
         <Card>
           <CardContent className="p-4">
             <h3 className="font-semibold text-gray-800 mb-3">Verlauf</h3>
             <div className="divide-y divide-gray-100">
-              {bewegungen.map(b => (
+              {sichtbareBewegungen.map(b => (
                 <div key={b.id} className={`flex items-center gap-3 py-2 text-sm ${b.storniert ? 'opacity-50' : ''}`}>
                   <span className="text-xs text-gray-400 w-20 flex-shrink-0">{new Date(b.datum).toLocaleDateString('de-DE')}</span>
                   <span className="flex-1 min-w-0 truncate">

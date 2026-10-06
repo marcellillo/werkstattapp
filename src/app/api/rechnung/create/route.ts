@@ -72,6 +72,9 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ error: 'Ein ausgewählter Betriebsstoff existiert nicht (mehr) oder ist deaktiviert' }, { status: 400 })
         }
         const preis = Number(stoff.preis_pro_einheit) || 0
+        if (preis <= 0) {
+          return NextResponse.json({ error: `Für „${stoff.name}“ ist noch kein Verkaufspreis hinterlegt (Menü Betriebsstoffe → Preis ändern)` }, { status: 400 })
+        }
         betriebsstoffeSumme += Math.round(menge * preis * 100) / 100
         betriebsstoffZeilen.push({
           betrieb_id: betriebId,
