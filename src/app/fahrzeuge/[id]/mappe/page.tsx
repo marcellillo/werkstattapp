@@ -22,7 +22,7 @@ export default async function MappePage({ params }: { params: Promise<{ id: stri
 
   if (!auftrag) notFound()
 
-  const [{ data: fotos }, { data: rechnungenRows }, cfg, { data: dokumente }, { data: lieferantenRechnungen }] = await Promise.all([
+  const [{ data: fotos }, { data: rechnungenRows }, cfg, { data: dokumente }, { data: lieferantenRechnungen }, { data: auftragDokumente, error: dokError }] = await Promise.all([
     supabase.from('auftrag_fotos').select('*').eq('auftrag_id', id).order('erstellt_am'),
     supabase.from('kunden_rechnungen').select('*').eq('auftrag_id', id).order('erstellt_am'),
     resolveFirmaSettings(supabase, betriebId),
@@ -30,7 +30,12 @@ export default async function MappePage({ params }: { params: Promise<{ id: stri
     auftrag.fahrzeug_id
       ? supabase.from('supplier_invoices').select('*').eq('fahrzeug_id', auftrag.fahrzeug_id).order('erstellt_am')
       : Promise.resolve({ data: [] as any[] }),
+    supabase.from('auftrag_dokumente')
+      .select('id, kategorie, titel, datei_name, datei_typ, groesse, erstellt_am')
+      .eq('auftrag_id', id).order('erstellt_am'),
   ])
+  // Abfragefehler dürfen nicht stillschweigend zu "keine Dokumente" werden
+  if (dokError) console.error('[Mappe] Dokumente konnten nicht geladen werden:', dokError)
 
   // Jede Rechnung eines Auftrags separat um ihre Positionen (Ersatzteile/Arbeitszeiten)
   // ergänzen, damit die Mappe nicht nur die Summe, sondern alle Rechnungsdetails zeigt.
@@ -58,6 +63,7 @@ export default async function MappePage({ params }: { params: Promise<{ id: stri
       betriebId={betriebId}
       dokumente={(dokumente ?? []) as any[]}
       lieferantenRechnungen={(lieferantenRechnungen ?? []) as any[]}
+      auftragDokumente={(auftragDokumente ?? []) as any[]}
     />
   )
 }

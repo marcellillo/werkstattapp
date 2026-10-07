@@ -3,6 +3,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Download, Car, User, Wrench, Package, Camera, FileText, Receipt, CheckCircle, Clock, AlertTriangle, Fuel, Gauge, Paperclip, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { DOKUMENT_KATEGORIEN, formatGroesse } from '@/lib/auftrag-dokumente'
 
 const STATUS_LABEL: Record<string, string> = {
   angenommen: 'Angenommen', diagnose: 'Diagnose', reparatur: 'In Arbeit',
@@ -28,6 +29,9 @@ function fmt(d?: string | null) {
   if (!d) return '—'
   return new Date(d).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
+function pdfCount(dokumente: any[]) {
+  return dokumente.filter(d => !String(d.datei_typ).startsWith('image/')).length
+}
 function fmtEuro(n?: number | null) {
   if (n == null) return '—'
   return n.toLocaleString('de-DE', { minimumFractionDigits: 2 }) + ' €'
@@ -43,9 +47,10 @@ interface Props {
   betriebId: string
   dokumente?: any[]
   lieferantenRechnungen?: any[]
+  auftragDokumente?: any[]
 }
 
-export function AuftragsMappe({ auftrag, fotos, rechnungen = [], firma, betriebId, dokumente = [], lieferantenRechnungen = [] }: Props) {
+export function AuftragsMappe({ auftrag, fotos, rechnungen = [], firma, betriebId, dokumente = [], lieferantenRechnungen = [], auftragDokumente = [] }: Props) {
   const fz = auftrag.fahrzeug
   const kunde = auftrag.kunde
   const teile: any[] = auftrag.ersatzteile ?? []
@@ -95,6 +100,13 @@ export function AuftragsMappe({ auftrag, fotos, rechnungen = [], firma, betriebI
       datum: r.rechnungsdatum || null,
     })),
   ]
+  // Bilder aus dem Fahrzeug-Inserat (z. B. von mobile.de importiert)
+  const fahrzeugBilder: string[] = (() => {
+    try { const v = fz?.bilder_urls ? JSON.parse(fz.bilder_urls) : []; return Array.isArray(v) ? v.filter((u: any) => typeof u === 'string' && u) : [] } catch { return [] }
+  })()
+  const dokGruppen = DOKUMENT_KATEGORIEN
+    .map(k => ({ ...k, items: auftragDokumente.filter((d: any) => d.kategorie === k.value) }))
+    .filter(g => g.items.length > 0)
   const alleKats = ['annahme', 'reparatur', 'fertig', 'allgemein', 'fahrzeugschein', 'tuev'].filter(k => fotosByKat(k).length > 0)
 
   return (
@@ -249,6 +261,55 @@ export function AuftragsMappe({ auftrag, fotos, rechnungen = [], firma, betriebI
           </section>
         )}
 
+        {/* ── Dokumente & Dateien (CarVertical, Gutachten, Fahrzeugbrief, ... als PDF oder Bild) ── */}
+        {auftragDokumente.length > 0 && (
+          <section className="border rounded-xl p-4">
+            <h2 className="flex items-center gap-2 font-semibold text-gray-800 mb-3 pb-2 border-b">
+              <FileText className="w-4 h-4 text-sky-500" />Dokumente & Dateien
+              <span className="text-xs font-normal text-gray-400 ml-auto">{auftragDokumente.length} Datei{auftragDokumente.length !== 1 ? 'en' : ''}</span>
+            </h2>
+            {dokGruppen.map(g => {
+              const bilder = g.items.filter((d: any) => String(d.datei_typ).startsWith('image/'))
+              const pdfs = g.items.filter((d: any) => !String(d.datei_typ).startsWith('image/'))
+              return (
+                <div key={g.value} className="mb-4 last:mb-0">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">{g.label}</p>
+                  {pdfs.length > 0 && (
+                    <div className="space-y-1 mb-2">
+                      {pdfs.map((d: any) => (
+                        <a key={d.id} href={`/api/auftrag-dokument/datei?id=${d.id}`} target="_blank" rel="noopener noreferrer"
+                          className="flex items-center justify-between gap-2 text-sm py-1.5 border-b border-gray-50 last:border-0 hover:bg-gray-50">
+                          <span className="flex items-center gap-2 min-w-0">
+                            <FileText className="w-4 h-4 text-red-500 flex-shrink-0" />
+                            <span className="font-medium text-gray-800 truncate">{d.titel || d.datei_name}</span>
+                            <span className="text-xs text-gray-400 flex-shrink-0">PDF · {fmt(d.erstellt_am)}{d.groesse ? ` · ${formatGroesse(d.groesse)}` : ''}</span>
+                          </span>
+                          <span className="no-print text-xs text-blue-600 flex-shrink-0">Öffnen →</span>
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                  {bilder.length > 0 && (
+                    <div className="grid grid-cols-3 md:grid-cols-4 gap-2">
+                      {bilder.map((d: any) => (
+                        <a key={d.id} href={`/api/auftrag-dokument/datei?id=${d.id}`} target="_blank" rel="noopener noreferrer" className="block">
+                          <div className="aspect-square rounded-lg overflow-hidden bg-gray-100">
+                            <img src={`/api/auftrag-dokument/datei?id=${d.id}`} alt={d.titel ?? d.datei_name} className="w-full h-full object-cover" />
+                          </div>
+                          <p className="text-[11px] text-gray-500 mt-0.5 truncate">{d.titel || d.datei_name}</p>
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+            {pdfCount(auftragDokumente) > 0 && (
+              <p className="no-print text-xs text-gray-400 mt-2">PDF-Dateien werden beim Drucken der Mappe nur aufgelistet — zum Ausdrucken bitte über „Öffnen“ separat drucken.</p>
+            )}
+          </section>
+        )}
+
         {/* ── Lieferanten-Belege (Lieferscheine & Rechnungen von Lieferanten, aus beiden Upload-Wegen) ── */}
         {alleBelege.length > 0 && (
           <section className="border rounded-xl p-4">
@@ -364,6 +425,23 @@ export function AuftragsMappe({ auftrag, fotos, rechnungen = [], firma, betriebI
                 </div>
               </div>
             ))}
+          </section>
+        )}
+
+        {/* ── Fahrzeugbilder (aus dem Inserat) ── */}
+        {fahrzeugBilder.length > 0 && (
+          <section className="border rounded-xl p-4">
+            <h2 className="flex items-center gap-2 font-semibold text-gray-800 mb-4 pb-2 border-b">
+              <Car className="w-4 h-4 text-orange-500" />Fahrzeugbilder
+              <span className="text-xs font-normal text-gray-400 ml-auto">{fahrzeugBilder.length} Bild{fahrzeugBilder.length !== 1 ? 'er' : ''}</span>
+            </h2>
+            <div className="grid grid-cols-3 md:grid-cols-4 gap-2">
+              {fahrzeugBilder.map((url, i) => (
+                <div key={i} className="aspect-square rounded-lg overflow-hidden bg-gray-100">
+                  <img src={url} alt="" className="w-full h-full object-cover" />
+                </div>
+              ))}
+            </div>
           </section>
         )}
 

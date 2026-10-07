@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Car, User, Wrench, Package, Calendar, Plus, Trash2, CheckCircle, Clock, Circle, ChevronRight, ShieldCheck, Search, Printer, Receipt, Ban, UserCheck, ClipboardCheck, X, Sparkles, MessageSquare, Mail, Phone, Camera, FolderOpen, Share2, Copy, Check } from 'lucide-react'
+import { ArrowLeft, Car, User, Wrench, Package, Calendar, Plus, Trash2, CheckCircle, Clock, Circle, ChevronRight, ShieldCheck, Search, Printer, Receipt, Ban, UserCheck, ClipboardCheck, X, Sparkles, MessageSquare, Mail, Phone, Camera, FolderOpen, Share2, Copy, Check, FileText } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { cn, formatDate, formatDateTime } from '@/lib/utils'
@@ -22,6 +22,7 @@ import { WerkstattauftragSection } from './werkstattauftrag-section'
 import { RechnungSection } from './rechnung-section'
 import { LieferscheinQuickScan } from '@/components/lieferschein-quick-scan'
 import { LieferscheinGalerie } from '@/components/lieferschein-galerie'
+import { AuftragDokumente } from '@/components/auftrag-dokumente'
 
 interface Props {
   auftrag: Auftrag
@@ -521,6 +522,10 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
         .eq('id', auftrag.id)
       if (auftragError) throw auftragError
       if (!count) throw new Error('Keine Berechtigung zum Löschen dieses Auftrags.')
+      // Gespeicherte Dokument-Dateien (PDF/Bilder) mit entfernen -- die Datenbankzeilen sind per CASCADE schon weg
+      await fetch('/api/auftrag-dokument/aufraeumen', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ auftragId: auftrag.id }),
+      }).catch(() => {})
       router.push('/fahrzeuge')
     } catch (err: any) {
       console.error('Fehler beim Löschen:', err)
@@ -664,6 +669,9 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
         <Link href={`/fahrzeuge/${auftrag.id}/fotos`} className="flex items-center gap-3 px-4 py-3 rounded-xl border border-purple-200 bg-purple-50 text-purple-700 hover:bg-purple-100 hover:border-purple-300 transition-colors text-sm">
           <Camera className="w-4 h-4 flex-shrink-0" /> Fotos
         </Link>
+        <a href="#dokumente" className="flex items-center gap-3 px-4 py-3 rounded-xl border border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100 hover:border-sky-300 transition-colors text-sm">
+          <FileText className="w-4 h-4 flex-shrink-0" /> Dokumente (PDF)
+        </a>
         <Link href={`/fahrzeuge/${auftrag.id}/protokoll`} target="_blank" className="flex items-center gap-3 px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100 hover:border-gray-300 transition-colors text-sm">
           <Printer className="w-4 h-4 flex-shrink-0" /> Werkstattprotokoll
         </Link>
@@ -2005,6 +2013,13 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
           </button>
         </div>
       </div>
+
+      {/* Dokumente & Dateien (CarVertical, Gutachten, ...) */}
+      <Card className="border-slate-200 mt-6">
+        <CardContent className="p-6">
+          <AuftragDokumente auftragId={auftrag.id} />
+        </CardContent>
+      </Card>
 
       {/* Lieferschein / Rechnung Scanner */}
       {betriebId && (
