@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(req: NextRequest) {
@@ -37,7 +38,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Du kannst dich nicht selbst entfernen' }, { status: 400 })
     }
 
-    const { error } = await supabase
+    // Mitgliedschaften ändert nur der Server (Admin-Prüfung oben bestanden); für Nutzer-Sitzungen ist das per RLS gesperrt
+    const { error } = await createAdminClient()
       .from('betrieb_users')
       .delete()
       .eq('id', membershipId)
