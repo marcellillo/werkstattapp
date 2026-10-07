@@ -202,7 +202,7 @@ export function AuftragDokumente({ auftragId }: { auftragId: string }) {
                             <button onClick={() => setEditId(null)} className="p-1 text-gray-400" title="Abbrechen"><X className="w-4 h-4" /></button>
                           </div>
                         ) : (
-                          <a href={url} target="_blank" rel="noopener noreferrer" className="block text-sm font-medium text-gray-800 hover:text-orange-600 truncate">
+                          <a href={url} target="_blank" rel="noopener noreferrer" className="block text-sm font-medium text-gray-800 hover:text-orange-600 break-words sm:truncate">
                             {d.titel || d.datei_name}
                           </a>
                         )}
