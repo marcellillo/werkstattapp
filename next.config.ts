@@ -17,6 +17,27 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
   turbopack: {},
+  // Sicherheits-Header für alle Antworten. Schnittstellen liefern angemeldete Daten und dürfen
+  // nirgends zwischengespeichert werden. (Eine Content-Security-Policy folgt separat -- sie muss
+  // gegen Next-Inline-Skripte, Karten und Bilder sorgfältig getestet werden.)
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+          { key: 'Permissions-Policy', value: 'camera=(self), microphone=(), geolocation=(self), payment=()' },
+          { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
+        ],
+      },
+      {
+        source: '/api/:path*',
+        headers: [{ key: 'Cache-Control', value: 'private, no-store' }],
+      },
+    ]
+  },
   // @sparticuz/chromium liefert vorkompilierte Binärdateien (.br) aus, die an ihrem
   // node_modules-Pfad liegen bleiben müssen -- der Bundler darf sie nicht anfassen/
   // verschieben, sonst findet chromium.executablePath() sie zur Laufzeit nicht mehr
