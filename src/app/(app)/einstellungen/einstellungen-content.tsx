@@ -44,9 +44,10 @@ interface Config {
   firma_stripe: string
 }
 
-export function EinstellungenContent({ initialConfig, graphStatus, betriebName, betriebId }: {
+export function EinstellungenContent({ initialConfig, graphStatus, geheimnisseGesetzt, betriebName, betriebId }: {
   initialConfig: Config
   graphStatus: GraphStatus
+  geheimnisseGesetzt: { anthropic_api_key: boolean; resend_api_key: boolean }
   betriebName: string
   betriebId: string
 }) {
@@ -442,7 +443,8 @@ export function EinstellungenContent({ initialConfig, graphStatus, betriebName, 
                         type={api.key.includes('password') || api.key.includes('key') ? (api.key === 'anthropic_api_key' ? (showApiKey ? 'text' : 'password') : (showResendKey ? 'text' : 'password')) : 'text'}
                         value={config[api.key]}
                         onChange={e => setConfig(c => ({ ...c, [api.key]: e.target.value }))}
-                        placeholder={`Geben Sie Ihren ${api.label} ein`}
+                        placeholder={geheimnisseGesetzt[api.key as 'anthropic_api_key' | 'resend_api_key'] ? '•••••••• gespeichert – nur zum Ersetzen ausfüllen' : `Geben Sie Ihren ${api.label} ein`}
+                        autoComplete="off"
                         className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 pr-10"
                       />
                       {api.key === 'anthropic_api_key' && (

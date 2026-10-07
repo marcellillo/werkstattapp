@@ -1,4 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js'
+import { istGeheimerSchluessel } from '@/lib/betrieb-geheimnisse'
 
 export interface RechnungPosition {
   beschreibung: string
@@ -87,7 +88,7 @@ export async function resolveRechnungDetail(
 
   const firma: Record<string, string> = {}
   for (const row of settingsRows || []) {
-    if (row.wert !== null) firma[row.schluessel] = row.wert
+    if (row.wert !== null && !istGeheimerSchluessel(row.schluessel)) firma[row.schluessel] = row.wert
   }
   if (!firma.firma_name && (betrieb as any)?.name) firma.firma_name = (betrieb as any).name
   const kleinunternehmer = firma.firma_kleinunternehmer === 'ja'

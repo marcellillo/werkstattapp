@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { EmailsContent } from './emails-content'
 import { getBetriebIdForUser } from '@/lib/server-betrieb'
+import { hatGeheimnisse, istGeheimerSchluessel } from '@/lib/betrieb-geheimnisse'
 
 export default async function EmailsPage() {
   const supabase = await createClient()
@@ -30,10 +31,10 @@ export default async function EmailsPage() {
 
   const cfg: Record<string, string> = {}
   for (const row of configRows ?? []) {
-    if (row.wert) cfg[row.schluessel] = row.wert
+    if (row.wert && !istGeheimerSchluessel(row.schluessel)) cfg[row.schluessel] = row.wert
   }
 
-  const istKonfiguriert = !!cfg.graph_refresh_token
+  const istKonfiguriert = (await hatGeheimnisse(betriebId, ['graph_refresh_token'])).graph_refresh_token
   const teileUpdatesAusstehend = cfg.teile_updates_ausstehend
     ? JSON.parse(cfg.teile_updates_ausstehend)
     : []

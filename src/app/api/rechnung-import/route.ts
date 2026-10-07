@@ -6,6 +6,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getBetriebIdForUser } from '@/lib/server-betrieb'
+import { ladeGeheimnis } from '@/lib/betrieb-geheimnisse'
 import { verarbeiteRechnungsDatei } from '@/lib/eingangsrechnung'
 
 // Manueller Upload einer Lieferantenrechnung (PDF/Foto): wird ausgelesen, in der App abgelegt
@@ -22,11 +23,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Kein Betrieb zugeordnet' }, { status: 403 })
   }
 
-  // API Key aus DB lesen, Fallback auf Umgebungsvariable
-  const { data: keyRow } = await supabase
-    .from('betrieb_einstellungen').select('wert')
-    .eq('betrieb_id', betriebId).eq('schluessel', 'anthropic_api_key').maybeSingle()
-  const apiKey = keyRow?.wert || process.env.ANTHROPIC_API_KEY
+  // API Key (nur serverseitig lesbar), Fallback auf Umgebungsvariable
+  const apiKey = (await ladeGeheimnis(betriebId, 'anthropic_api_key')) || process.env.ANTHROPIC_API_KEY
   if (!apiKey) {
     return NextResponse.json({ error: 'Anthropic API Key fehlt. Bitte unter Einstellungen → KI-Integration eintragen.' }, { status: 400 })
   }

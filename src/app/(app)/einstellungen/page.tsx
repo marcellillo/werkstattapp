@@ -1,6 +1,7 @@
 ﻿import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { EinstellungenContent } from './einstellungen-content'
+import { hatGeheimnisse, istGeheimerSchluessel } from '@/lib/betrieb-geheimnisse'
 
 export default async function EinstellungenPage() {
   const supabase = await createClient()
@@ -34,20 +35,22 @@ export default async function EinstellungenPage() {
 
   const settings: Record<string, string> = {}
   for (const row of settingsRows ?? []) {
-    if (row.wert !== null) settings[row.schluessel] = row.wert
+    if (row.wert !== null && !istGeheimerSchluessel(row.schluessel)) settings[row.schluessel] = row.wert
   }
+  // Zugangsdaten werden nie an den Browser geschickt -- nur, OB sie gesetzt sind
+  const geheim = await hatGeheimnisse(betriebId, ['anthropic_api_key', 'resend_api_key', 'graph_client_secret', 'graph_refresh_token'])
 
   // Build config with defaults
   const initialConfig = {
     imap_email: settings?.imap_email ?? '',
-    imap_password: settings?.imap_password ?? '',
+    imap_password: '',
     graph_client_id: settings?.graph_client_id ?? '',
     graph_tenant_id: settings?.graph_tenant_id ?? '',
     graph_client_secret: '', // nie an den Browser ausliefern
     graph_email: settings?.graph_email ?? '',
     graph_refresh_token: '', // nie an den Browser ausliefern
-    anthropic_api_key: settings?.anthropic_api_key ?? '',
-    resend_api_key: settings?.resend_api_key ?? '',
+    anthropic_api_key: '',
+    resend_api_key: '',
     firma_absender_email: settings?.firma_absender_email ?? '',
     firma_name: settings?.firma_name ?? '',
     firma_strasse: settings?.firma_strasse ?? '',
@@ -74,11 +77,12 @@ export default async function EinstellungenPage() {
   return (
     <EinstellungenContent
       initialConfig={initialConfig}
+      geheimnisseGesetzt={{ anthropic_api_key: geheim.anthropic_api_key, resend_api_key: geheim.resend_api_key }}
       graphStatus={{
         clientId: settings.graph_client_id ?? '',
         tenantId: settings.graph_tenant_id ?? '',
-        hatSecret: !!settings.graph_client_secret,
-        verbunden: !!settings.graph_refresh_token,
+        hatSecret: geheim.graph_client_secret,
+        verbunden: geheim.graph_refresh_token,
         email: settings.graph_email ?? '',
         aktiv: settings.email_sync_aktiv === 'true',
         letzterSync: settings.letzter_email_sync ?? null,

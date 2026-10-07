@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { ladeGeheimnis } from '@/lib/betrieb-geheimnisse'
 import { createClient } from '@/lib/supabase/server'
 import { Resend } from 'resend'
 import QRCode from 'qrcode'
@@ -396,7 +397,7 @@ export async function POST(req: NextRequest) {
     if (!betriebCheck) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
     const firma = await resolveFirmaSettings(supabase, auftrag.betrieb_id)
-    const resendKey = firma.resend_api_key || process.env.RESEND_API_KEY
+    const resendKey = (await ladeGeheimnis(auftrag.betrieb_id, 'resend_api_key')) || process.env.RESEND_API_KEY
     if (!resendKey) {
       return NextResponse.json(
         { error: 'Resend API-Key fehlt. Bitte in Einstellungen → "Resend API-Key" eintragen oder als RESEND_API_KEY Umgebungsvariable setzen.' },
@@ -452,7 +453,7 @@ export async function POST(req: NextRequest) {
   const empfaenger = an || detail.kunde?.email
   if (!empfaenger) return NextResponse.json({ error: 'Keine E-Mail-Adresse vorhanden' }, { status: 400 })
 
-  const resendKey = detail.firma.resend_api_key || process.env.RESEND_API_KEY
+  const resendKey = (await ladeGeheimnis(betriebId, 'resend_api_key')) || process.env.RESEND_API_KEY
   if (!resendKey) {
     return NextResponse.json(
       { error: 'Resend API-Key fehlt. Bitte in Einstellungen → "Resend API-Key" eintragen oder als RESEND_API_KEY Umgebungsvariable setzen.' },

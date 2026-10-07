@@ -1,6 +1,7 @@
 export const runtime = 'nodejs'
 
 import { NextResponse } from 'next/server'
+import { ladeGeheimnis } from '@/lib/betrieb-geheimnisse'
 import { createClient } from '@/lib/supabase/server'
 import Anthropic from '@anthropic-ai/sdk'
 
@@ -21,14 +22,8 @@ export async function POST(req: Request) {
     .maybeSingle()
   if (!betriebCheck) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const { data: rows } = await supabase
-    .from('betrieb_einstellungen')
-    .select('schluessel, wert')
-    .eq('betrieb_id', betriebId)
-  const cfg: Record<string, string> = {}
-  for (const r of rows ?? []) if (r.wert) cfg[r.schluessel] = r.wert
-
-  const apiKey = cfg.anthropic_api_key || process.env.ANTHROPIC_API_KEY
+  // Zugangsdaten liest nur der Server (Betriebszugehörigkeit oben geprüft)
+  const apiKey = (await ladeGeheimnis(betriebId, 'anthropic_api_key')) || process.env.ANTHROPIC_API_KEY
   if (!apiKey) return NextResponse.json({ error: 'Kein Claude API-Key konfiguriert' }, { status: 400 })
 
   const client = new Anthropic({ apiKey })

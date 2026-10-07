@@ -1,4 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { istGeheimerSchluessel } from '@/lib/betrieb-geheimnisse'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(req: NextRequest) {
@@ -33,6 +35,8 @@ export async function POST(req: NextRequest) {
     // Upsert settings as key-value pairs
     const updates = Object.entries(config)
       .filter(([schluessel]) => !GESCHUETZT.test(schluessel))
+      // Zugangsdaten werden im Browser nie angezeigt: ein leeres Feld heißt "unverändert", nicht "löschen"
+      .filter(([schluessel, wert]) => !(istGeheimerSchluessel(schluessel) && !String(wert ?? '').trim()))
       .map(([schluessel, wert]) => ({
         betrieb_id: betriebId,
         schluessel,
@@ -40,7 +44,9 @@ export async function POST(req: NextRequest) {
       }))
     if (updates.length === 0) return NextResponse.json({ success: true })
 
-    const { error } = await supabase
+    // Admin-Rolle ist oben geprüft. Zugangsdaten sind für Nutzer-Sitzungen per RLS unlesbar/unbeschreibbar,
+    // deshalb schreibt der Server mit Service-Role.
+    const { error } = await createAdminClient()
       .from('betrieb_einstellungen')
       .upsert(updates, {
         onConflict: 'betrieb_id,schluessel'

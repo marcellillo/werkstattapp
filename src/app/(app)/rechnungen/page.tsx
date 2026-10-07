@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { RechnungenContent } from './rechnungen-content'
+import { hatGeheimnisse } from '@/lib/betrieb-geheimnisse'
 
 export default async function RechnungenPage() {
   const supabase = await createClient()
@@ -29,8 +30,9 @@ export default async function RechnungenPage() {
       .from('betrieb_einstellungen')
       .select('schluessel, wert')
       .eq('betrieb_id', betriebId)
-      .in('schluessel', ['graph_refresh_token', 'email_sync_aktiv', 'letzter_email_sync', 'graph_fehler', 'graph_email']),
+      .in('schluessel', ['email_sync_aktiv', 'letzter_email_sync', 'graph_fehler', 'graph_email']),
   ])
+  const geheim = await hatGeheimnisse(betriebId, ['graph_refresh_token'])
 
   // Abfragefehler dürfen nicht stillschweigend zu "keine Rechnungen" werden
   if (rechnungen.error) console.error('[Rechnungen] Abfrage fehlgeschlagen:', rechnungen.error)
@@ -45,7 +47,7 @@ export default async function RechnungenPage() {
       isAdmin={isAdmin}
       ladefehler={rechnungen.error ? 'Die Rechnungen konnten nicht geladen werden. Bitte Seite neu laden.' : null}
       email={{
-        verbunden: !!cfg.graph_refresh_token,
+        verbunden: geheim.graph_refresh_token,
         aktiv: cfg.email_sync_aktiv === 'true',
         letzterSync: cfg.letzter_email_sync ?? null,
         fehler: cfg.graph_fehler ?? '',

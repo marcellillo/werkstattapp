@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { Resend } from 'resend'
+import { ladeGeheimnis } from '@/lib/betrieb-geheimnisse'
 
 export async function POST() {
   const supabase = await createClient()
@@ -21,7 +22,7 @@ export async function POST() {
   const cfg: Record<string, string> = {}
   for (const r of rows ?? []) if (r.wert) cfg[r.schluessel] = r.wert
 
-  const resendKey = cfg.resend_api_key || process.env.RESEND_API_KEY
+  const resendKey = (await ladeGeheimnis(betriebId, 'resend_api_key')) || process.env.RESEND_API_KEY
   if (!resendKey) return NextResponse.json({ error: 'Kein Resend API-Key konfiguriert' }, { status: 400 })
 
   const absender = cfg.firma_absender_email || 'onboarding@resend.dev'

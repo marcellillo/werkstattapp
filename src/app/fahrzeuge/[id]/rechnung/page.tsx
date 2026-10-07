@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect, notFound } from 'next/navigation'
 import { RechnungFlow } from './rechnung-flow'
 import { getBetriebIdForUser } from '@/lib/server-betrieb'
+import { istGeheimerSchluessel } from '@/lib/betrieb-geheimnisse'
 
 export default async function RechnungPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -25,7 +26,7 @@ export default async function RechnungPage({ params }: { params: Promise<{ id: s
 
   const cfg: Record<string, string> = {}
   for (const row of configRows ?? []) {
-    if (row.wert) cfg[row.schluessel] = row.wert
+    if (row.wert && !istGeheimerSchluessel(row.schluessel)) cfg[row.schluessel] = row.wert
   }
 
   return <RechnungFlow auftrag={auftrag as any} firma={cfg} betriebId={betriebId} />
