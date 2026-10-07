@@ -1,5 +1,6 @@
 'use client'
 import { useState } from 'react'
+import { fotoUrl, belegUrl } from '@/lib/datei-urls'
 import Link from 'next/link'
 import { ArrowLeft, Download, Car, User, Wrench, Package, Camera, FileText, Receipt, CheckCircle, Clock, AlertTriangle, Fuel, Gauge, Paperclip, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -90,12 +91,12 @@ export function AuftragsMappe({ auftrag, fotos, rechnungen = [], firma, betriebI
   // der Auftragsmappe kein Beleg fehlt, egal ueber welchen Weg er erfasst wurde.
   const alleBelege = [
     ...dokumente.map((d: any) => ({
-      id: `ls-${d.id}`, url: d.datei_url, titel: d.lieferant || d.dateiname || 'Dokument',
+      id: `ls-${d.id}`, url: belegUrl('lieferschein', d.id), titel: d.lieferant || d.dateiname || 'Dokument',
       typLabel: DOKUMENT_TYP_LABEL[d.dokument_typ] ?? DOKUMENT_TYP_LABEL.lieferschein,
       datum: d.lieferdatum || null,
     })),
     ...lieferantenRechnungen.map((r: any) => ({
-      id: `si-${r.id}`, url: r.datei_url, titel: r.lieferant || r.rechnungsnummer || r.datei_name || 'Lieferantenrechnung',
+      id: `si-${r.id}`, url: belegUrl('lieferant', r.id), titel: r.lieferant || r.rechnungsnummer || r.datei_name || 'Lieferantenrechnung',
       typLabel: '🧾 Rechnung',
       datum: r.rechnungsdatum || null,
     })),
@@ -419,7 +420,7 @@ export function AuftragsMappe({ auftrag, fotos, rechnungen = [], firma, betriebI
                 <div className="grid grid-cols-3 md:grid-cols-4 gap-2">
                   {fotosByKat(kat).map((foto: any) => (
                     <div key={foto.id} className="aspect-square rounded-lg overflow-hidden bg-gray-100">
-                      <img src={foto.url} alt={foto.beschreibung ?? ''} className="w-full h-full object-cover" />
+                      <img src={fotoUrl(foto.id)} alt={foto.beschreibung ?? ''} className="w-full h-full object-cover" />
                     </div>
                   ))}
                 </div>

@@ -1,5 +1,6 @@
 'use client'
 import { useState, useRef, useEffect } from 'react'
+import { fotoUrl } from '@/lib/datei-urls'
 import { createClient } from '@/lib/supabase/client'
 import { ArrowLeft, Printer, Save, Fuel, Gauge, Euro, Camera, Upload, X, Trash2, Car, ClipboardList } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -531,7 +532,7 @@ export function AnnahmeProtokoll({ auftrag, firma }: Props) {
                 <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                   {fotos.map(foto => (
                     <div key={foto.id} className="relative aspect-square rounded-lg overflow-hidden border border-gray-200">
-                      <img src={foto.url} alt="" className="w-full h-full object-cover" />
+                      <img src={fotoUrl(foto.id)} alt="" className="w-full h-full object-cover" />
                       <button
                         onClick={() => deleteFoto(foto)}
                         className="absolute top-1 right-1 w-6 h-6 bg-black/60 rounded-full flex items-center justify-center hover:bg-black/80 transition-colors"

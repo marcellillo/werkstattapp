@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { belegUrl } from '@/lib/datei-urls'
 import { createClient } from '@/lib/supabase/client'
 import { Trash2, FileWarning, CheckCircle2 } from 'lucide-react'
 
@@ -82,8 +83,8 @@ export function LieferscheinGalerie({ kostenvoranschlagId, auftragId, refreshSig
               key={u.id}
               role="link"
               tabIndex={0}
-              onClick={() => window.open(u.datei_url, '_blank', 'noopener,noreferrer')}
-              onKeyDown={e => { if (e.key === 'Enter') window.open(u.datei_url, '_blank', 'noopener,noreferrer') }}
+              onClick={() => window.open(belegUrl('lieferschein', u.id), '_blank', 'noopener,noreferrer')}
+              onKeyDown={e => { if (e.key === 'Enter') window.open(belegUrl('lieferschein', u.id), '_blank', 'noopener,noreferrer') }}
               className={`relative group block rounded-lg border overflow-hidden cursor-pointer ${
                 u.erfolg ? 'border-slate-200' : 'border-red-300 bg-red-50'
               }`}
@@ -92,7 +93,7 @@ export function LieferscheinGalerie({ kostenvoranschlagId, auftragId, refreshSig
               {isPdf ? (
                 <div className="w-full h-24 flex items-center justify-center bg-slate-100 text-3xl">📄</div>
               ) : (
-                <img src={u.datei_url} alt={u.dateiname || 'Lieferschein'} className="w-full h-24 object-cover bg-slate-100" />
+                <img src={belegUrl('lieferschein', u.id)} alt={u.dateiname || 'Lieferschein'} className="w-full h-24 object-cover bg-slate-100" />
               )}
               <div className="p-1.5 text-xs">
                 <p className="font-medium truncate flex items-center gap-1">

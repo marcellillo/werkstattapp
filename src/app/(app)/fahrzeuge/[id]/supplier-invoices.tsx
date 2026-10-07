@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { belegUrl } from '@/lib/datei-urls'
 import { createClient } from '@/lib/supabase/client'
 import { useBetrieb } from '@/lib/betrieb-context'
 import { Card, CardContent } from '@/components/ui/card'
@@ -349,7 +350,7 @@ export function SupplierInvoices({ fahrzeugId, fahrzeugName }: Props) {
 
                   {/* File & Delete */}
                   <a
-                    href={invoice.datei_url}
+                    href={belegUrl('lieferant', invoice.id)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="p-2 hover:bg-slate-200 rounded transition"

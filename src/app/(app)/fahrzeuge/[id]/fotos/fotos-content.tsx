@@ -1,5 +1,6 @@
 'use client'
 import { useState, useRef } from 'react'
+import { fotoUrl } from '@/lib/datei-urls'
 import { Camera, Upload, Trash2, X, ZoomIn, Plus, ImageIcon } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useBetrieb } from '@/lib/betrieb-context'
@@ -146,7 +147,7 @@ export function FotosContent({ auftragId, initialFotos }: Props) {
               <div className="grid grid-cols-3 gap-2">
                 {items.map(foto => (
                   <div key={foto.id} className="relative group aspect-square rounded-lg overflow-hidden bg-gray-100 cursor-pointer" onClick={() => setLightbox(foto)}>
-                    <img src={foto.url} alt={foto.beschreibung ?? ''} className="w-full h-full object-cover" />
+                    <img src={fotoUrl(foto.id)} alt={foto.beschreibung ?? ''} className="w-full h-full object-cover" />
                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
                       <ZoomIn className="w-5 h-5 text-white" />
                     </div>
@@ -181,7 +182,7 @@ export function FotosContent({ auftragId, initialFotos }: Props) {
       {lightbox && (
         <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center" onClick={() => setLightbox(null)}>
           <div className="relative max-w-4xl w-full mx-4" onClick={e => e.stopPropagation()}>
-            <img src={lightbox.url} alt={lightbox.beschreibung ?? ''} className="w-full max-h-[80vh] object-contain rounded-lg" />
+            <img src={fotoUrl(lightbox.id)} alt={lightbox.beschreibung ?? ''} className="w-full max-h-[80vh] object-contain rounded-lg" />
             {lightbox.beschreibung && (
               <p className="text-white text-center mt-3 text-sm">{lightbox.beschreibung}</p>
             )}
