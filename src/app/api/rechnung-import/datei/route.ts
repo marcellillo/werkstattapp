@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getBetriebIdForUser } from '@/lib/server-betrieb'
 import { RECHNUNG_BUCKET } from '@/lib/eingangsrechnung'
+import { verlangeFinanzrolle } from '@/lib/rollen-server'
 
 // GET /api/rechnung-import/datei?id=<rechnungId>[&download=1]
 // Prüft, dass die Rechnung zum Betrieb des angemeldeten Nutzers gehört, und leitet auf einen
@@ -24,6 +25,9 @@ export async function GET(req: NextRequest) {
   } catch {
     return NextResponse.json({ error: 'Kein Betrieb zugeordnet' }, { status: 403 })
   }
+
+  const rolleFehler = await verlangeFinanzrolle(supabase, user.id, betriebId)
+  if (rolleFehler) return rolleFehler
 
   const { data: rechnung } = await supabase
     .from('rechnungen')

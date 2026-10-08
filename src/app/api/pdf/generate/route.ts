@@ -1,6 +1,7 @@
 import { generatePDF } from '@/lib/pdf-generator'
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { rateLimit } from '@/lib/rate-limit'
 
 // Kaltstart von @sparticuz/chromium + Rendern braucht mehr als das Standard-Timeout
 export const maxDuration = 30
@@ -12,6 +13,8 @@ export async function POST(req: NextRequest) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const rlAntwort = await rateLimit(`pdf:${user.id}`, 80, 600)
+    if (rlAntwort) return rlAntwort
 
     const { template, data } = await req.json()
 

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { rateLimit } from '@/lib/rate-limit'
 
 // Farb-/Kraftstoff-Mappings (Mobile.de → Deutsch)
 const FARBE: Record<string, string> = {
@@ -19,6 +20,8 @@ export async function POST(req: Request) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Nicht angemeldet' }, { status: 401 })
+    const rlAntwort = await rateLimit(`mobile-import:${user.id}`, 120, 3600)
+    if (rlAntwort) return rlAntwort
 
     const { data: userBetriebe } = await supabase
       .from('betrieb_users')

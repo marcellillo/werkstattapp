@@ -6,6 +6,8 @@ import QRCode from 'qrcode'
 import { buildGiroCode } from '@/lib/girocode'
 import { resolveRechnungDetail, type RechnungDetail } from '@/lib/rechnung-detail'
 import { resolveFirmaSettings } from '@/lib/firma-settings'
+import { esc, escObjekt, sichereBildQuelle, kopfzeilenText } from '@/lib/html-escape'
+import { rateLimit } from '@/lib/rate-limit'
 
 function fmt(d?: string | null) {
   if (!d) return '—'
@@ -23,28 +25,33 @@ async function toQrDataUrl(text: string): Promise<string | null> {
 }
 
 async function buildRechnungHtml(detail: RechnungDetail): Promise<string> {
-  const fz = detail.fahrzeug ?? {}
-  const kd = detail.kunde ?? {}
-  const firma = detail.firma
-  const { rechnung, kleinunternehmer, ersatzteilePositionen, arbeitswertePositionen } = detail
+  // Alle frei eintippbaren Texte werden hier einmalig escaped; die Rohwerte (rohFirma) dienen nur den QR-Codes.
+  const fz = escObjekt(detail.fahrzeug ?? {})
+  const kd = escObjekt(detail.kunde ?? {})
+  const rohFirma = detail.firma
+  const firma = escObjekt(detail.firma)
+  const { kleinunternehmer } = detail
+  const rechnung = { ...detail.rechnung, rechnungs_nr: esc(detail.rechnung.rechnungs_nr) }
+  const ersatzteilePositionen = detail.ersatzteilePositionen.map(p => ({ ...p, beschreibung: esc(p.beschreibung) }))
+  const arbeitswertePositionen = detail.arbeitswertePositionen.map(p => ({ ...p, beschreibung: esc(p.beschreibung) }))
   const istPauschal = rechnung.anzeige_modus === 'pauschal'
 
   const zahlungsziel = new Date(new Date(rechnung.erstellt_am).getTime() + 14 * 86_400_000)
 
-  const giroCode = firma.firma_iban
+  const giroCode = rohFirma.firma_iban
     ? buildGiroCode({
-        bic: firma.firma_bic,
-        name: firma.firma_name || 'Werkstatt',
-        iban: firma.firma_iban,
+        bic: rohFirma.firma_bic,
+        name: rohFirma.firma_name || 'Werkstatt',
+        iban: rohFirma.firma_iban,
         betrag: rechnung.betrag_brutto,
-        verwendungszweck: `Rechnung ${rechnung.rechnungs_nr}`,
+        verwendungszweck: `Rechnung ${detail.rechnung.rechnungs_nr}`,
       })
     : null
   const [giroQr, paypalQr, sumupQr, stripeQr] = await Promise.all([
     toQrDataUrl(giroCode ?? ''),
-    toQrDataUrl(firma.firma_paypal ?? ''),
-    toQrDataUrl(firma.firma_sumup ?? ''),
-    toQrDataUrl(firma.firma_stripe ?? ''),
+    toQrDataUrl(rohFirma.firma_paypal ?? ''),
+    toQrDataUrl(rohFirma.firma_sumup ?? ''),
+    toQrDataUrl(rohFirma.firma_stripe ?? ''),
   ])
 
   const qrItems = [
@@ -68,7 +75,7 @@ async function buildRechnungHtml(detail: RechnungDetail): Promise<string> {
       </tr>`).join('')
 
   const fmtMengeMail = (n: number) => n.toLocaleString('de-DE', { maximumFractionDigits: 2 })
-  const betriebsstoffePositionen = detail.betriebsstoffePositionen
+  const betriebsstoffePositionen = detail.betriebsstoffePositionen.map(p => ({ ...p, bezeichnung: esc(p.bezeichnung), einheit: esc(p.einheit) }))
   const betriebsstoffeRows = betriebsstoffePositionen.map((pos, i) => istPauschal ? `
       <tr style="border-bottom:1px solid #f1f5f9;">
         <td style="padding:5px 8px;font-size:11px;">${i + 1}</td>
@@ -85,7 +92,7 @@ async function buildRechnungHtml(detail: RechnungDetail): Promise<string> {
   const arbeitswerteAlle = [
     ...arbeitswertePositionen,
     ...(detail.kleinteilNetto > 0 ? [{ beschreibung: 'Kleinteilpauschale (Schrauben, Dichtungen, Kleinmaterial)', menge: 1, preis: detail.kleinteilNetto, summe: detail.kleinteilNetto }] : []),
-    ...(detail.sonstigesNetto > 0 ? [{ beschreibung: detail.sonstigesBeschreibung || 'Sonstige Leistungen', menge: 1, preis: detail.sonstigesNetto, summe: detail.sonstigesNetto }] : []),
+    ...(detail.sonstigesNetto > 0 ? [{ beschreibung: esc(detail.sonstigesBeschreibung) || 'Sonstige Leistungen', menge: 1, preis: detail.sonstigesNetto, summe: detail.sonstigesNetto }] : []),
   ]
   const arbeitswerteRows = arbeitswerteAlle.map((pos, i) => istPauschal ? `
       <tr style="border-bottom:1px solid #f1f5f9;">
@@ -114,8 +121,9 @@ async function buildRechnungHtml(detail: RechnungDetail): Promise<string> {
         </tr>`
   const summenzeileColspan = istPauschal ? 1 : 4
 
-  const logoBlock = firma.firma_logo
-    ? `<img src="${firma.firma_logo}" alt="${firma.firma_name || 'Logo'}" style="max-height:60px;max-width:200px;object-fit:contain;margin-bottom:4px;" />`
+  const logoQuelle = sichereBildQuelle(rohFirma.firma_logo)
+  const logoBlock = logoQuelle
+    ? `<img src="${logoQuelle}" alt="${firma.firma_name || 'Logo'}" style="max-height:60px;max-width:200px;object-fit:contain;margin-bottom:4px;" />`
     : `<div style="font-size:18px;font-weight:700;color:#ea580c;">${firma.firma_name || 'Kfz-Werkstatt'}</div>`
 
   const qrBlock = qrItems.length > 0 ? `
@@ -307,11 +315,13 @@ async function buildRechnungHtml(detail: RechnungDetail): Promise<string> {
 
 // Einfache Benachrichtigungs-E-Mail (Fahrzeug fertig, noch keine Rechnung)
 function buildFertigHtml(auftrag: any, firma: Record<string, string>): string {
-  const fz = auftrag.fahrzeug ?? {}
-  const kd = auftrag.kunde ?? {}
+  const fz = escObjekt(auftrag.fahrzeug ?? {})
+  const kd = escObjekt(auftrag.kunde ?? {})
+  const logoQuelle = sichereBildQuelle(firma.firma_logo)
+  firma = escObjekt(firma)
   const firmaName = firma.firma_name || 'Kfz-Werkstatt'
-  const logoBlock = firma.firma_logo
-    ? `<img src="${firma.firma_logo}" alt="${firmaName}" style="max-height:56px;max-width:180px;object-fit:contain;" />`
+  const logoBlock = logoQuelle
+    ? `<img src="${logoQuelle}" alt="${firmaName}" style="max-height:56px;max-width:180px;object-fit:contain;" />`
     : `<div style="font-size:18px;font-weight:700;color:#ea580c;">${firmaName}</div>`
 
   return `<!DOCTYPE html>
@@ -335,7 +345,7 @@ function buildFertigHtml(auftrag: any, firma: Record<string, string>): string {
     <div style="background:#f0fdf4;border:1.5px solid #86efac;border-radius:10px;padding:16px 20px;margin-bottom:24px;">
       <div style="font-size:18px;font-weight:700;color:#1e293b;">${fz.marke ?? ''} ${fz.modell ?? ''}</div>
       <div style="font-size:14px;font-family:monospace;color:#64748b;margin-top:2px;">${fz.kennzeichen || ''}</div>
-      ${auftrag.arbeiten ? `<div style="font-size:12px;color:#475569;margin-top:8px;border-top:1px solid #bbf7d0;padding-top:8px;">Durchgeführte Arbeiten: ${auftrag.arbeiten}</div>` : ''}
+      ${auftrag.arbeiten ? `<div style="font-size:12px;color:#475569;margin-top:8px;border-top:1px solid #bbf7d0;padding-top:8px;">Durchgeführte Arbeiten: ${esc(auftrag.arbeiten)}</div>` : ''}
     </div>
 
     ${(firma.firma_telefon || firma.firma_email) ? `
@@ -358,8 +368,11 @@ export async function POST(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Nicht angemeldet' }, { status: 401 })
+  // E-Mails kosten Geld und tragen den Namen der Werkstatt: pro Nutzer begrenzen (Missbrauch als Spam-Schleuder verhindern)
+  const limit = await rateLimit(`rechnung-email:${user.id}`, 40, 3600)
+  if (limit) return limit
 
-  const body = await req.json()
+  const body = await req.json().catch(() => ({}))
   const {
     // Rechnungsversand: rechnungId + betriebId
     rechnungId,
@@ -408,9 +421,9 @@ export async function POST(req: NextRequest) {
     const empfaenger = an || auftrag.kunde?.email
     if (!empfaenger) return NextResponse.json({ error: 'Keine E-Mail-Adresse vorhanden' }, { status: 400 })
 
-    const firmaName = firma.firma_name || 'Kfz-Werkstatt'
+    const firmaName = kopfzeilenText(firma.firma_name) || 'Kfz-Werkstatt'
     const fromEmail = firma.firma_absender_email || 'onboarding@resend.dev'
-    const fzName = `${auftrag.fahrzeug?.marke ?? ''} ${auftrag.fahrzeug?.modell ?? ''}`.trim()
+    const fzName = kopfzeilenText(`${auftrag.fahrzeug?.marke ?? ''} ${auftrag.fahrzeug?.modell ?? ''}`)
 
     const html = buildFertigHtml(auftrag, firma)
     const subject = `Ihr ${fzName} ist abholbereit – ${firmaName}`
@@ -419,7 +432,7 @@ export async function POST(req: NextRequest) {
     const { error } = await resend.emails.send({ from: `${firmaName} <${fromEmail}>`, to: empfaenger, subject, html })
     if (error) {
       console.error('Resend error:', error)
-      return NextResponse.json({ error: (error as any).message ?? 'Sendefehler' }, { status: 500 })
+      return NextResponse.json({ error: 'E-Mail konnte nicht gesendet werden. Bitte Empfänger-Adresse und Resend-Einstellungen prüfen.' }, { status: 502 })
     }
 
     await supabase.from('email_protokoll').insert({
@@ -461,17 +474,15 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  const firmaName = detail.firma.firma_name || 'Kfz-Werkstatt'
+  const firmaName = kopfzeilenText(detail.firma.firma_name) || 'Kfz-Werkstatt'
   const fromEmail = detail.firma.firma_absender_email || 'onboarding@resend.dev'
 
   let html = await buildRechnungHtml(detail)
   if (nachricht) {
-    html = html.replace(
-      'Sehr geehrte Damen und Herren,',
-      `${nachricht.replace(/\n/g, '<br>')}<br><br>Sehr geehrte Damen und Herren,`
-    )
+    const nachrichtHtml = esc(String(nachricht).slice(0, 2000)).replace(/\r?\n/g, '<br>')
+    html = html.replace('Sehr geehrte Damen und Herren,', () => `${nachrichtHtml}<br><br>Sehr geehrte Damen und Herren,`)
   }
-  const subject = `Ihre Rechnung ${detail.rechnung.rechnungs_nr} von ${firmaName}`
+  const subject = `Ihre Rechnung ${kopfzeilenText(detail.rechnung.rechnungs_nr, 40)} von ${firmaName}`
 
   const resend = new Resend(resendKey)
   const { error } = await resend.emails.send({
@@ -483,7 +494,7 @@ export async function POST(req: NextRequest) {
 
   if (error) {
     console.error('Resend error:', error)
-    return NextResponse.json({ error: (error as any).message ?? 'Sendefehler' }, { status: 500 })
+    return NextResponse.json({ error: 'E-Mail konnte nicht gesendet werden. Bitte Empfänger-Adresse und Resend-Einstellungen prüfen.' }, { status: 502 })
   }
 
   await supabase.from('email_protokoll').insert({

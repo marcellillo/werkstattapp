@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { NextRequest, NextResponse } from 'next/server'
 import { generateRechnungsNummer } from '@/lib/nummernvergabe'
 import { syncAuftragEinnahmen } from '@/lib/auftrag-einnahmen'
+import { serverFehler } from '@/lib/api-fehler'
 
 export async function POST(req: NextRequest) {
   try {
@@ -233,6 +234,6 @@ export async function POST(req: NextRequest) {
     })
   } catch (error: any) {
     console.error('[Rechnung] Error:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return serverFehler(error, 'rechnung/create')
   }
 }

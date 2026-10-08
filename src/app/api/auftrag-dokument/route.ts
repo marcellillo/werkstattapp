@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { pruefeZugriff } from '@/lib/auftrag-dokumente-server'
 import { DOKUMENT_BUCKET, erlaubterTyp, istKategorie } from '@/lib/auftrag-dokumente'
+import { serverFehler } from '@/lib/api-fehler'
 
 // Schritt 2 des Uploads: die hochgeladene Datei als Dokument des Auftrags eintragen.
 // Prüft, dass die Datei wirklich im Ordner dieses Betriebs/Auftrags liegt, und übernimmt Typ und
@@ -75,6 +76,6 @@ export async function PATCH(req: NextRequest) {
   if (!vorhanden) return NextResponse.json({ error: 'Dokument nicht gefunden' }, { status: 404 })
 
   const { error } = await createAdminClient().from('auftrag_dokumente').update(felder).eq('id', id).eq('betrieb_id', zugriff.betriebId)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverFehler(error, 'auftrag-dokument')
   return NextResponse.json({ erfolg: true })
 }

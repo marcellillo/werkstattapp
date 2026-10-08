@@ -4,11 +4,15 @@ import { NextResponse } from 'next/server'
 import { ladeGeheimnis } from '@/lib/betrieb-geheimnisse'
 import { createClient } from '@/lib/supabase/server'
 import Anthropic from '@anthropic-ai/sdk'
+import { serverFehler } from '@/lib/api-fehler'
+import { rateLimit } from '@/lib/rate-limit'
 
 export async function POST(req: Request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const rlAntwort = await rateLimit(`ki-teile:${user.id}`, 40, 600)
+  if (rlAntwort) return rlAntwort
 
   const { arbeiten, fahrzeug, betriebId } = await req.json()
   if (!arbeiten?.trim()) return NextResponse.json({ error: 'Keine Arbeiten angegeben' }, { status: 400 })
@@ -85,6 +89,6 @@ Maximal 8 Teile. Nur tatsächlich benötigte Teile.`
     const teile = JSON.parse(jsonMatch[0])
     return NextResponse.json({ teile })
   } catch (e: any) {
-    return NextResponse.json({ error: e.message }, { status: 500 })
+    return serverFehler(e, 'ki-teile')
   }
 }

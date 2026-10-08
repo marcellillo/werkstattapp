@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { verlangeFinanzrolle } from '@/lib/rollen-server'
 
 export async function GET() {
   const supabase = await createClient()
@@ -15,6 +16,9 @@ export async function GET() {
     .maybeSingle()
   const betriebId = userBetrieb?.betrieb_id
   if (!betriebId) return NextResponse.json({ error: 'Kein Betrieb zugeordnet' }, { status: 403 })
+
+  const rolleFehler = await verlangeFinanzrolle(supabase, user.id, betriebId)
+  if (rolleFehler) return rolleFehler
 
   const { data: rechnungen } = await supabase
     .from('rechnungen')

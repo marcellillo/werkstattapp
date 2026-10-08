@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextRequest, NextResponse } from 'next/server'
+import { clientIp, rateLimit } from '@/lib/rate-limit'
 
 // Läuft komplett über den Admin-Client statt über die Session des neuen Nutzers.
 // Grund: Dieses Supabase-Projekt hat mailer_autoconfirm=false (E-Mail-Bestätigung
@@ -13,12 +14,19 @@ import { NextRequest, NextResponse } from 'next/server'
 // sofort bestätigt, sodass die Registrierung ohne echtes SMTP funktioniert.
 export async function POST(req: NextRequest) {
   try {
-    const { token, password } = await req.json()
-    if (!token || !password) {
+    // Token raten/durchprobieren und Massen-Registrierung verhindern
+    const limit = await rateLimit(`einladung-annehmen:${clientIp(req)}`, 10, 600)
+    if (limit) return limit
+
+    const { token, password } = await req.json().catch(() => ({}))
+    if (!token || !password || typeof token !== 'string' || typeof password !== 'string') {
       return NextResponse.json({ error: 'Token und Passwort erforderlich' }, { status: 400 })
     }
-    if (password.length < 6) {
-      return NextResponse.json({ error: 'Passwort muss mindestens 6 Zeichen lang sein' }, { status: 400 })
+    if (password.length < 10) {
+      return NextResponse.json({ error: 'Passwort muss mindestens 10 Zeichen lang sein' }, { status: 400 })
+    }
+    if (password.length > 200) {
+      return NextResponse.json({ error: 'Passwort ist zu lang' }, { status: 400 })
     }
 
     const admin = createAdminClient()
@@ -50,13 +58,20 @@ export async function POST(req: NextRequest) {
     // gegenüber Wiederholungsversuchen mit demselben Einladungslink.
     const listResult = await admin.auth.admin.listUsers({ perPage: 1000 })
     if (listResult.error) throw listResult.error
-    const alleUsers = listResult.data.users as { id: string; email?: string }[]
+    const alleUsers = listResult.data.users as { id: string; email?: string; last_sign_in_at?: string | null }[]
     const existingUser = alleUsers.find(
       u => u.email?.toLowerCase() === invitation.email.toLowerCase()
     )
 
+    // SICHERHEIT: Ein Konto, mit dem sich schon jemand angemeldet hat, darf über einen Einladungslink NIE ein
+    // neues Passwort bekommen -- sonst könnte jeder Admin, der die E-Mail-Adresse eines fremden Kontos einlädt,
+    // dieses Konto übernehmen. Solche Konten werden nur dem Betrieb hinzugefügt und melden sich wie gewohnt an.
+    const bestehendesAktivesKonto = !!existingUser?.last_sign_in_at
+
     let userId: string
-    if (existingUser) {
+    if (existingUser && bestehendesAktivesKonto) {
+      userId = existingUser.id
+    } else if (existingUser) {
       const { data: updated, error: updateErr } = await admin.auth.admin.updateUserById(existingUser.id, {
         password,
         email_confirm: true,
@@ -110,9 +125,10 @@ export async function POST(req: NextRequest) {
       success: true,
       betriebId: invitation.betrieb_id,
       rolle: invitation.rolle,
+      bestehendesKonto: bestehendesAktivesKonto,
     })
   } catch (error: any) {
     console.error('[Accept Invitation] Error:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ error: 'Die Einladung konnte nicht angenommen werden. Bitte später erneut versuchen.' }, { status: 500 })
   }
 }

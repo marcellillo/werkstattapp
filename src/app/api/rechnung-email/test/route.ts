@@ -2,11 +2,14 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { Resend } from 'resend'
 import { ladeGeheimnis } from '@/lib/betrieb-geheimnisse'
+import { rateLimit } from '@/lib/rate-limit'
 
 export async function POST() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Nicht angemeldet' }, { status: 401 })
+  const rlAntwort = await rateLimit(`rechnung-email-test:${user.id}`, 10, 600)
+  if (rlAntwort) return rlAntwort
 
   const { data: userBetrieb } = await supabase
     .from('betrieb_users')

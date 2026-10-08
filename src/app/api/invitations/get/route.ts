@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { NextRequest, NextResponse } from 'next/server'
+import { clientIp, rateLimit } from '@/lib/rate-limit'
 
 export async function POST(req: NextRequest) {
   try {
@@ -8,9 +9,11 @@ export async function POST(req: NextRequest) {
     // anonymen Request grundsätzlich keinen Zugriff geben. Der Token selbst ist hier
     // die Berechtigung, daher läuft die Suche bewusst über den Admin-Client.
     const supabase = createAdminClient()
-    const { token } = await req.json()
+    const limit = await rateLimit(`einladung-lesen:${clientIp(req)}`, 30, 600)
+    if (limit) return limit
+    const { token } = await req.json().catch(() => ({}))
 
-    if (!token) {
+    if (!token || typeof token !== 'string') {
       return NextResponse.json({ error: 'Token erforderlich' }, { status: 400 })
     }
 
@@ -42,6 +45,6 @@ export async function POST(req: NextRequest) {
     })
   } catch (error: any) {
     console.error('[Get Invitation] Error:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ error: 'Die Einladung konnte nicht geladen werden.' }, { status: 500 })
   }
 }

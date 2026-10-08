@@ -32,6 +32,9 @@ export async function proxy(request: NextRequest) {
   const isPublicApi =
     request.nextUrl.pathname.startsWith('/api/buchen') ||
     request.nextUrl.pathname.startsWith('/status/') ||
+    // Datenquelle der öffentlichen Kunden-Statusseite (/status/[id]); ohne diese Freigabe wurden
+    // nicht angemeldete Kunden zur Login-Seite umgeleitet und sahen nie ihren Auftragsstatus
+    request.nextUrl.pathname.startsWith('/api/status/') ||
     request.nextUrl.pathname.startsWith('/api/invitations/get') ||
     request.nextUrl.pathname.startsWith('/api/invitations/accept') ||
     // Cron-Aufrufe haben keine Nutzer-Session; die Route prüft das CRON_SECRET selbst

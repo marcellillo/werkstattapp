@@ -1,5 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
+import { verlangeFinanzrolle } from '@/lib/rollen-server'
 import { NextRequest, NextResponse } from 'next/server'
+import { serverFehler } from '@/lib/api-fehler'
 
 export async function POST(req: NextRequest) {
   try {
@@ -24,6 +26,8 @@ export async function POST(req: NextRequest) {
     if (!betriebCheck) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
+    const rolleFehler = await verlangeFinanzrolle(supabase, user.id, betriebId)
+    if (rolleFehler) return rolleFehler
 
     // Es gibt keine DB-Unique-Constraint auf rechnungs_nr -- Eindeutigkeit innerhalb
     // des Betriebs hier in der App sicherstellen, damit keine zwei Rechnungen
@@ -52,6 +56,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ erfolg: true, rechnungs_nr: nummer })
   } catch (error: any) {
     console.error('[Rechnung Nummer Update] Error:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return serverFehler(error, 'rechnung/update-nummer')
   }
 }

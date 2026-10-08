@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { resolveRechnungDetail } from '@/lib/rechnung-detail'
+import { serverFehler } from '@/lib/api-fehler'
 
 export async function POST(req: NextRequest) {
   try {
@@ -30,6 +31,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(detail)
   } catch (error: any) {
     console.error('[Rechnung Detail] Error:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return serverFehler(error, 'rechnung/detail')
   }
 }

@@ -12,14 +12,36 @@ const withPWA = withPWAInit({
   },
 })
 
+// Content-Security-Policy. Next.js setzt eigene Inline-Skripte (Hydration) ein, deshalb 'unsafe-inline' bei
+// script-src; trotzdem sperrt die Richtlinie fremde Skript-Quellen, Plug-ins (object-src), Einbetten der
+// App in fremde Seiten (frame-ancestors), fremde <base>-Adressen und fremde Formularziele.
+// Außerhalb der Entwicklung zunächst nur melden (Report-Only), nach Prüfung auf "erzwingen" umstellen.
+const SUPABASE = 'https://wjglxskeqfzwonugsquo.supabase.co'
+const csp = [
+  "default-src 'self'",
+  `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : ''}`,
+  "style-src 'self' 'unsafe-inline'",
+  `img-src 'self' data: blob: ${SUPABASE} https://img.classistatic.de https://unpkg.com https://raw.githubusercontent.com https://*.tile.openstreetmap.org`,
+  "font-src 'self' data:",
+  `connect-src 'self' ${SUPABASE} wss://wjglxskeqfzwonugsquo.supabase.co https://nominatim.openstreetmap.org`,
+  `frame-src 'self' blob: ${SUPABASE}`,
+  "worker-src 'self' blob:",
+  "manifest-src 'self'",
+  "media-src 'self' blob: data:",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "frame-ancestors 'self'",
+].join('; ')
+
 const nextConfig: NextConfig = {
+  poweredByHeader: false,
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false,
   },
   turbopack: {},
   // Sicherheits-Header für alle Antworten. Schnittstellen liefern angemeldete Daten und dürfen
-  // nirgends zwischengespeichert werden. (Eine Content-Security-Policy folgt separat -- sie muss
-  // gegen Next-Inline-Skripte, Karten und Bilder sorgfältig getestet werden.)
+  // nirgends zwischengespeichert werden.
   async headers() {
     return [
       {
@@ -30,6 +52,7 @@ const nextConfig: NextConfig = {
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
           { key: 'Permissions-Policy', value: 'camera=(self), microphone=(), geolocation=(self), payment=()' },
           { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
+          { key: 'Content-Security-Policy-Report-Only', value: csp },
         ],
       },
       {

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getBetriebIdForUser } from '@/lib/server-betrieb'
+import { serverFehler } from '@/lib/api-fehler'
 
 // Azure-Zugangsdaten und Automatik-Schalter für das E-Mail-Postfach (nur Admins).
 // Das Client-Secret wird nur überschrieben, wenn ein neues mitgeschickt wird.
@@ -47,6 +48,6 @@ export async function POST(req: NextRequest) {
 
   const { error } = await createAdminClient()
     .from('betrieb_einstellungen').upsert(zeilen, { onConflict: 'betrieb_id,schluessel' })
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverFehler(error, 'graph/config')
   return NextResponse.json({ erfolg: true })
 }

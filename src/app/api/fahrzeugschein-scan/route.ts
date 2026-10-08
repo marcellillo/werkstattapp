@@ -4,11 +4,15 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { serverFehler } from '@/lib/api-fehler'
+import { rateLimit } from '@/lib/rate-limit'
 
 export async function POST(req: Request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const rlAntwort = await rateLimit(`fahrzeugschein-scan:${user.id}`, 30, 600)
+  if (rlAntwort) return rlAntwort
 
   const { data: userBetrieb } = await supabase
     .from('betrieb_users')
@@ -101,6 +105,6 @@ Regeln:
     const daten = JSON.parse(jsonMatch[0])
     return NextResponse.json({ daten })
   } catch (e: any) {
-    return NextResponse.json({ error: e.message }, { status: 500 })
+    return serverFehler(e, 'fahrzeugschein-scan')
   }
 }

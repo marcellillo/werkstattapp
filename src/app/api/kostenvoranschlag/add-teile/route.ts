@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { mitAufschlag } from '@/lib/ersatzteil-aufschlag'
+import { serverFehler } from '@/lib/api-fehler'
 
 export async function POST(req: NextRequest) {
   try {
@@ -65,6 +66,6 @@ export async function POST(req: NextRequest) {
     })
   } catch (error: any) {
     console.error('[Kostenvoranschlag Add-Teile] Error:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return serverFehler(error, 'kostenvoranschlag/add-teile')
   }
 }

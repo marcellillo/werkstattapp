@@ -19,6 +19,7 @@ function RegisterContent() {
   const [passwordConfirm, setPasswordConfirm] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
+  const [bestehend, setBestehend] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const supabase = createClient()
 
@@ -71,8 +72,8 @@ function RegisterContent() {
       return
     }
 
-    if (password.length < 6) {
-      setError('Passwort muss mindestens 6 Zeichen lang sein')
+    if (password.length < 10) {
+      setError('Passwort muss mindestens 10 Zeichen lang sein')
       return
     }
 
@@ -93,6 +94,15 @@ function RegisterContent() {
 
       if (!response.ok) {
         throw new Error(acceptData.error || 'Fehler beim Akzeptieren der Einladung')
+      }
+
+      // Gab es für diese E-Mail schon ein Konto, bleibt dessen Passwort unverändert (Sicherheit):
+      // Der Betrieb wurde nur hinzugefügt -> normal anmelden.
+      if (acceptData.bestehendesKonto) {
+        setBestehend(true)
+        setSuccess(true)
+        setTimeout(() => { router.push('/login') }, 3500)
+        return
       }
 
       // Jetzt einloggen, um im Browser eine echte Session zu etablieren
@@ -129,7 +139,7 @@ function RegisterContent() {
         <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
           <div className="text-4xl mb-4">✅</div>
           <h1 className="text-2xl font-bold text-green-600">Willkommen!</h1>
-          <p className="text-gray-600 mt-2">Dein Konto wurde erstellt. Weitergeleitet zum Dashboard...</p>
+          <p className="text-gray-600 mt-2">{bestehend ? 'Du wurdest dem Betrieb hinzugefügt. Dein bisheriges Passwort bleibt gültig – bitte wie gewohnt anmelden. Weiterleitung...' : 'Dein Konto wurde erstellt. Weitergeleitet zum Dashboard...'}</p>
         </div>
       </div>
     )
@@ -170,7 +180,7 @@ function RegisterContent() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Mindestens 6 Zeichen"
+              placeholder="Mindestens 10 Zeichen"
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
             />
           </div>

@@ -8,10 +8,19 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { email, betriebId, rolle = 'mechaniker' } = await req.json()
+    const eingabe = await req.json().catch(() => ({}))
+    const betriebId = eingabe.betriebId
+    const rolle = eingabe.rolle ?? 'mechaniker'
+    const email = typeof eingabe.email === 'string' ? eingabe.email.trim().toLowerCase().slice(0, 200) : ''
 
     if (!email || !betriebId) {
       return NextResponse.json({ error: 'Email und Betrieb erforderlich' }, { status: 400 })
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return NextResponse.json({ error: 'Ungültige E-Mail-Adresse' }, { status: 400 })
+    }
+    if (!['admin', 'mechaniker', 'buchhalter', 'verkaeufer', 'superadmin'].includes(rolle)) {
+      return NextResponse.json({ error: 'Ungültige Rolle' }, { status: 400 })
     }
 
     // Check ob User Admin ist
@@ -24,6 +33,9 @@ export async function POST(req: NextRequest) {
 
     if (userRole?.role !== 'admin' && userRole?.role !== 'superadmin') {
       return NextResponse.json({ error: 'Nur Admins können einladen' }, { status: 403 })
+    }
+    if (rolle === 'superadmin' && userRole?.role !== 'superadmin') {
+      return NextResponse.json({ error: 'Die Rolle Superadmin kann nur ein Superadmin vergeben' }, { status: 403 })
     }
 
     // Generate Token
@@ -54,6 +66,6 @@ export async function POST(req: NextRequest) {
     })
   } catch (error: any) {
     console.error('[Invitations] Error:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ error: 'Die Einladung konnte nicht erstellt werden.' }, { status: 500 })
   }
 }

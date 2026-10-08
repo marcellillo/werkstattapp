@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { generateVorvertragNummer } from '@/lib/nummernvergabe'
+import { serverFehler } from '@/lib/api-fehler'
 
 export async function POST(req: NextRequest) {
   try {
@@ -74,6 +75,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(data)
   } catch (error: any) {
     console.error('[Vorvertrag Create] Error:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return serverFehler(error, 'vorvertrag/create')
   }
 }

@@ -2,6 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { generateWerkstattauftragPDF } from '@/lib/pdf-generator-werkstattauftrag'
 import { resolveFirmaSettings } from '@/lib/firma-settings'
+import { serverFehler } from '@/lib/api-fehler'
+import { rateLimit } from '@/lib/rate-limit'
 
 // Kaltstart von @sparticuz/chromium + Rendern braucht mehr als das Standard-Timeout
 export const maxDuration = 30
@@ -11,6 +13,8 @@ export async function POST(req: NextRequest) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const rlAntwort = await rateLimit(`pdf:${user.id}`, 80, 600)
+    if (rlAntwort) return rlAntwort
 
     const { werkstattauftragId, betriebId } = await req.json()
 
@@ -128,6 +132,6 @@ export async function POST(req: NextRequest) {
     })
   } catch (error: any) {
     console.error('[Werkstattauftrag PDF Export] Error:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return serverFehler(error, 'werkstattauftrag/pdf')
   }
 }

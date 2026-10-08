@@ -2,12 +2,16 @@ import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { generateVorvertragPDF } from '@/lib/pdf-generator-vorvertrag'
 import { resolveFirmaSettings } from '@/lib/firma-settings'
+import { serverFehler } from '@/lib/api-fehler'
+import { rateLimit } from '@/lib/rate-limit'
 
 export async function POST(req: NextRequest) {
   try {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const rlAntwort = await rateLimit(`pdf:${user.id}`, 80, 600)
+    if (rlAntwort) return rlAntwort
 
     const { vorvertragId, betriebId } = await req.json()
 
@@ -94,6 +98,6 @@ export async function POST(req: NextRequest) {
     })
   } catch (error: any) {
     console.error('[Vorvertrag PDF Export] Error:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return serverFehler(error, 'vorvertrag/pdf')
   }
 }

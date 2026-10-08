@@ -6,6 +6,8 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getBetriebIdForUser } from '@/lib/server-betrieb'
 import { ladeSyncConfig, syncBetrieb } from '@/lib/email-sync'
+import { serverFehler } from '@/lib/api-fehler'
+import { rateLimit } from '@/lib/rate-limit'
 
 // Manueller Abruf (Button "E-Mails prüfen" / automatisch beim Öffnen der Rechnungsseite).
 // Der tägliche Abruf läuft über GET /api/cron/email-sync.
@@ -13,6 +15,8 @@ export async function POST(req: Request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Nicht angemeldet' }, { status: 401 })
+  const rlAntwort = await rateLimit(`email-sync:${user.id}`, 30, 600)
+  if (rlAntwort) return rlAntwort
 
   let betriebId: string
   try {
@@ -39,6 +43,6 @@ export async function POST(req: Request) {
     const result = await syncBetrieb(admin, betriebId, cfg, { tage })
     return NextResponse.json({ erfolg: true, ...result })
   } catch (e: any) {
-    return NextResponse.json({ error: e.message }, { status: 500 })
+    return serverFehler(e, 'email-sync')
   }
 }

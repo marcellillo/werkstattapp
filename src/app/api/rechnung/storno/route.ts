@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
+import { verlangeFinanzrolle } from '@/lib/rollen-server'
 import { NextRequest, NextResponse } from 'next/server'
 import { syncAuftragEinnahmen } from '@/lib/auftrag-einnahmen'
+import { serverFehler } from '@/lib/api-fehler'
 
 export async function POST(req: NextRequest) {
   try {
@@ -24,6 +26,8 @@ export async function POST(req: NextRequest) {
     if (!betriebCheck) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
+    const rolleFehler = await verlangeFinanzrolle(supabase, user.id, betriebId)
+    if (rolleFehler) return rolleFehler
 
     const { data: rechnung, error: rechnungError } = await supabase
       .from('kunden_rechnungen')
@@ -64,6 +68,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ erfolg: true })
   } catch (error: any) {
     console.error('[Rechnung Storno] Error:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return serverFehler(error, 'rechnung/storno')
   }
 }

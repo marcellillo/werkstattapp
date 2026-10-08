@@ -32,10 +32,6 @@ export async function scanLieferschein(
 ): Promise<LieferscheinScanResult> {
   const apiKey = process.env.ANTHROPIC_API_KEY || ''
 
-  console.log('[Lieferschein] API Key check:')
-  console.log('[Lieferschein]   - env value:', apiKey ? `${apiKey.substring(0, 20)}...` : 'NICHT GESETZT')
-  console.log('[Lieferschein]   - process.env keys:', Object.keys(process.env).filter(k => k.includes('ANTHROPIC')))
-
   if (!apiKey) {
     return {
       erfolg: false,

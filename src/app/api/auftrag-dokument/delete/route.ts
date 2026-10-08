@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { pruefeZugriff } from '@/lib/auftrag-dokumente-server'
 import { DOKUMENT_BUCKET } from '@/lib/auftrag-dokumente'
+import { serverFehler } from '@/lib/api-fehler'
 
 // Löscht ein Dokument samt Datei.
 export async function POST(req: NextRequest) {
@@ -31,7 +32,7 @@ export async function POST(req: NextRequest) {
   }
 
   const { error } = await admin.from('auftrag_dokumente').delete().eq('id', id).eq('betrieb_id', zugriff.betriebId)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverFehler(error, 'auftrag-dokument/delete')
 
   const { error: storageErr } = await admin.storage.from(DOKUMENT_BUCKET).remove([dok.datei_pfad])
   if (storageErr) console.error('[Dokumente] Datei konnte nicht entfernt werden:', storageErr.message)

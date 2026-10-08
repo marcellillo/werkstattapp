@@ -8,6 +8,8 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { getBetriebIdForUser } from '@/lib/server-betrieb'
 import { ladeGeheimnis } from '@/lib/betrieb-geheimnisse'
 import { verarbeiteRechnungsDatei } from '@/lib/eingangsrechnung'
+import { verlangeFinanzrolle } from '@/lib/rollen-server'
+import { rateLimit } from '@/lib/rate-limit'
 
 // Manueller Upload einer Lieferantenrechnung (PDF/Foto): wird ausgelesen, in der App abgelegt
 // und als Eingangsrechnung angelegt. Pro Aufruf eine Datei.
@@ -22,6 +24,11 @@ export async function POST(req: NextRequest) {
   } catch {
     return NextResponse.json({ error: 'Kein Betrieb zugeordnet' }, { status: 403 })
   }
+
+  const rolleFehler = await verlangeFinanzrolle(supabase, user.id, betriebId)
+  if (rolleFehler) return rolleFehler
+  const limit = await rateLimit(`rechnung-import:${user.id}`, 30, 3600)
+  if (limit) return limit
 
   // API Key (nur serverseitig lesbar), Fallback auf Umgebungsvariable
   const apiKey = (await ladeGeheimnis(betriebId, 'anthropic_api_key')) || process.env.ANTHROPIC_API_KEY

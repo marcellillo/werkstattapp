@@ -1,10 +1,14 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { serverFehler } from '@/lib/api-fehler'
+import { rateLimit } from '@/lib/rate-limit'
 
 export async function POST() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Nicht angemeldet' }, { status: 401 })
+  const rlAntwort = await rateLimit(`demo-daten:${user.id}`, 5, 3600)
+  if (rlAntwort) return rlAntwort
 
   const now = new Date()
   const ts = (minusMin: number) => new Date(now.getTime() - minusMin * 60_000).toISOString()
@@ -100,7 +104,7 @@ export async function POST() {
     .is('auftrag_id', null)
 
   const { error } = await supabase.from('benachrichtigungen').insert(beispiele)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverFehler(error, 'demo-daten')
 
   return NextResponse.json({ erstellt: beispiele.length })
 }

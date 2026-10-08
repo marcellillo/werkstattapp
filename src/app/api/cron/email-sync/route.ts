@@ -3,6 +3,7 @@ export const maxDuration = 60
 
 import { NextResponse } from 'next/server'
 import { syncAlleBetriebe } from '@/lib/email-sync'
+import { serverFehler } from '@/lib/api-fehler'
 
 // Täglicher Abruf (siehe vercel.json). Vercel schickt "Authorization: Bearer $CRON_SECRET".
 // Ohne gesetztes CRON_SECRET wird jeder Aufruf abgewiesen (nicht "offen lassen").
@@ -16,6 +17,6 @@ export async function GET(req: Request) {
     const betriebe = await syncAlleBetriebe()
     return NextResponse.json({ erfolg: true, betriebe })
   } catch (e: any) {
-    return NextResponse.json({ error: e.message }, { status: 500 })
+    return serverFehler(e, 'cron/email-sync')
   }
 }

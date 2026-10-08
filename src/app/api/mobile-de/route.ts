@@ -1,8 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
+import { rateLimit } from '@/lib/rate-limit'
+import { serverFehler } from '@/lib/api-fehler'
 
 export async function GET(req: NextRequest) {
+  // Nur für angemeldete Nutzer (sonst wäre die App ein offener Abruf-Dienst für mobile.de)
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Nicht angemeldet' }, { status: 401 })
+  const limit = await rateLimit(`mobile-de:${user.id}`, 60, 600)
+  if (limit) return limit
+
   const id = req.nextUrl.searchParams.get('id')
   if (!id) return NextResponse.json({ error: 'Keine ID' }, { status: 400 })
+  // mobile.de-Inserat-IDs sind reine Zahlen; alles andere würde die Abruf-Adresse verändern können
+  if (!/^\d{5,15}$/.test(id)) return NextResponse.json({ error: 'Ungültige ID' }, { status: 400 })
 
   try {
     const url = `https://suchen.mobile.de/fahrzeuge/details.html?id=${id}`
@@ -12,6 +24,8 @@ export async function GET(req: NextRequest) {
         'Accept-Language': 'de-DE,de;q=0.9',
       },
       next: { revalidate: 0 },
+      redirect: 'error',
+      signal: AbortSignal.timeout(10_000),
     })
 
     if (!res.ok) return NextResponse.json({ error: 'Inserat nicht gefunden' }, { status: 404 })
@@ -70,6 +84,6 @@ export async function GET(req: NextRequest) {
       url,
     })
   } catch (e: any) {
-    return NextResponse.json({ error: e.message }, { status: 500 })
+    return serverFehler(e, 'mobile-de')
   }
 }

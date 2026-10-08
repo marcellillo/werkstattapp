@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { istGeheimerSchluessel } from '@/lib/betrieb-geheimnisse'
 import { NextRequest, NextResponse } from 'next/server'
+import { serverFehler } from '@/lib/api-fehler'
 
 export async function POST(req: NextRequest) {
   try {
@@ -57,6 +58,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true })
   } catch (error: any) {
     console.error('[Settings Save] Error:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return serverFehler(error, 'betrieb-settings/save')
   }
 }

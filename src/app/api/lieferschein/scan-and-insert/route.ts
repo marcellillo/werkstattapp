@@ -2,12 +2,15 @@ import { createClient } from '@/lib/supabase/server'
 import { scanLieferschein } from '@/lib/lieferschein-scanner'
 import { validateAndInsertParts } from '@/lib/teile-validator'
 import { NextRequest, NextResponse } from 'next/server'
+import { rateLimit } from '@/lib/rate-limit'
 
 export async function POST(req: NextRequest) {
   try {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const rlAntwort = await rateLimit(`lieferschein:${user.id}`, 40, 600)
+    if (rlAntwort) return rlAntwort
 
     const formData = await req.formData()
     const file = formData.get('file') as File
@@ -123,7 +126,7 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     console.error('[Scan+Insert] Error:', error)
     return NextResponse.json(
-      { error: error.message || 'Fehler beim Scannen' },
+      { error: 'Der Lieferschein konnte nicht verarbeitet werden. Bitte ein klareres Foto versuchen.' },
       { status: 500 }
     )
   }

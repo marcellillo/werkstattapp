@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { rateLimit } from '@/lib/rate-limit'
 
 const DEDUPE_STUNDEN = 12 // Keine doppelten Notifications innerhalb von 12h
 
@@ -7,6 +8,8 @@ export async function POST() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Nicht angemeldet' }, { status: 401 })
+  const rlAntwort = await rateLimit(`benachrichtigungen:${user.id}`, 150, 600)
+  if (rlAntwort) return rlAntwort
 
   const { data: userBetrieb } = await supabase
     .from('betrieb_users')

@@ -5,12 +5,15 @@ import webpush from 'web-push'
 import { initWebPush } from '@/lib/push-vapid'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { pruefeZugriff } from '@/lib/auftrag-dokumente-server'
+import { rateLimit } from '@/lib/rate-limit'
 
 // Push-Nachricht an Kollegen des EIGENEN Betriebs (optional nur an bestimmte Mitarbeiter-IDs).
 // Der Link darf nur innerhalb der App liegen (sonst wären Phishing-Nachrichten möglich).
 export async function POST(req: NextRequest) {
   const zugriff = await pruefeZugriff()
   if ('res' in zugriff) return zugriff.res
+  const rlAntwort = await rateLimit(`push-send:${zugriff.userId}`, 60, 600)
+  if (rlAntwort) return rlAntwort
 
   const { title, body, url, tag, userIds } = await req.json().catch(() => ({}))
   const titel = String(title ?? '').slice(0, 120)

@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { verlangeFinanzrolle } from '@/lib/rollen-server'
 import { NextRequest, NextResponse } from 'next/server'
 import { syncAuftragEinnahmen } from '@/lib/auftrag-einnahmen'
 
@@ -24,6 +25,8 @@ export async function POST(req: NextRequest) {
     if (!betriebCheck) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
+    const rolleFehler = await verlangeFinanzrolle(supabase, user.id, betriebId)
+    if (rolleFehler) return rolleFehler
 
     const { data: rechnung, error: rechnungError } = await supabase
       .from('kunden_rechnungen')

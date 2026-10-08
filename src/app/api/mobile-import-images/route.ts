@@ -2,11 +2,14 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import * as fs from 'fs'
 import * as path from 'path'
+import { rateLimit } from '@/lib/rate-limit'
 
 export async function POST() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Nicht angemeldet' }, { status: 401 })
+  const rlAntwort = await rateLimit(`mobile-import:${user.id}`, 120, 3600)
+  if (rlAntwort) return rlAntwort
 
   const { data: userBetriebe } = await supabase
     .from('betrieb_users')
