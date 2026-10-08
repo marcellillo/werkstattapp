@@ -24,7 +24,8 @@ export async function POST(req: NextRequest) {
 
     console.log('[PDF] Generiere:', template)
 
-    const pdfBuffer = await generatePDF(template, data)
+    // Die Daten stammen vom Browser des Nutzers: ALLES wird maskiert (auch "HTML-Bausteine")
+    const pdfBuffer = await generatePDF(template, data, { vertrauenswuerdig: false })
 
     return new NextResponse(new Uint8Array(pdfBuffer), {
       headers: {
@@ -34,6 +35,6 @@ export async function POST(req: NextRequest) {
     })
   } catch (error: any) {
     console.error('[PDF Error]:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ error: 'PDF konnte nicht erstellt werden' }, { status: 500 })
   }
 }

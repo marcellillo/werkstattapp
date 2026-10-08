@@ -1,4 +1,4 @@
-import { generatePDF } from '@/lib/pdf-generator'
+import { generatePDF, escapeHtml as zentralEscape } from '@/lib/pdf-generator'
 
 export interface WerkstattauftragPDF {
   nummer: string
@@ -115,8 +115,5 @@ export async function generateWerkstattauftragPDF(daten: WerkstattauftragPDF): P
 }
 
 function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
+  return zentralEscape(String(value ?? ''))
 }

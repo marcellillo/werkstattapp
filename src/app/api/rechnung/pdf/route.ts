@@ -10,8 +10,8 @@ function fmt(n: number) {
   return n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-function esc(s: string) {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+function esc(s: unknown) {
+  return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
 }
 function fmtMenge(n: number) {
   return n.toLocaleString('de-DE', { maximumFractionDigits: 2 })
@@ -36,7 +36,7 @@ function rowsHtml(positionen: RechnungPosition[], istPauschal: boolean, startNr 
   return positionen.map((pos, i) => istPauschal ? `
     <tr>
       <td class="ta-right pos-nr">${startNr + i}</td>
-      <td>${pos.beschreibung}</td>
+      <td>${esc(pos.beschreibung)}</td>
     </tr>` : `
     <tr>
       <td class="ta-right pos-nr">${startNr + i}</td>
@@ -157,13 +157,13 @@ export async function POST(req: NextRequest) {
          <tr><td colspan="4" class="mwst-hinweis">Gemäß §19 UStG wird keine Umsatzsteuer berechnet (Kleinunternehmerregelung).</td></tr>`
 
     const kundeBlock = (kunde?.vorname || kunde?.nachname)
-      ? `${kunde.firma ? `<strong>${kunde.firma}</strong><br>` : ''}<strong>${kunde.vorname ?? ''} ${kunde.nachname ?? ''}</strong><br>${kunde.strasse ? kunde.strasse + '<br>' : ''}${(kunde.plz || kunde.ort) ? `${kunde.plz ?? ''} ${kunde.ort ?? ''}<br>` : ''}${kunde.telefon ? 'Tel.: ' + kunde.telefon : ''}`
+      ? `${kunde.firma ? `<strong>${esc(kunde.firma)}</strong><br>` : ''}<strong>${esc(kunde.vorname)} ${esc(kunde.nachname)}</strong><br>${kunde.strasse ? esc(kunde.strasse) + '<br>' : ''}${(kunde.plz || kunde.ort) ? `${esc(kunde.plz)} ${esc(kunde.ort)}<br>` : ''}${kunde.telefon ? 'Tel.: ' + esc(kunde.telefon) : ''}`
       : '<span style="color:#888">Kein Kunde hinterlegt</span>'
 
-    const firmaSteuerBlock = `${firma.firma_ust_id ? `USt-IdNr.: ${firma.firma_ust_id}<br>` : ''}${firma.firma_steuernummer ? `Steuernr.: ${firma.firma_steuernummer}` : ''}`
+    const firmaSteuerBlock = `${firma.firma_ust_id ? `USt-IdNr.: ${esc(firma.firma_ust_id)}<br>` : ''}${firma.firma_steuernummer ? `Steuernr.: ${esc(firma.firma_steuernummer)}` : ''}`
 
     const bankBlock = firma.firma_iban
-      ? `${firma.firma_bank ? firma.firma_bank + '<br>' : ''}IBAN: <strong>${firma.firma_iban}</strong>${firma.firma_bic ? '<br>BIC: ' + firma.firma_bic : ''}`
+      ? `${firma.firma_bank ? esc(firma.firma_bank) + '<br>' : ''}IBAN: <strong>${esc(firma.firma_iban)}</strong>${firma.firma_bic ? '<br>BIC: ' + esc(firma.firma_bic) : ''}`
       : '<span style="color:#888">Bitte IBAN in Einstellungen eintragen</span>'
 
     const firmaFooterzeile = [
@@ -181,7 +181,7 @@ export async function POST(req: NextRequest) {
       logoBase64: firma.firma_logo || '',
       betriebName: firma.firma_name || 'Kfz-Werkstatt',
       betriebAdresse: `${firma.firma_strasse || ''}, ${firma.firma_plz || ''} ${firma.firma_ort || ''}`,
-      betriebTelZeile: firma.firma_telefon ? `Tel.: ${firma.firma_telefon}<br>` : '',
+      betriebTelZeile: firma.firma_telefon ? `Tel.: ${esc(firma.firma_telefon)}<br>` : '',
       betriebEmail: firma.firma_email || '',
       rechnungsNummer: rechnung.rechnungs_nr,
       datum: new Date(rechnung.erstellt_am).toLocaleDateString('de-DE'),
