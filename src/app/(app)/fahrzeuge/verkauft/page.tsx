@@ -16,7 +16,7 @@ export default async function VerkauftPage() {
       id, status, verkauft_am, auslieferung_geplant, einnahmen, bemerkungen, kaeufer_name, steuerart, erstellt_am,
       ersatzteile(einzelpreis, menge),
       fahrzeug:fahrzeuge(
-        id, marke, modell, kennzeichen, mobile_de_id, fahrzeug_typ,
+        id, marke, modell, kennzeichen, fahrgestellnummer, mobile_de_id, fahrzeug_typ,
         baujahr, kilometerstand, farbe, motortyp, leistung_kw, bilder_urls,
         verkaufspreis, einkaufspreis
       )

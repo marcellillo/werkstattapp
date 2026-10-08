@@ -850,6 +850,7 @@ export function FahrzeugeContent({
                         Als verkauft markieren
                       </button>
                     )}
+                    {auftrag.status !== 'verkauft' && (
                     <button
                       onClick={() => setLoeschen({ fahrzeugId: fz?.id, name: `${fz?.marke ?? ''} ${fz?.modell ?? ''}`.trim() || 'Fahrzeug', kennzeichen: fz?.kennzeichen })}
                       title="Aus Bestand löschen"
@@ -857,6 +858,7 @@ export function FahrzeugeContent({
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
+                    )}
                   </div>
                 </div>
               )

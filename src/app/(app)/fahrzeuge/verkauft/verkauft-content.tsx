@@ -2,7 +2,7 @@
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Car, ChevronDown, Download, User, Calendar, TrendingUp } from 'lucide-react'
+import { ArrowLeft, Car, ChevronDown, Download, User, Calendar, TrendingUp, Search, FolderOpen } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { berechneFahrzeugSteuer, STEUERART_KURZ, STEUERART_COLOR, type Steuerart } from '@/lib/fahrzeug-steuer'
@@ -23,6 +23,7 @@ type VerkauftEintrag = {
     modell: string
     kennzeichen: string
     mobile_de_id: string | null
+    fahrgestellnummer?: string | null
     verkaufspreis: number | null
     einkaufspreis: number | null
   } | null
@@ -40,6 +41,8 @@ type Row = {
   ek: number | null
   steuerart: Steuerart
   kaeufer: string | null
+  fin: string | null
+  kennzeichen: string | null
 }
 
 function toRow(e: VerkauftEintrag, standard: Steuerart): Row {
@@ -54,6 +57,8 @@ function toRow(e: VerkauftEintrag, standard: Steuerart): Row {
     ek: e.fahrzeug?.einkaufspreis ?? null,
     steuerart: e.steuerart ?? standard,
     kaeufer: e.kaeufer_name ?? e.bemerkungen?.match(/Käufer:\s*(.+)/)?.[1]?.trim() ?? null,
+    fin: e.fahrzeug?.fahrgestellnummer ?? null,
+    kennzeichen: e.fahrzeug?.kennzeichen ?? null,
   }
 }
 
@@ -67,6 +72,7 @@ export function VerkauftContent({ verkauft, standardSteuerart = 'differenz', isA
   const [offeneJahre, setOffeneJahre] = useState<Set<number>>(() => new Set([new Date().getFullYear()]))
   const [uebergebenId, setUebergebenId] = useState<string | null>(null)
   const [uebergebenLoading, setUebergebenLoading] = useState(false)
+  const [suche, setSuche] = useState('')
 
   function toggleJahr(jahr: number) {
     setOffeneJahre(prev => {
@@ -122,17 +128,24 @@ export function VerkauftContent({ verkauft, standardSteuerart = 'differenz', isA
     }
   }
 
+  // Suche (Käufer, Kennzeichen, FIN, Modell, B-Nr.)
+  const sichtbar = useMemo(() => {
+    const q = suche.trim().toLowerCase()
+    if (!q) return rows
+    return rows.filter(r => [r.name, r.bnr, r.kaeufer, r.fin, r.kennzeichen].some(v => (v ?? '').toLowerCase().includes(q)))
+  }, [rows, suche])
+
   // Nach Jahr gruppieren
   const jahre = useMemo(() => {
     const map = new Map<number, Row[]>()
-    for (const r of rows) {
+    for (const r of sichtbar) {
       const j = r.verkauftAm ? parseInt(r.verkauftAm.slice(0, 4)) : 0
       if (!map.has(j)) map.set(j, [])
       map.get(j)!.push(r)
     }
     for (const list of map.values()) list.sort((a, b) => (b.verkauftAm ?? '').localeCompare(a.verkauftAm ?? ''))
     return [...map.entries()].sort((a, b) => b[0] - a[0])
-  }, [rows])
+  }, [sichtbar])
 
   function summe(list: Row[]) {
     return list.reduce((acc, r) => {
@@ -217,6 +230,25 @@ export function VerkauftContent({ verkauft, standardSteuerart = 'differenz', isA
         </div>
       )}
 
+      {/* Suche + Hinweis zur Aufbewahrung */}
+      {rows.length > 0 && (
+        <div className="space-y-2">
+          <div className="relative">
+            <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              value={suche} onChange={e => setSuche(e.target.value)}
+              placeholder="Suchen: Käufer, Kennzeichen, FIN, Modell …"
+              className="w-full pl-9 pr-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-300"
+            />
+          </div>
+          <p className="text-xs text-gray-500 flex items-center gap-1.5">
+            <FolderOpen className="w-3.5 h-3.5 text-orange-500 flex-shrink-0" />
+            Die Mappe jedes verkauften Fahrzeugs (Fotos, Dokumente, Rechnungen, Belege) bleibt dauerhaft gespeichert und ist hier über „Mappe“ jederzeit abrufbar.
+          </p>
+          {suche.trim() && sichtbar.length === 0 && <p className="text-sm text-gray-500 px-1">Nichts gefunden.</p>}
+        </div>
+      )}
+
       {/* Leer-State */}
       {rows.length === 0 && (
         <div className="bg-white border border-gray-200 rounded-xl py-16 text-center">
@@ -230,7 +262,7 @@ export function VerkauftContent({ verkauft, standardSteuerart = 'differenz', isA
 
       {/* Jahres-Gruppen als Steuerblatt-Tabellen */}
       {jahre.map(([jahr, list]) => {
-        const offen = offeneJahre.has(jahr)
+        const offen = offeneJahre.has(jahr) || suche.trim() !== ''
         const jSum = summe(list)
         return (
           <div key={jahr} className="bg-white border border-gray-200 rounded-xl overflow-hidden">
@@ -275,6 +307,8 @@ export function VerkauftContent({ verkauft, standardSteuerart = 'differenz', isA
                               <div className="flex items-center gap-2 text-xs text-gray-400">
                                 {r.bnr && <span className="font-mono text-purple-500">{r.bnr}</span>}
                                 {r.status === 'verkauft' && <span className="text-orange-500">⏳ n. übergeben</span>}
+                                {r.kaeufer && <span className="text-gray-500">· {r.kaeufer}</span>}
+                                <Link href={`/fahrzeuge/${r.auftragId}/mappe`} className="inline-flex items-center gap-1 text-blue-600 hover:underline"><FolderOpen className="w-3 h-3" />Mappe</Link>
                               </div>
                             </td>
                             <td className="px-3 py-2.5 text-gray-500 whitespace-nowrap">{fmtDatum(r.verkauftAm)}</td>
@@ -351,6 +385,8 @@ export function VerkauftContent({ verkauft, standardSteuerart = 'differenz', isA
                             <div className="flex items-center gap-2 text-xs text-gray-500 mt-1 flex-wrap">
                               {r.bnr && <span className="font-mono text-purple-600">{r.bnr}</span>}
                               <span className="whitespace-nowrap">{fmtDatum(r.verkauftAm)}</span>
+                              {r.kaeufer && <span>· {r.kaeufer}</span>}
+                              <Link href={`/fahrzeuge/${r.auftragId}/mappe`} className="inline-flex items-center gap-1 text-blue-600 hover:underline"><FolderOpen className="w-3 h-3" />Mappe</Link>
                             </div>
                           </div>
                           {r.status === 'verkauft' && (

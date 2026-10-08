@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { NextRequest, NextResponse } from 'next/server'
 import { generateRechnungsNummer } from '@/lib/nummernvergabe'
 import { syncAuftragEinnahmen } from '@/lib/auftrag-einnahmen'
@@ -203,7 +204,8 @@ export async function POST(req: NextRequest) {
         .insert(betriebsstoffZeilen.map(z => ({ ...z, rechnung_id: rechnung.id })))
       if (zeilenError) {
         console.error('[Rechnung] Betriebsstoffe speichern fehlgeschlagen:', zeilenError)
-        await supabase.from('kunden_rechnungen').delete().eq('id', rechnung.id)
+        // Server-Aufräumen (die Aufbewahrungs-Sperre gilt für Nutzer-Sitzungen, nicht für diesen Rückbau)
+        await createAdminClient().from('kunden_rechnungen').delete().eq('id', rechnung.id)
         throw new Error(`Betriebsstoffe konnten nicht gespeichert werden: ${zeilenError.message}`)
       }
     }

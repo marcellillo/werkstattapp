@@ -27,13 +27,21 @@ export async function POST(req: NextRequest) {
 
     const { data: rechnung, error: rechnungError } = await supabase
       .from('kunden_rechnungen')
-      .select('id, auftrag_id')
+      .select('id, auftrag_id, status')
       .eq('id', rechnungId)
       .eq('betrieb_id', betriebId)
       .maybeSingle()
 
     if (rechnungError) throw rechnungError
     if (!rechnung) return NextResponse.json({ error: 'Rechnung nicht gefunden' }, { status: 404 })
+
+    // Aufbewahrung: bezahlte Rechnungen und Rechnungen verkaufter/übergebener Fahrzeuge nur stornieren (vor dem Entknüpfen prüfen)
+    const AUFBEWAHRUNG = 'Bezahlte Rechnungen und Rechnungen verkaufter bzw. übergebener Fahrzeuge werden aufbewahrt und können nicht gelöscht werden – bitte stattdessen stornieren.'
+    if (rechnung.status === 'bezahlt') return NextResponse.json({ error: AUFBEWAHRUNG }, { status: 409 })
+    if (rechnung.auftrag_id) {
+      const { data: auftrag } = await supabase.from('auftraege').select('status').eq('id', rechnung.auftrag_id).maybeSingle()
+      if (auftrag && ['verkauft', 'ausgeliefert'].includes(auftrag.status)) return NextResponse.json({ error: AUFBEWAHRUNG }, { status: 409 })
+    }
 
     // Verknüpfte Kostenvoranschläge/Werkstattaufträge wieder als "offen" markieren,
     // damit sie in einer künftigen Rechnung erneut ausgewählt werden können.
@@ -63,6 +71,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ erfolg: true })
   } catch (error: any) {
     console.error('[Rechnung Delete] Error:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    if (/AUFBEWAHRUNG/.test(error?.message ?? '')) return NextResponse.json({ error: String(error.message).replace(/^AUFBEWAHRUNG:\s*/, '') }, { status: 409 })
+    return NextResponse.json({ error: 'Rechnung konnte nicht gelöscht werden' }, { status: 500 })
   }
 }

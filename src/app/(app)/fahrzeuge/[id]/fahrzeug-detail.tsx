@@ -2005,12 +2005,19 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
               <Ban className="w-4 h-4" /> Auftrag stornieren
             </button>
           )}
-          <button
-            onClick={() => setLoeschenBestaetigung(true)}
-            className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-red-400 bg-red-600 text-white hover:bg-red-700 text-sm font-medium transition-colors"
-          >
-            <Trash2 className="w-4 h-4" /> Auftrag endgültig löschen
-          </button>
+          {['verkauft', 'ausgeliefert'].includes(auftrag.status) ? (
+            <p className="flex items-center gap-2 text-sm text-gray-600 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5">
+              <FolderOpen className="w-4 h-4 flex-shrink-0 text-orange-500" />
+              Verkaufte bzw. übergebene Fahrzeuge werden samt Auftragsmappe dauerhaft aufbewahrt und können nicht gelöscht werden.
+            </p>
+          ) : (
+            <button
+              onClick={() => setLoeschenBestaetigung(true)}
+              className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-red-400 bg-red-600 text-white hover:bg-red-700 text-sm font-medium transition-colors"
+            >
+              <Trash2 className="w-4 h-4" /> Auftrag endgültig löschen
+            </button>
+          )}
         </div>
       </div>
 
