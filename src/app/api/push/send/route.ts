@@ -2,6 +2,7 @@ export const runtime = 'nodejs'
 
 import { NextRequest, NextResponse } from 'next/server'
 import webpush from 'web-push'
+import { initWebPush } from '@/lib/push-vapid'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { pruefeZugriff } from '@/lib/auftrag-dokumente-server'
 
@@ -17,11 +18,7 @@ export async function POST(req: NextRequest) {
   if (!titel) return NextResponse.json({ error: 'title erforderlich' }, { status: 400 })
   const ziel = typeof url === 'string' && url.startsWith('/') && !url.startsWith('//') ? url : '/dashboard'
 
-  webpush.setVapidDetails(
-    process.env.VAPID_EMAIL!,
-    process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
-    process.env.VAPID_PRIVATE_KEY!,
-  )
+  if (!initWebPush()) return NextResponse.json({ error: 'Push ist nicht konfiguriert' }, { status: 500 })
 
   const admin = createAdminClient()
   const { data: mitglieder } = await admin.from('betrieb_users').select('profile_id').eq('betrieb_id', zugriff.betriebId)

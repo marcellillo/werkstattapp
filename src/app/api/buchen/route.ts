@@ -3,6 +3,7 @@ export const runtime = 'nodejs'
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import webpush from 'web-push'
+import { initWebPush } from '@/lib/push-vapid'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -200,11 +201,7 @@ export async function POST(req: NextRequest) {
 
   // Push-Benachrichtigung an alle abonnierten Geräte senden
   try {
-    webpush.setVapidDetails(
-      process.env.VAPID_EMAIL!,
-      process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
-      process.env.VAPID_PRIVATE_KEY!,
-    )
+    if (!initWebPush()) throw new Error('Push nicht konfiguriert (VAPID)')
     // Nur Mitarbeiter des Ziel-Betriebs benachrichtigen, nicht alle abonnierten
     // Geraete app-weit (push_subscriptions ist pro user_id, nicht pro Betrieb).
     const { data: betriebMitarbeiter } = await supabase.from('betrieb_users').select('profile_id').eq('betrieb_id', defaultBetriebId)
