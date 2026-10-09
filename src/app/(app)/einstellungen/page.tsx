@@ -67,6 +67,7 @@ export default async function EinstellungenPage() {
     firma_hrb: settings?.firma_hrb ?? '',
     firma_amtsgericht: settings?.firma_amtsgericht ?? '',
     firma_stundensatz: settings?.firma_stundensatz ?? '',
+    google_bewertung_url: settings?.google_bewertung_url ?? '',
     firma_kleinunternehmer: settings?.firma_kleinunternehmer ?? '',
     firma_logo: settings?.firma_logo ?? '',
     firma_paypal: settings?.firma_paypal ?? '',
