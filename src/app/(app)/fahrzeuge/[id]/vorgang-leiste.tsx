@@ -5,11 +5,13 @@
 // Rechnungs-Assistent) — es kommt nichts Neues dazu, nur der Weg ist sichtbar und kürzer.
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { Check, ChevronRight, Loader2, FolderOpen, PackagePlus } from 'lucide-react'
+import { Check, ChevronRight, Loader2, FolderOpen, PackagePlus, Send } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import type { FahrzeugStatus } from '@/types/database'
 import { LeistungspaketDialog } from './leistungspaket-dialog'
+import { FreigabeDialog } from './freigabe-dialog'
+import { useBetrieb } from '@/lib/betrieb-context'
 
 interface Props {
   auftragId: string
@@ -24,6 +26,8 @@ interface Props {
   onKostenvoranschlagErstellt: () => void
   /** nach Übernahme eines Leistungspakets: Kostenvoranschlag/Werkstattauftrag neu laden */
   onPaketUebernommen: () => void
+  kunde?: any
+  fahrzeugName?: string
 }
 
 type SchrittZustand = 'erledigt' | 'aktuell' | 'offen'
@@ -46,7 +50,8 @@ const SCHRITTE_EIGEN: Schritt[] = [
 
 const euro = (n: number) => n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
 
-export function VorgangLeiste({ auftragId, fahrzeugId, betriebId, status, istEigenfahrzeug, aktualisierung, onStatus, onVerkaufen, onKostenvoranschlagErstellt, onPaketUebernommen }: Props) {
+export function VorgangLeiste({ auftragId, fahrzeugId, betriebId, status, istEigenfahrzeug, aktualisierung, onStatus, onVerkaufen, onKostenvoranschlagErstellt, onPaketUebernommen, kunde, fahrzeugName = '' }: Props) {
+  const { currentBetrieb } = useBetrieb()
   const supabase = useMemo(() => createClient(), [])
   const [kva, setKva] = useState<{ anzahl: number; offen: number }>({ anzahl: 0, offen: 0 })
   const [wa, setWa] = useState<{ anzahl: number; offen: number }>({ anzahl: 0, offen: 0 })
@@ -56,6 +61,8 @@ export function VorgangLeiste({ auftragId, fahrzeugId, betriebId, status, istEig
   const [fehler, setFehler] = useState<string | null>(null)
   const [tick, setTick] = useState(0)
   const [paketOffen, setPaketOffen] = useState(false)
+  const [freigabeOffen, setFreigabeOffen] = useState(false)
+  const [kvaOffen, setKvaOffen] = useState<any | null>(null)   // neuester noch nicht abgerechneter Kostenvoranschlag
   useEffect(() => {
     const neu = () => setTick(t => t + 1)
     window.addEventListener('focus', neu)
@@ -66,12 +73,13 @@ export function VorgangLeiste({ auftragId, fahrzeugId, betriebId, status, istEig
     let aktiv = true
     ;(async () => {
       const [k, w, r] = await Promise.all([
-        supabase.from('kostenvoranschlaege').select('id, rechnung_id').eq('betrieb_id', betriebId).eq('auftrag_id', auftragId),
+        supabase.from('kostenvoranschlaege').select('id, rechnung_id, status, freigabe_gesendet_am, freigegeben_am, freigegeben_name, freigegeben_betrag, freigabe_hinweis, created_at').eq('betrieb_id', betriebId).eq('auftrag_id', auftragId).order('created_at', { ascending: false }),
         supabase.from('werkstattauftraege').select('id, rechnung_id').eq('betrieb_id', betriebId).eq('auftrag_id', auftragId),
         supabase.from('kunden_rechnungen').select('rechnungs_nr, status, betrag_brutto').eq('betrieb_id', betriebId).eq('auftrag_id', auftragId).order('erstellt_am'),
       ])
       if (!aktiv) return
       setKva({ anzahl: k.data?.length ?? 0, offen: (k.data ?? []).filter(x => !x.rechnung_id).length })
+      setKvaOffen((k.data ?? []).find(x => !x.rechnung_id) ?? null)
       setWa({ anzahl: w.data?.length ?? 0, offen: (w.data ?? []).filter(x => !x.rechnung_id).length })
       setRechnungen((r.data ?? []).filter(x => x.status !== 'storniert').map(x => ({ nr: x.rechnungs_nr, status: x.status, brutto: Number(x.betrag_brutto) || 0 })))
       setGeladen(true)
@@ -121,6 +129,16 @@ export function VorgangLeiste({ auftragId, fahrzeugId, betriebId, status, istEig
       setErstellt(false)
     }
   }
+
+  const freigabeText = (() => {
+    if (!kvaOffen || kvaOffen.status !== 'akzeptiert') return ''
+    const teile = [
+      kvaOffen.freigegeben_name,
+      kvaOffen.freigegeben_am && new Date(kvaOffen.freigegeben_am).toLocaleDateString('de-DE'),
+      kvaOffen.freigegeben_betrag != null && euro(Number(kvaOffen.freigegeben_betrag)),
+    ].filter(Boolean)
+    return 'Vom Kunden freigegeben' + (teile.length ? ` (${teile.join(', ')})` : '')
+  })()
 
   // ── nächster Schritt: Text + Aktion ──
   type Aktion =
@@ -252,6 +270,34 @@ export function VorgangLeiste({ auftragId, fahrzeugId, betriebId, status, istEig
               )}
             </div>
           </div>
+        )}
+        {!istEigenfahrzeug && geladen && kvaOffen && !['ausgeliefert', 'verkauft'].includes(status) && (
+          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+            {kvaOffen.status === 'akzeptiert' ? (
+              <span className="inline-flex items-center gap-1.5 text-emerald-700 font-medium">
+                <Check className="w-4 h-4" /> {freigabeText}
+              </span>
+            ) : kvaOffen.status === 'abgelehnt' ? (
+              <span className="text-amber-700">Rückfrage vom Kunden{kvaOffen.freigabe_hinweis ? `: „${kvaOffen.freigabe_hinweis}“` : ''}</span>
+            ) : kvaOffen.status === 'gesendet' ? (
+              <span className="text-slate-500">Freigabe angefragt{kvaOffen.freigabe_gesendet_am ? ` am ${new Date(kvaOffen.freigabe_gesendet_am).toLocaleDateString('de-DE')}` : ''} — wartet auf den Kunden</span>
+            ) : null}
+            {kvaOffen.status !== 'akzeptiert' && (
+              <button type="button" onClick={() => setFreigabeOffen(true)} className="inline-flex items-center gap-1.5 font-medium text-slate-600 hover:text-orange-600 transition-colors">
+                <Send className="w-4 h-4" /> {kvaOffen.status === 'gesendet' || kvaOffen.status === 'abgelehnt' ? 'Link erneut senden' : 'Zur Freigabe an den Kunden senden'}
+              </button>
+            )}
+          </div>
+        )}
+        {freigabeOffen && kvaOffen && (
+          <FreigabeDialog
+            kostenvoranschlagId={kvaOffen.id}
+            kunde={kunde}
+            fahrzeugName={fahrzeugName}
+            firmaName={currentBetrieb?.name ?? ''}
+            onClose={() => setFreigabeOffen(false)}
+            onGesendet={() => setTick(t => t + 1)}
+          />
         )}
         {!istEigenfahrzeug && geladen && !['fertig', 'ausgeliefert', 'verkauft'].includes(status) && (
           <button type="button" onClick={() => setPaketOffen(true)} className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-slate-600 hover:text-orange-600 transition-colors">

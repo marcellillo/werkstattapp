@@ -689,6 +689,8 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
         onVerkaufen={() => setShowVerkaufenModal(true)}
         onKostenvoranschlagErstellt={() => { setKvRefreshSignal(n => n + 1); setDokumenteBlockKey(n => n + 1) }}
         onPaketUebernommen={() => { setKvRefreshSignal(n => n + 1); setDokumenteBlockKey(n => n + 1) }}
+        kunde={auftrag.kunde}
+        fahrzeugName={`${(auftrag.fahrzeug as any)?.marke ?? ''} ${(auftrag.fahrzeug as any)?.modell ?? ''}`.trim()}
       />
 
       {/* Schnellaktionen */}

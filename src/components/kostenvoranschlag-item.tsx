@@ -169,7 +169,7 @@ export function KostenvoranschlagItem({ kostenvoranschlag, betriebId, onDelete }
           <ChevronDown className={`w-5 h-5 transition ${expanded ? 'rotate-180' : ''}`} />
           <div>
             <p className="font-medium">Kostenvoranschlag {kostenvoranschlag.id?.slice(0, 8)}</p>
-            <p className="text-sm text-slate-600">{kostenvoranschlag.status || 'entwurf'}</p>
+            <p className={`text-sm ${kostenvoranschlag.status === 'akzeptiert' ? 'text-emerald-700 font-medium' : kostenvoranschlag.status === 'abgelehnt' ? 'text-amber-700' : 'text-slate-600'}`}>{({ entwurf: 'Entwurf', gesendet: 'Zur Freigabe gesendet', akzeptiert: '✓ Vom Kunden freigegeben', abgelehnt: 'Rückfrage vom Kunden' } as Record<string, string>)[kostenvoranschlag.status || 'entwurf'] ?? kostenvoranschlag.status}</p>
           </div>
         </button>
         <div className="flex gap-2">

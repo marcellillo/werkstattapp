@@ -35,6 +35,9 @@ export async function proxy(request: NextRequest) {
     // Datenquelle der öffentlichen Kunden-Statusseite (/status/[id]); ohne diese Freigabe wurden
     // nicht angemeldete Kunden zur Login-Seite umgeleitet und sahen nie ihren Auftragsstatus
     request.nextUrl.pathname.startsWith('/api/status/') ||
+    // Kunden-Freigabe des Kostenvoranschlags per Link (Berechtigung = geheimes Token im Link)
+    request.nextUrl.pathname.startsWith('/freigabe/') ||
+    request.nextUrl.pathname.startsWith('/api/freigabe/') ||
     request.nextUrl.pathname.startsWith('/api/invitations/get') ||
     request.nextUrl.pathname.startsWith('/api/invitations/accept') ||
     // Cron-Aufrufe haben keine Nutzer-Session; die Route prüft das CRON_SECRET selbst

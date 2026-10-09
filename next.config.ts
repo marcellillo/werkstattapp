@@ -59,6 +59,15 @@ const nextConfig: NextConfig = {
         source: '/api/:path*',
         headers: [{ key: 'Cache-Control', value: 'private, no-store' }],
       },
+      {
+        // Seite mit dem Kunden-Link: nicht zwischenspeichern, nicht in Suchmaschinen
+        source: '/freigabe/:path*',
+        headers: [
+          { key: 'Cache-Control', value: 'private, no-store' },
+          { key: 'X-Robots-Tag', value: 'noindex, nofollow' },
+          { key: 'Referrer-Policy', value: 'no-referrer' },
+        ],
+      },
     ]
   },
   // @sparticuz/chromium liefert vorkompilierte Binärdateien (.br) aus, die an ihrem
