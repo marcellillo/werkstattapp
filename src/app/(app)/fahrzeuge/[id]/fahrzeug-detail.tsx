@@ -20,6 +20,7 @@ import { SupplierInvoices } from './supplier-invoices'
 import { KostenvoranschlagSection } from './kostenvoranschlag-section'
 import { WerkstattauftragSection } from './werkstattauftrag-section'
 import { RechnungSection } from './rechnung-section'
+import { VorgangLeiste } from './vorgang-leiste'
 import { LieferscheinQuickScan } from '@/components/lieferschein-quick-scan'
 import { LieferscheinGalerie } from '@/components/lieferschein-galerie'
 import { AuftragDokumente } from '@/components/auftrag-dokumente'
@@ -120,6 +121,11 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
   const router = useRouter()
 
   const isEigenfahrzeug = (auftrag.fahrzeug as any)?.fahrzeug_typ === 'eigen'
+
+  // Kommt die Frage "Auf welcher Bühne steht das Fahrzeug?" (z. B. nach dem Knopf in der Vorgangs-Leiste), dorthin scrollen
+  useEffect(() => {
+    if (buehneWarnung) setTimeout(() => document.getElementById('buehne-warnung')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100)
+  }, [buehneWarnung])
 
   const CHECKLISTE_FERTIG = isEigenfahrzeug ? [
     { id: 'arbeiten', label: 'Alle Aufbereitungsarbeiten erledigt' },
@@ -658,24 +664,37 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
         )}
       </div>
 
+      {/* Vorgang: wo steht der Auftrag, was ist der nächste Schritt? */}
+      <VorgangLeiste
+        auftragId={auftrag.id}
+        fahrzeugId={(auftrag.fahrzeug as any)?.id}
+        betriebId={betriebId}
+        status={auftrag.status}
+        istEigenfahrzeug={isEigenfahrzeug}
+        aktualisierung={kvRefreshSignal}
+        onStatus={handleStatusChange}
+        onVerkaufen={() => setShowVerkaufenModal(true)}
+        onKostenvoranschlagErstellt={() => setKvRefreshSignal(n => n + 1)}
+      />
+
       {/* Schnellaktionen */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-        <Link href={`/fahrzeuge/${auftrag.id}/mappe`} className="flex items-center gap-3 px-4 py-3 rounded-xl border border-orange-200 bg-orange-50 text-orange-700 hover:bg-orange-100 hover:border-orange-300 transition-colors font-semibold text-sm">
+      <div className="flex flex-wrap gap-2">
+        <Link href={`/fahrzeuge/${auftrag.id}/mappe`} className="flex items-center gap-2 px-3 py-2 rounded-lg border border-orange-200 bg-orange-50 text-orange-700 hover:bg-orange-100 hover:border-orange-300 transition-colors font-semibold text-sm">
           <FolderOpen className="w-4 h-4 flex-shrink-0" /> Auftragsmappe
         </Link>
-        <Link href={`/fahrzeuge/${auftrag.id}/annahme`} className="flex items-center gap-3 px-4 py-3 rounded-xl border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:border-blue-300 transition-colors text-sm">
+        <Link href={`/fahrzeuge/${auftrag.id}/annahme`} className="flex items-center gap-2 px-3 py-2 rounded-lg border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:border-blue-300 transition-colors text-xs sm:text-sm">
           <ClipboardCheck className="w-4 h-4 flex-shrink-0" /> Annahmeprotokoll
         </Link>
-        <Link href={`/fahrzeuge/${auftrag.id}/fotos`} className="flex items-center gap-3 px-4 py-3 rounded-xl border border-purple-200 bg-purple-50 text-purple-700 hover:bg-purple-100 hover:border-purple-300 transition-colors text-sm">
+        <Link href={`/fahrzeuge/${auftrag.id}/fotos`} className="flex items-center gap-2 px-3 py-2 rounded-lg border border-purple-200 bg-purple-50 text-purple-700 hover:bg-purple-100 hover:border-purple-300 transition-colors text-xs sm:text-sm">
           <Camera className="w-4 h-4 flex-shrink-0" /> Fotos
         </Link>
-        <a href="#dokumente" className="flex items-center gap-3 px-4 py-3 rounded-xl border border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100 hover:border-sky-300 transition-colors text-sm">
+        <a href="#dokumente" className="flex items-center gap-2 px-3 py-2 rounded-lg border border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100 hover:border-sky-300 transition-colors text-xs sm:text-sm">
           <FileText className="w-4 h-4 flex-shrink-0" /> Dokumente (PDF)
         </a>
-        <Link href={`/fahrzeuge/${auftrag.id}/protokoll`} target="_blank" className="flex items-center gap-3 px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100 hover:border-gray-300 transition-colors text-sm">
+        <Link href={`/fahrzeuge/${auftrag.id}/protokoll`} target="_blank" className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100 hover:border-gray-300 transition-colors text-xs sm:text-sm">
           <Printer className="w-4 h-4 flex-shrink-0" /> Werkstattprotokoll
         </Link>
-        <Link href={`/fahrzeuge/${auftrag.id}/rechnung`} target="_blank" className="flex items-center gap-3 px-4 py-3 rounded-xl border border-green-200 bg-green-50 text-green-700 hover:bg-green-100 hover:border-green-300 transition-colors text-sm">
+        <Link href={`/fahrzeuge/${auftrag.id}/rechnung`} target="_blank" className="flex items-center gap-2 px-3 py-2 rounded-lg border border-green-200 bg-green-50 text-green-700 hover:bg-green-100 hover:border-green-300 transition-colors text-xs sm:text-sm">
           <Receipt className="w-4 h-4 flex-shrink-0" /> Rechnung
         </Link>
         <button
@@ -689,7 +708,7 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
               setTimeout(() => setLinkKopiert(false), 2500)
             }
           }}
-          className="flex items-center gap-3 px-4 py-3 rounded-xl border border-teal-200 bg-teal-50 text-teal-700 hover:bg-teal-100 hover:border-teal-300 transition-colors text-sm"
+          className="flex items-center gap-2 px-3 py-2 rounded-lg border border-teal-200 bg-teal-50 text-teal-700 hover:bg-teal-100 hover:border-teal-300 transition-colors text-xs sm:text-sm"
         >
           {linkKopiert ? <Check className="w-4 h-4 flex-shrink-0" /> : <Share2 className="w-4 h-4 flex-shrink-0" />}
           {linkKopiert ? 'Link kopiert!' : 'Status-Link'}
@@ -1740,7 +1759,7 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
               )}
 
               {buehneWarnung && (
-                <div className="mt-2 bg-yellow-50 border border-yellow-300 rounded-xl p-4 space-y-3">
+                <div id="buehne-warnung" className="mt-2 bg-yellow-50 border border-yellow-300 rounded-xl p-4 space-y-3">
                   <div className="flex items-start gap-2">
                     <span className="text-xl leading-none">⚠️</span>
                     <div>
@@ -2021,6 +2040,17 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
         </div>
       </div>
 
+      {/* Kostenvoranschlag, Werkstattauftrag, Rechnungen */}
+      <div id="vorgang-dokumente" className="space-y-6 mt-6 scroll-mt-20">
+        {betriebId && (
+          <>
+            <KostenvoranschlagSection auftragId={auftrag.id} betriebId={betriebId} fahrzeugId={(auftrag.fahrzeug as any)?.id} refreshSignal={kvRefreshSignal} />
+            <WerkstattauftragSection auftragId={auftrag.id} betriebId={betriebId} fahrzeugId={(auftrag.fahrzeug as any)?.id} />
+            <RechnungSection auftragId={auftrag.id} betriebId={betriebId} fahrzeugId={(auftrag.fahrzeug as any)?.id} />
+          </>
+        )}
+      </div>
+
       {/* Dokumente & Dateien (CarVertical, Gutachten, ...) */}
       <Card className="border-slate-200 mt-6">
         <CardContent className="p-6">
@@ -2054,17 +2084,6 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
           />
         </CardContent>
       </Card>
-
-      {/* Kostenvoranschlag, Werkstattauftrag, Rechnungen */}
-      <div className="space-y-6 mt-6">
-        {betriebId && (
-          <>
-            <KostenvoranschlagSection auftragId={auftrag.id} betriebId={betriebId} fahrzeugId={(auftrag.fahrzeug as any)?.id} refreshSignal={kvRefreshSignal} />
-            <WerkstattauftragSection auftragId={auftrag.id} betriebId={betriebId} fahrzeugId={(auftrag.fahrzeug as any)?.id} />
-            <RechnungSection auftragId={auftrag.id} betriebId={betriebId} fahrzeugId={(auftrag.fahrzeug as any)?.id} />
-          </>
-        )}
-      </div>
 
       {/* Verkaufen Modal */}
       {showVerkaufenModal && (

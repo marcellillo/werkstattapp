@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { Sidebar } from '@/components/layout/sidebar'
 import { Topbar } from '@/components/layout/topbar'
@@ -60,7 +60,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
         'fixed lg:sticky lg:top-0 lg:h-screen inset-y-0 left-0 z-50 lg:z-auto transition-transform duration-300 hidden lg:block lg:flex-shrink-0',
         sidebarOpen ? 'translate-x-0 !block' : '-translate-x-full lg:translate-x-0'
       )}>
-        <Sidebar />
+        <Suspense fallback={null}><Sidebar /></Suspense>
       </div>
 
       <div className="flex flex-col flex-1 min-w-0">
@@ -74,7 +74,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
         </main>
       </div>
 
-      <BottomNav />
+      <Suspense fallback={null}><BottomNav /></Suspense>
     </div>
   )
 }

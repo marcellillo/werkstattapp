@@ -1,77 +1,17 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
-  LayoutDashboard, Car, Users, Package, Calendar,
-  Bell, Settings, LogOut, BarChart2,
-  Mail, CalendarClock, Layers, Receipt, History, BookOpen,
-  ShieldAlert, Wrench, ClipboardCheck, Lock, ChevronDown, Droplets
+  Settings, LogOut, Users, ChevronDown, MoreHorizontal
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useRollen } from '@/lib/rollen-context'
 import { useBetrieb } from '@/lib/betrieb-context'
 import { useBenachrichtigungenAnzahl } from '@/hooks/use-benachrichtigungen-anzahl'
-
-const navGroupsTemplate = [
-  {
-    label: 'Tagesbetrieb',
-    items: [
-      { href: '/dashboard',   label: 'Dashboard',   icon: LayoutDashboard, key: 'dashboard' },
-      { href: '/hebebuehnen', label: 'Hebebühnen',  icon: Layers,          key: 'hebebuehnen' },
-      { href: '/annahme',     label: 'Annahme',     icon: ClipboardCheck,  key: 'annahme' },
-      { href: '/fahrzeuge',   label: 'Fahrzeuge',   icon: Car,             key: 'fahrzeuge' },
-      { href: '/termine',     label: 'Termine',     icon: CalendarClock,   key: 'termine' },
-    ],
-  },
-  {
-    label: 'Eigenfahrzeuge',
-    items: [
-      { href: '/fahrzeuge/bestand',    label: '📥 Bestand-Import',      icon: Package, key: 'fahrzeuge' },
-      { href: '/fahrzeuge/verkauft',   label: '💰 Verkaufte Fahrzeuge', icon: Package, key: 'fahrzeuge' },
-      { href: '/fahrzeuge/uebergeben', label: '✅ Übergeben',           icon: Package, key: 'fahrzeuge' },
-    ],
-  },
-  {
-    label: 'Kunden & Lager',
-    items: [
-      { href: '/kunden', label: 'Kunden', icon: Users,   key: 'kunden' },
-      { href: '/teile',  label: 'Lager',  icon: Package, key: 'teile' },
-      { href: '/betriebsstoffe', label: 'Betriebsstoffe', icon: Droplets, key: 'betriebsstoffe' },
-    ],
-  },
-  {
-    label: 'Wecker',
-    items: [
-      { href: '/tuev-wecker',    label: 'TÜV-Wecker',    icon: ShieldAlert, key: 'tuev_wecker' },
-      { href: '/service-wecker', label: 'Service-Wecker', icon: Wrench,      key: 'service_wecker' },
-      { href: '/kalender',       label: 'Kalender',       icon: Calendar,    key: 'kalender' },
-    ],
-  },
-  {
-    label: 'Finanzen',
-    items: [
-      { href: '/rechnungen',  label: 'Rechnungen',  icon: Receipt,  key: 'rechnungen' },
-      { href: '/buchhaltung', label: 'Buchhaltung', icon: BookOpen, key: 'buchhaltung' },
-    ],
-  },
-  {
-    label: 'Kommunikation',
-    items: [
-      { href: '/emails',             label: 'E-Mails',            icon: Mail,     key: 'emails' },
-      { href: '/benachrichtigungen', label: 'Benachrichtigungen', icon: Bell,     key: 'benachrichtigungen' },
-    ],
-  },
-  {
-    label: 'Auswertung',
-    items: [
-      { href: '/statistiken', label: 'Statistiken', icon: BarChart2, key: 'statistiken' },
-      { href: '/verlauf',     label: 'Verlauf',     icon: History,   key: 'verlauf' },
-    ],
-  },
-]
+import { NAV_HAUPT, NAV_MEHR, NAV_ALLE_MEHR, sichtbar, type NavItem } from '@/lib/nav-config'
 
 export function Sidebar() {
   const pathname = usePathname()
@@ -82,36 +22,48 @@ export function Sidebar() {
   const benAnzahl = useBenachrichtigungenAnzahl()
   const [dropdownOpen, setDropdownOpen] = useState(false)
 
-  // Filter navGroups basierend auf enabled Features
-  // Note: Einstellungen & Admin sind immer sichtbar (werden nicht gefiltert)
-  const navGroups = navGroupsTemplate.filter(group => {
-    // Immer anzeigen
-    if (group.label === 'Kunden & Lager') return true
-    if (group.label === 'Finanzen') return true // Immer anzeigen
-    if (group.label === 'Auswertung') return true // Immer anzeigen
-    if (group.label === 'Wecker' && group.items.some(i => i.key === 'kalender')) {
-      return isFeatureEnabled('kalender') || group.items.some(i => i.key !== 'kalender')
-    }
-    return true
-  }).map(group => {
-    if (group.label === 'Wecker') {
-      return {
-        ...group,
-        items: group.items.filter(item =>
-          item.key !== 'kalender' || isFeatureEnabled('kalender')
-        )
-      }
-    }
-    if (group.label === 'Kunden & Lager') {
-      return {
-        ...group,
-        items: group.items.filter(item =>
-          item.label !== 'Lager' || isFeatureEnabled('teile_bestellen')
-        )
-      }
-    }
-    return group
-  })
+  const tab = useSearchParams().get('tab')
+  const [mehrOffen, setMehrOffen] = useState(false)
+  useEffect(() => {
+    try { setMehrOffen(localStorage.getItem('nav-mehr-offen') === '1') } catch { /* Speicher nicht verfügbar */ }
+  }, [])
+  const sichtbarFn = (i: NavItem) => !loading && sichtbar(i, kannZugreifen, isFeatureEnabled)
+  const hauptItems = NAV_HAUPT.filter(sichtbarFn)
+  const mehrGruppen = NAV_MEHR
+    .map(g => ({ ...g, items: g.items.filter(sichtbarFn) }))
+    .filter(g => g.items.length > 0)
+  // Ist man gerade auf einer Seite aus "Weitere Funktionen", bleibt der Bereich offen
+  const mehrAktiv = NAV_ALLE_MEHR.some(i => sichtbarFn(i) && i.aktiv(pathname, tab))
+  const mehrZeigen = mehrOffen || mehrAktiv
+  function mehrUmschalten() {
+    const neu = !mehrOffen
+    setMehrOffen(neu)
+    try { localStorage.setItem('nav-mehr-offen', neu ? '1' : '0') } catch { /* egal */ }
+  }
+
+  const navLink = ({ href, label, icon: Icon, badge, aktiv }: NavItem) => {
+    const active = aktiv(pathname, tab)
+    return (
+      <Link
+        key={href}
+        href={href}
+        className={cn(
+          'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all',
+          active ? 'bg-orange-500 text-white shadow-sm' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100'
+        )}
+      >
+        <div className="relative flex-shrink-0">
+          <Icon className="w-[18px] h-[18px]" />
+          {badge === 'benachrichtigungen' && benAnzahl > 0 && (
+            <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-0.5">
+              {benAnzahl > 99 ? '99+' : benAnzahl}
+            </span>
+          )}
+        </div>
+        <span className="flex-1 leading-none">{label}</span>
+      </Link>
+    )
+  }
 
   async function handleSignOut() {
     await supabase.auth.signOut()
@@ -165,46 +117,32 @@ export function Sidebar() {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-3 py-3 overflow-y-auto space-y-4">
-        {navGroups.map(group => {
-          const visibleItems = loading ? [] : group.items.filter(i => kannZugreifen(i.key))
-          if (visibleItems.length === 0) return null
-          return (
-            <div key={group.label}>
-              <p className="px-3 mb-1.5 text-[11px] font-bold uppercase tracking-widest text-slate-400 select-none border-t border-slate-800 pt-3">
-                {group.label}
-              </p>
-              <div className="space-y-0.5">
-                {visibleItems.map(({ href, label, icon: Icon, key }) => {
-                  const active = pathname === href || pathname.startsWith(href + '/')
-                  const isBell = key === 'benachrichtigungen'
-                  return (
-                    <Link
-                      key={href}
-                      href={href}
-                      className={cn(
-                        'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all',
-                        active
-                          ? 'bg-orange-500 text-white shadow-sm'
-                          : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100'
-                      )}
-                    >
-                      <div className="relative flex-shrink-0">
-                        <Icon className="w-[18px] h-[18px]" />
-                        {isBell && benAnzahl > 0 && (
-                          <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-0.5">
-                            {benAnzahl > 99 ? '99+' : benAnzahl}
-                          </span>
-                        )}
-                      </div>
-                      <span className="flex-1 leading-none">{label}</span>
-                    </Link>
-                  )
-                })}
+      <nav className="flex-1 px-3 py-3 overflow-y-auto space-y-1">
+        <div className="space-y-0.5">{hauptItems.map(navLink)}</div>
+
+        {mehrGruppen.length > 0 && (
+          <div className="pt-3 mt-3 border-t border-slate-800">
+            <button
+              onClick={mehrUmschalten}
+              className="flex w-full items-center gap-3 px-3 py-2 rounded-lg text-xs font-semibold uppercase tracking-widest text-slate-400 hover:text-slate-200 hover:bg-slate-900 transition-colors"
+              aria-expanded={mehrZeigen}
+            >
+              <MoreHorizontal className="w-[18px] h-[18px]" />
+              <span className="flex-1 text-left">Weitere Funktionen</span>
+              <ChevronDown className={cn('w-4 h-4 transition-transform', mehrZeigen && 'rotate-180')} />
+            </button>
+            {mehrZeigen && (
+              <div className="mt-2 space-y-3">
+                {mehrGruppen.map(g => (
+                  <div key={g.label}>
+                    <p className="px-3 mb-1 text-[10px] font-bold uppercase tracking-widest text-slate-500 select-none">{g.label}</p>
+                    <div className="space-y-0.5">{g.items.map(navLink)}</div>
+                  </div>
+                ))}
               </div>
-            </div>
-          )
-        })}
+            )}
+          </div>
+        )}
       </nav>
 
       {/* Admin & Footer */}
