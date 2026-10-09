@@ -279,7 +279,7 @@ export function WerkstattauftragItem({ werkstattauftrag, betriebId, onDelete }: 
                         <tr key={pos.id} className="border-b hover:bg-slate-50">
                           <td className="py-2 px-2">{pos.beschreibung}</td>
                           <td className="text-right py-2 px-2">{pos.menge} h</td>
-                          <td className="text-right py-2 px-2">{(pos.einzelpreis || 0).toFixed(2)} €</td>
+                          <td className="text-right py-2 px-2">{(pos.einzelpreis || 0).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</td>
                           <td className="text-right py-2 px-2 font-medium text-blue-600">{(pos.gesamtpreis || 0).toFixed(2)} €</td>
                           <td className="text-center py-2 px-2">
                             <button

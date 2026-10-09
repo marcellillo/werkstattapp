@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { generateKostenvoranschlagNummer } from '@/lib/nummernvergabe'
+import { serverFehler } from '@/lib/api-fehler'
 
 export async function POST(req: NextRequest) {
   try {
@@ -72,7 +73,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ kostenvoranschlag })
   } catch (error: any) {
     console.error('[Kostenvoranschlag Create] Full Error:', error)
-    const message = error?.message || JSON.stringify(error)
-    return NextResponse.json({ error: `${message}` }, { status: 500 })
+    return serverFehler(error, 'kostenvoranschlag/create')
   }
 }

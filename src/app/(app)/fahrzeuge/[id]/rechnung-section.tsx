@@ -221,7 +221,7 @@ export function RechnungSection({ auftragId, betriebId }: Props) {
                     <p className="text-sm text-slate-600">🔧 Werkstatt • {rechnung.status}</p>
                   </div>
                   <div className="flex gap-2 items-center">
-                    <p className="font-semibold mr-2">{(rechnung.betrag_brutto || 0).toFixed(2)} €</p>
+                    <p className="font-semibold mr-2">{(rechnung.betrag_brutto || 0).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</p>
                     <Button
                       size="sm"
                       variant="ghost"
@@ -269,7 +269,7 @@ export function RechnungSection({ auftragId, betriebId }: Props) {
                       <p className="text-xs text-slate-500">Storniert</p>
                     </div>
                     <div className="flex gap-2 items-center">
-                      <p className="font-medium mr-2 text-sm">{(rechnung.betrag_brutto || 0).toFixed(2)} €</p>
+                      <p className="font-medium mr-2 text-sm">{(rechnung.betrag_brutto || 0).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</p>
                       <Button
                         size="sm"
                         variant="ghost"

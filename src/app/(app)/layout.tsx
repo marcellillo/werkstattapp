@@ -23,6 +23,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/hebebuehnen': 'Hebebühnen verwalten',
   '/teile': 'Lager',
   '/betriebsstoffe': 'Betriebsstoffe',
+  '/leistungspakete': 'Leistungspakete',
   '/kalender': 'Kalender',
   '/termine': 'Termine',
   '/kunden': 'Kunden',

@@ -295,7 +295,7 @@ export function KostenvoranschlagDetailsModal({ kostenvoranschlagId, betriebId, 
                           className="w-full px-2 py-1 border rounded text-right"
                         />
                       </td>
-                      <td className="py-2 text-right pr-2">{(pos.gesamtpreis || 0).toFixed(2)}</td>
+                      <td className="py-2 text-right pr-2">{(pos.gesamtpreis || 0).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                       <td className="py-2">
                         <button
                           onClick={() => handleRemovePosition(idx)}
@@ -346,15 +346,15 @@ export function KostenvoranschlagDetailsModal({ kostenvoranschlagId, betriebId, 
             <div className="bg-slate-100 p-4 rounded-lg space-y-2">
               <div className="flex justify-between">
                 <span>Summe Netto:</span>
-                <span className="font-medium">{totals.summeNetto.toFixed(2)} €</span>
+                <span className="font-medium">{totals.summeNetto.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</span>
               </div>
               <div className="flex justify-between">
                 <span>MwSt. (19%):</span>
-                <span className="font-medium">{totals.mwst.toFixed(2)} €</span>
+                <span className="font-medium">{totals.mwst.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</span>
               </div>
               <div className="flex justify-between text-lg font-bold border-t pt-2">
                 <span>Summe Brutto:</span>
-                <span>{totals.summeBrutto.toFixed(2)} €</span>
+                <span>{totals.summeBrutto.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</span>
               </div>
             </div>
           </div>

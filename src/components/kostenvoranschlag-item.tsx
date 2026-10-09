@@ -314,7 +314,7 @@ export function KostenvoranschlagItem({ kostenvoranschlag, betriebId, onDelete }
                     </div>
                     {festpreis > 0 && (
                       <div className="text-sm font-medium text-blue-600 pt-2 border-t border-blue-200">
-                        ✓ Ersatzteile in Rechnung: {festpreis.toFixed(2)} €
+                        ✓ Ersatzteile in Rechnung: {festpreis.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
                       </div>
                     )}
                   </div>
@@ -346,8 +346,8 @@ export function KostenvoranschlagItem({ kostenvoranschlag, betriebId, onDelete }
                             <tr key={pos.id} className="border-b hover:bg-slate-50">
                               <td className="py-2 px-2">{pos.beschreibung}</td>
                               <td className="text-right py-2 px-2">{pos.menge || 1}</td>
-                              <td className="text-right py-2 px-2">{(pos.einzelpreis || 0).toFixed(2)} €</td>
-                              <td className="text-right py-2 px-2">{(pos.gesamtpreis ?? (pos.menge || 1) * (pos.einzelpreis || 0)).toFixed(2)} €</td>
+                              <td className="text-right py-2 px-2">{(pos.einzelpreis || 0).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</td>
+                              <td className="text-right py-2 px-2">{(pos.gesamtpreis ?? (pos.menge || 1) * (pos.einzelpreis || 0)).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</td>
                               <td className="text-center py-2 px-2">
                                 <button
                                   onClick={() => handleDeletePosition(pos.id)}
@@ -360,7 +360,7 @@ export function KostenvoranschlagItem({ kostenvoranschlag, betriebId, onDelete }
                           ))}
                           <tr className="font-bold bg-green-100">
                             <td className="py-2 px-2" colSpan={3}>Summe Ersatzteile:</td>
-                            <td className="text-right py-2 px-2">{ersatzteile_summe.toFixed(2)} €</td>
+                            <td className="text-right py-2 px-2">{ersatzteile_summe.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</td>
                             <td></td>
                           </tr>
                         </tbody>
@@ -415,7 +415,7 @@ export function KostenvoranschlagItem({ kostenvoranschlag, betriebId, onDelete }
               <div className="bg-slate-100 p-3 rounded text-sm border-l-4 border-slate-400">
                 <p>
                   <strong>Modus:</strong> {modus === 'festpreis' ? '💰 Festpreis' : '📋 Einzeln'} |
-                  <strong className="ml-3">Ersatzteile gesamt:</strong> {gesamtsumme.toFixed(2)} €
+                  <strong className="ml-3">Ersatzteile gesamt:</strong> {gesamtsumme.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
                 </p>
               </div>
             </>

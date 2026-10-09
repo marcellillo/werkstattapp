@@ -5,10 +5,11 @@
 // Rechnungs-Assistent) — es kommt nichts Neues dazu, nur der Weg ist sichtbar und kürzer.
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { Check, ChevronRight, Loader2, FolderOpen } from 'lucide-react'
+import { Check, ChevronRight, Loader2, FolderOpen, PackagePlus } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import type { FahrzeugStatus } from '@/types/database'
+import { LeistungspaketDialog } from './leistungspaket-dialog'
 
 interface Props {
   auftragId: string
@@ -21,6 +22,8 @@ interface Props {
   onStatus: (s: FahrzeugStatus) => void
   onVerkaufen: () => void
   onKostenvoranschlagErstellt: () => void
+  /** nach Übernahme eines Leistungspakets: Kostenvoranschlag/Werkstattauftrag neu laden */
+  onPaketUebernommen: () => void
 }
 
 type SchrittZustand = 'erledigt' | 'aktuell' | 'offen'
@@ -43,7 +46,7 @@ const SCHRITTE_EIGEN: Schritt[] = [
 
 const euro = (n: number) => n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
 
-export function VorgangLeiste({ auftragId, fahrzeugId, betriebId, status, istEigenfahrzeug, aktualisierung, onStatus, onVerkaufen, onKostenvoranschlagErstellt }: Props) {
+export function VorgangLeiste({ auftragId, fahrzeugId, betriebId, status, istEigenfahrzeug, aktualisierung, onStatus, onVerkaufen, onKostenvoranschlagErstellt, onPaketUebernommen }: Props) {
   const supabase = useMemo(() => createClient(), [])
   const [kva, setKva] = useState<{ anzahl: number; offen: number }>({ anzahl: 0, offen: 0 })
   const [wa, setWa] = useState<{ anzahl: number; offen: number }>({ anzahl: 0, offen: 0 })
@@ -52,6 +55,7 @@ export function VorgangLeiste({ auftragId, fahrzeugId, betriebId, status, istEig
   const [erstellt, setErstellt] = useState(false)
   const [fehler, setFehler] = useState<string | null>(null)
   const [tick, setTick] = useState(0)
+  const [paketOffen, setPaketOffen] = useState(false)
   useEffect(() => {
     const neu = () => setTick(t => t + 1)
     window.addEventListener('focus', neu)
@@ -248,6 +252,20 @@ export function VorgangLeiste({ auftragId, fahrzeugId, betriebId, status, istEig
               )}
             </div>
           </div>
+        )}
+        {!istEigenfahrzeug && geladen && !['fertig', 'ausgeliefert', 'verkauft'].includes(status) && (
+          <button type="button" onClick={() => setPaketOffen(true)} className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-slate-600 hover:text-orange-600 transition-colors">
+            <PackagePlus className="w-4 h-4" /> Leistungspaket hinzufügen
+            <span className="hidden sm:inline text-slate-400 font-normal">(Ölwechsel, Inspektion … mit einem Klick)</span>
+          </button>
+        )}
+        {paketOffen && (
+          <LeistungspaketDialog
+            auftragId={auftragId}
+            betriebId={betriebId}
+            onClose={() => setPaketOffen(false)}
+            onUebernommen={() => { onPaketUebernommen(); setTick(t => t + 1) }}
+          />
         )}
         {uebergeben && geladen && (
           <Link href={`/fahrzeuge/${auftragId}/mappe`} className="mt-3 inline-flex items-center gap-2 text-sm font-medium text-orange-700 hover:text-orange-800">

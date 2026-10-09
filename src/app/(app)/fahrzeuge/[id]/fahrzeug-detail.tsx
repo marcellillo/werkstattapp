@@ -91,6 +91,7 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
   const [kiError, setKiError] = useState<string | null>(null)
   const [showKiVorschlaege, setShowKiVorschlaege] = useState(false)
   const [kvRefreshSignal, setKvRefreshSignal] = useState(0)
+  const [dokumenteBlockKey, setDokumenteBlockKey] = useState(0)   // erzwingt Neuladen von Kostenvoranschlag/Werkstattauftrag/Rechnungen
   const [fertigEmailStatus, setFertigEmailStatus] = useState<'idle' | 'senden' | 'ok' | 'fehler'>('idle')
   const [storniereBestaetigung, setStorniereBestaetigung] = useState(false)
   const [stornieren, setStornieren] = useState(false)
@@ -686,7 +687,8 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
         aktualisierung={kvRefreshSignal}
         onStatus={handleStatusChange}
         onVerkaufen={() => setShowVerkaufenModal(true)}
-        onKostenvoranschlagErstellt={() => setKvRefreshSignal(n => n + 1)}
+        onKostenvoranschlagErstellt={() => { setKvRefreshSignal(n => n + 1); setDokumenteBlockKey(n => n + 1) }}
+        onPaketUebernommen={() => { setKvRefreshSignal(n => n + 1); setDokumenteBlockKey(n => n + 1) }}
       />
 
       {/* Schnellaktionen */}
@@ -2053,7 +2055,7 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
       </div>
 
       {/* Kostenvoranschlag, Werkstattauftrag, Rechnungen */}
-      <div id="vorgang-dokumente" className="space-y-6 mt-6 scroll-mt-20">
+      <div key={dokumenteBlockKey} id="vorgang-dokumente" className="space-y-6 mt-6 scroll-mt-20">
         {betriebId && (
           <>
             <KostenvoranschlagSection auftragId={auftrag.id} betriebId={betriebId} fahrzeugId={(auftrag.fahrzeug as any)?.id} refreshSignal={kvRefreshSignal} />
