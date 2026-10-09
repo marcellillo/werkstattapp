@@ -2,6 +2,8 @@
 
 export const DOKUMENT_BUCKET = 'auftrag-dokumente'
 export const DOKUMENT_MAX_BYTES = 25 * 1024 * 1024
+/** Privater Bucket für die erzeugte Komplett-PDF der Auftragsmappe (nur Server-Zugriff). */
+export const MAPPEN_BUCKET = 'auftrag-mappen'
 
 export const DOKUMENT_KATEGORIEN = [
   { value: 'carvertical',    label: 'CarVertical / Fahrzeughistorie', kurz: 'CarVertical' },

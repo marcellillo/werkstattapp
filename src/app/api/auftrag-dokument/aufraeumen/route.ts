@@ -3,7 +3,7 @@ export const runtime = 'nodejs'
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { pruefeZugriff } from '@/lib/auftrag-dokumente-server'
-import { DOKUMENT_BUCKET } from '@/lib/auftrag-dokumente'
+import { DOKUMENT_BUCKET, MAPPEN_BUCKET } from '@/lib/auftrag-dokumente'
 
 // Nach dem Löschen eines Auftrags: die Dateien seiner Dokumente aus dem Speicher entfernen (die
 // Datenbankzeilen sind per ON DELETE CASCADE schon weg). Wirkt nur, wenn der Auftrag tatsächlich
@@ -24,5 +24,7 @@ export async function POST(req: NextRequest) {
   const ordner = `${zugriff.betriebId}/${auftragId}`
   const { data: dateien } = await admin.storage.from(DOKUMENT_BUCKET).list(ordner, { limit: 1000 })
   if (dateien?.length) await admin.storage.from(DOKUMENT_BUCKET).remove(dateien.map(d => `${ordner}/${d.name}`))
+  // erzeugte Komplett-PDF der Mappe ebenfalls entfernen
+  await admin.storage.from(MAPPEN_BUCKET).remove([`${zugriff.betriebId}/${auftragId}.pdf`])
   return NextResponse.json({ erfolg: true, entfernt: dateien?.length ?? 0 })
 }

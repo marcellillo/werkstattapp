@@ -57,6 +57,24 @@ export function AuftragsMappe({ auftrag, fotos, rechnungen = [], firma, betriebI
   const teile: any[] = auftrag.ersatzteile ?? []
   const heute = new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
   const [pdfLadendId, setPdfLadendId] = useState<string | null>(null)
+  const [komplett, setKomplett] = useState<{ laedt: boolean; fehler?: string; ergebnis?: any }>({ laedt: false })
+
+  // Komplett-PDF: Deckblatt + anklickbares Inhaltsverzeichnis + alle Dateien/Rechnungen/Fotos in EINEM PDF
+  const komplettErstellen = async () => {
+    setKomplett({ laedt: true })
+    try {
+      const res = await fetch('/api/mappe/komplett-pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ auftragId: auftrag.id }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || 'Die Komplett-PDF konnte nicht erstellt werden.')
+      setKomplett({ laedt: false, ergebnis: data })
+    } catch (e: any) {
+      setKomplett({ laedt: false, fehler: e?.message || 'Die Komplett-PDF konnte nicht erstellt werden.' })
+    }
+  }
 
   const rechnungPdfLaden = async (rechnungId: string, rechnungsNr: string) => {
     setPdfLadendId(rechnungId)
@@ -130,10 +148,39 @@ export function AuftragsMappe({ auftrag, fotos, rechnungen = [], firma, betriebI
           <Button variant="ghost" size="sm"><ArrowLeft className="w-4 h-4 mr-1" />Zurück</Button>
         </Link>
         <h1 className="font-semibold text-gray-900 flex-1">Auftragsmappe</h1>
-        <Button size="sm" onClick={() => window.print()} className="gap-2">
-          <Download className="w-4 h-4" />Als PDF speichern
+        <Button size="sm" onClick={komplettErstellen} disabled={komplett.laedt} className="gap-2">
+          {komplett.laedt ? <Loader2 className="w-4 h-4 animate-spin" /> : <Paperclip className="w-4 h-4" />}Komplett-PDF (alle Dateien)
+        </Button>
+        <Button size="sm" variant="outline" onClick={() => window.print()} className="gap-2">
+          <Download className="w-4 h-4" />Seite drucken
         </Button>
       </div>
+
+      {(komplett.laedt || komplett.fehler || komplett.ergebnis) && (
+        <div className="no-print bg-sky-50 border-b border-sky-100 px-4 py-3 text-sm text-sky-900">
+          {komplett.laedt && (
+            <div className="flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" />Die Komplett-PDF wird erstellt (Rechnungen, Dokumente, Belege, Fotos) – das kann bis zu einer Minute dauern …</div>
+          )}
+          {komplett.fehler && <div className="text-red-700">{komplett.fehler}</div>}
+          {komplett.ergebnis && (
+            <div className="space-y-2">
+              <div className="font-medium">
+                Fertig: {komplett.ergebnis.seiten} Seiten · {komplett.ergebnis.dateien} Datei{komplett.ergebnis.dateien !== 1 ? 'en' : ''} · {komplett.ergebnis.fotos} Foto{komplett.ergebnis.fotos !== 1 ? 's' : ''} · {komplett.ergebnis.angehaengt} Original{komplett.ergebnis.angehaengt !== 1 ? 'e' : ''} als Anhang · {formatGroesse(komplett.ergebnis.groesse)}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <a href={komplett.ergebnis.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 rounded-md bg-sky-600 px-3 py-1.5 text-white text-sm font-medium hover:bg-sky-700">Öffnen</a>
+                <a href={komplett.ergebnis.downloadUrl} className="inline-flex items-center gap-2 rounded-md border border-sky-300 bg-white px-3 py-1.5 text-sky-800 text-sm font-medium hover:bg-sky-100">Herunterladen</a>
+              </div>
+              <p className="text-xs text-sky-800/80">Im PDF: Deckblatt mit anklickbarem Inhaltsverzeichnis, Lesezeichen-Leiste (jede Datei einzeln) und die Originale als Anhänge (Büroklammer). Die Links sind 15 Minuten gültig – danach einfach erneut erstellen.</p>
+              {komplett.ergebnis.hinweise?.length > 0 && (
+                <ul className="list-disc pl-5 text-xs text-amber-800">
+                  {komplett.ergebnis.hinweise.map((h: string, i: number) => <li key={i}>{h}</li>)}
+                </ul>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Content — shown on screen AND in print */}
       <div className="max-w-4xl mx-auto p-4 md:p-8 space-y-6 bg-white min-h-screen">
@@ -306,7 +353,7 @@ export function AuftragsMappe({ auftrag, fotos, rechnungen = [], firma, betriebI
               )
             })}
             {pdfCount(auftragDokumente) > 0 && (
-              <p className="no-print text-xs text-gray-400 mt-2">PDF-Dateien werden beim Drucken der Mappe nur aufgelistet — zum Ausdrucken bitte über „Öffnen“ separat drucken.</p>
+              <p className="no-print text-xs text-gray-400 mt-2">Beim Drucken dieser Seite werden PDF-Dateien nur aufgelistet. Für alle Dateien in einem PDF (mit anklickbarem Inhaltsverzeichnis): oben „Komplett-PDF (alle Dateien)“.</p>
             )}
           </section>
         )}
