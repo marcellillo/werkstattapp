@@ -122,6 +122,18 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
 
   const isEigenfahrzeug = (auftrag.fahrzeug as any)?.fahrzeug_typ === 'eigen'
 
+  // Vom Board aus geöffnet (?aktion=…): den passenden Schritt einmalig anstoßen (Bühnen-Frage, Checkliste, …)
+  const aktionGestartet = useRef(false)
+  useEffect(() => {
+    if (aktionGestartet.current) return
+    const aktion = new URLSearchParams(window.location.search).get('aktion')
+    if (!aktion) return
+    aktionGestartet.current = true
+    window.history.replaceState(null, '', window.location.pathname)
+    if (['reparatur', 'fertig', 'ausgeliefert'].includes(aktion) && auftrag.status !== aktion) handleStatusChange(aktion as FahrzeugStatus)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   // Kommt die Frage "Auf welcher Bühne steht das Fahrzeug?" (z. B. nach dem Knopf in der Vorgangs-Leiste), dorthin scrollen
   useEffect(() => {
     if (buehneWarnung) setTimeout(() => document.getElementById('buehne-warnung')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100)

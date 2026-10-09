@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
-import { Car, Search, Plus, ChevronRight, Package, Tag, Gauge, Palette, Fuel, ArrowUpDown, Wrench, Euro, ShieldCheck, CheckCircle2, ExternalLink, Trash2, AlertTriangle, Edit2 } from 'lucide-react'
+import { Car, Search, Plus, ChevronRight, Package, Tag, Gauge, Palette, Fuel, ArrowUpDown, Wrench, Euro, ShieldCheck, CheckCircle2, ExternalLink, Trash2, AlertTriangle, Edit2, List, Columns3 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { cn, formatDate } from '@/lib/utils'
@@ -17,6 +17,7 @@ import { berechnePrioritaet, PRIORITAET_LABEL, PRIORITAET_COLOR, PRIORITAET_DOT 
 import { TuevWeckerContent } from '@/app/(app)/tuev-wecker/tuev-wecker-content'
 import { ServiceWeckerContent } from '@/app/(app)/service-wecker/service-wecker-content'
 import { VehicleEditDialog } from './vehicle-edit-dialog'
+import { AuftragsBoard } from './auftrags-board'
 
 const STATUS_FILTERS: { label: string; value: FahrzeugStatus | 'alle' }[] = [
   { label: 'Alle', value: 'alle' },
@@ -62,6 +63,15 @@ export function FahrzeugeContent({
   const [loeschenLoading, setLoeschenLoading] = useState(false)
   const [eigenSubTab, setEigenSubTab] = useState<'bestand' | 'verkauft' | 'uebergeben'>('bestand')
   const [editFahrzeug, setEditFahrzeug] = useState<any | null>(null)
+  // Ansicht der Kundenaufträge: Liste oder Board (Spalten nach Status) — wird pro Gerät gemerkt
+  const [ansicht, setAnsicht] = useState<'liste' | 'board'>('liste')
+  useEffect(() => {
+    try { if (localStorage.getItem('auftraege-ansicht') === 'board') setAnsicht('board') } catch { /* Speicher nicht verfügbar */ }
+  }, [])
+  function ansichtWaehlen(a: 'liste' | 'board') {
+    setAnsicht(a)
+    try { localStorage.setItem('auftraege-ansicht', a) } catch { /* egal */ }
+  }
 
   // URL-Parameter verarbeiten
   useEffect(() => {
@@ -358,6 +368,22 @@ export function FahrzeugeContent({
           />
         </div>
         {tab === 'fremd' && (
+          <div className="inline-flex self-start rounded-xl border border-gray-200 bg-white p-1 gap-1" role="group" aria-label="Ansicht">
+            <button
+              onClick={() => ansichtWaehlen('liste')}
+              className={cn('px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-1.5 transition-colors', ansicht === 'liste' ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-50')}
+            >
+              <List className="w-4 h-4" /> Liste
+            </button>
+            <button
+              onClick={() => ansichtWaehlen('board')}
+              className={cn('px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-1.5 transition-colors', ansicht === 'board' ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-50')}
+            >
+              <Columns3 className="w-4 h-4" /> Board
+            </button>
+          </div>
+        )}
+        {tab === 'fremd' && ansicht === 'liste' && (
           <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide -mx-1 px-1">
             <button
               onClick={() => setSortByPrio(v => !v)}
@@ -389,8 +415,13 @@ export function FahrzeugeContent({
         )}
       </div>}
 
-      {/* Fremdfahrzeuge */}
-      {tab === 'fremd' && (
+      {/* Fremdfahrzeuge: Board */}
+      {tab === 'fremd' && ansicht === 'board' && (
+        <AuftragsBoard auftraege={filteredFremd.filter(a => a.status !== 'ausgeliefert')} />
+      )}
+
+      {/* Fremdfahrzeuge: Liste */}
+      {tab === 'fremd' && ansicht === 'liste' && (
         filteredFremd.length === 0 ? (
           <Card>
             <CardContent className="py-16 text-center">
