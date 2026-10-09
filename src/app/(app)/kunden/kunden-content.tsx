@@ -1,13 +1,12 @@
 'use client'
 import { useState } from 'react'
-import { Users, Search, Plus, Phone, MapPin, Building, Car, ClipboardList, ChevronDown, ChevronRight, Pencil, Trash2, Loader2, Map } from 'lucide-react'
+import { Users, Search, Plus, Phone, MapPin, Building, Car, ClipboardList, ChevronDown, ChevronRight, Pencil, Trash2, Loader2 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { createClient } from '@/lib/supabase/client'
 import { useBetrieb } from '@/lib/betrieb-context'
 import type { Kunde } from '@/types/database'
 import { KundeEditDialog } from './kunde-edit-dialog'
-import { KundenKarte } from './kunden-karte'
 
 type Auftrag = {
   id: string
@@ -223,14 +222,12 @@ function AuftragsUebersicht({ kunden }: { kunden: KundeMitAuftraegen[] }) {
 export function KundenContent({
   kunden: initialKunden,
   kundenMitAuftraegen,
-  firma,
 }: {
   kunden: Kunde[]
   kundenMitAuftraegen: KundeMitAuftraegen[]
-  firma: Record<string, string>
 }) {
   const [kunden, setKunden] = useState(initialKunden)
-  const [activeTab, setActiveTab] = useState<'kunden' | 'auftraege' | 'karte'>('kunden')
+  const [activeTab, setActiveTab] = useState<'kunden' | 'auftraege'>('kunden')
   const [search, setSearch] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -345,16 +342,6 @@ export function KundenContent({
         >
           <span className="flex items-center gap-2"><ClipboardList className="w-4 h-4" />Auftragsübersicht</span>
         </button>
-        <button
-          onClick={() => setActiveTab('karte')}
-          className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-            activeTab === 'karte'
-              ? 'border-orange-500 text-orange-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700'
-          }`}
-        >
-          <span className="flex items-center gap-2"><Map className="w-4 h-4" />Karte</span>
-        </button>
       </div>
 
       {activeTab === 'kunden' ? (
@@ -451,10 +438,8 @@ export function KundenContent({
             </div>
           )}
         </>
-      ) : activeTab === 'auftraege' ? (
-        <AuftragsUebersicht kunden={kundenMitAuftraegen} />
       ) : (
-        <KundenKarte kunden={kunden} firma={firma} />
+        <AuftragsUebersicht kunden={kundenMitAuftraegen} />
       )}
 
       <KundeEditDialog
