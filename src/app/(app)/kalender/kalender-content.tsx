@@ -10,6 +10,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { cn, formatDate } from '@/lib/utils'
 import { FAHRZEUG_STATUS_LABEL, FAHRZEUG_STATUS_COLOR, type FahrzeugStatus } from '@/types/database'
 import { createClient } from '@/lib/supabase/client'
+import { hatKontakt, KONTAKT_FEHLER } from '@/lib/kontakt'
 import { useBetrieb } from '@/lib/betrieb-context'
 
 type ViewMode = 'monat' | 'woche' | 'tag'
@@ -204,6 +205,7 @@ function TerminPanel({
     if (!titel.trim()) { setError('Titel ist erforderlich'); return }
     if (!datum) { setError('Datum ist erforderlich'); return }
     if (!currentBetriebId) { setError('Kein Betrieb geladen — bitte Seite neu laden.'); return }
+    if (showNeukunde && neuNachname.trim() && !hatKontakt(neuTelefon, neuEmail)) { setError(KONTAKT_FEHLER); return }
     setSaving(true); setError('')
 
     try {

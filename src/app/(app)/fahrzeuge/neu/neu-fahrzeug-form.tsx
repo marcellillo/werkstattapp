@@ -6,6 +6,7 @@ import { ArrowLeft, Car, User, Plus, Download, Upload, ShieldAlert, Bell, BellOf
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { createClient } from '@/lib/supabase/client'
+import { hatKontakt, KONTAKT_FEHLER } from '@/lib/kontakt'
 import { useBetrieb } from '@/lib/betrieb-context'
 import type { Kunde, Hebebuehne } from '@/types/database'
 
@@ -91,6 +92,7 @@ export function NeuFahrzeugForm({ kunden, hebebuehnen }: Props) {
   const [importResult, setImportResult] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
   const scanInputRef = useRef<HTMLInputElement>(null)
+  const [scanKundeHinweis, setScanKundeHinweis] = useState('')   // Meldung nach Übernahme der Halterdaten aus dem Fahrzeugschein
 
   // Vom Dashboard-Schnellstart (?scan=1): den Scan-Knopf ins Bild holen und hervorheben — ein Tipp öffnet die Kamera
   const [scanHervorheben, setScanHervorheben] = useState(false)
@@ -267,6 +269,43 @@ export function NeuFahrzeugForm({ kunden, hebebuehnen }: Props) {
     setBilderUrls((ad.images ?? []).map(img => img.ref))
   }
 
+  // Halter aus dem Fahrzeugschein = Kunde: gibt es ihn schon, wird er gewählt, sonst ein neuer Kunde vorbefüllt.
+  // Es wird nichts überschrieben, was schon gewählt/eingetippt ist; bei Eigenfahrzeugen entfällt es ganz.
+  function uebernehmeHalter(h: any) {
+    setScanKundeHinweis('')
+    if (!h || fahrzeugTyp === 'eigen') return
+    if (kundenId || kNachname.trim() || kFirma.trim()) return
+    const vorname = String(h.vorname ?? '').trim()
+    const nachname = String(h.nachname ?? '').trim()
+    const firma = String(h.firma ?? '').trim()
+    if (!nachname && !firma) return
+    const norm = (s: string) => s.toLowerCase().replace(/ß/g, 'ss').replace(/[^a-z0-9äöü]/g, '')
+    const treffer = (kunden as any[]).find(k => {
+      const gleichePlz = !h.plz || !k.plz || String(k.plz).replace(/\D/g, '') === h.plz
+      if (!gleichePlz) return false
+      if (nachname) {
+        return norm(k.nachname ?? '') === norm(nachname) && (!vorname || !k.vorname || norm(k.vorname).startsWith(norm(vorname).slice(0, 3)))
+      }
+      return norm(k.firma ?? '') === norm(firma) || norm(k.nachname ?? '') === norm(firma)
+    })
+    if (treffer) {
+      const name = `${treffer.vorname ?? ''} ${treffer.nachname ?? ''}`.trim() + (treffer.firma ? ` (${treffer.firma})` : '')
+      setNewKunde(false)
+      setKundenId(treffer.id)
+      setKundenSuche(name)
+      setScanKundeHinweis(`Kunde „${name}“ ist schon angelegt und wurde übernommen.`)
+      return
+    }
+    setNewKunde(true)
+    setKVorname(vorname)
+    setKNachname(nachname || firma)          // Nachname ist Pflicht: bei einer Firma als Halter den Firmennamen verwenden
+    setKFirma(firma)
+    if (h.strasse) setKStrasse(String(h.strasse))
+    if (h.plz) setKPlz(String(h.plz))
+    if (h.ort) setKOrt(String(h.ort))
+    setScanKundeHinweis('Kundendaten aus dem Fahrzeugschein übernommen — bitte noch Handynummer eintragen.')
+  }
+
   async function handleScan(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
@@ -290,6 +329,7 @@ export function NeuFahrzeugForm({ kunden, hebebuehnen }: Props) {
       if (d.leistung_kw) setLeistungKw(String(d.leistung_kw))
       if (d.fahrzeugtyp) setFahrzeugtyp(d.fahrzeugtyp)
       setScanErfolg(true)
+      uebernehmeHalter(d.halter)
     } catch (err: any) {
       setScanFehler(err.message)
     } finally {
@@ -310,6 +350,12 @@ export function NeuFahrzeugForm({ kunden, hebebuehnen }: Props) {
     try {
       if (!currentBetriebId) {
         setError('Keine Betrieb-ID vorhanden. Bitte melden Sie sich neu an.')
+        setSaving(false)
+        return
+      }
+
+      if (newKunde && kNachname && !hatKontakt(kTelefon, kMobil)) {
+        setError(KONTAKT_FEHLER)
         setSaving(false)
         return
       }
@@ -448,6 +494,9 @@ export function NeuFahrzeugForm({ kunden, hebebuehnen }: Props) {
                 <p className="text-xs text-green-600 mt-1.5 flex items-center gap-1">
                   ✓ Fahrzeugdaten erfolgreich eingelesen — bitte prüfen und ggf. ergänzen
                 </p>
+              )}
+              {scanErfolg && scanKundeHinweis && (
+                <p className="text-xs text-green-600 mt-1 flex items-center gap-1">✓ {scanKundeHinweis}</p>
               )}
               {scanFehler && (
                 <p className="text-xs text-red-600 mt-1.5">{scanFehler}</p>
@@ -654,7 +703,7 @@ export function NeuFahrzeugForm({ kunden, hebebuehnen }: Props) {
                 <div>
                   <label className="text-xs text-gray-800 mb-1 block">Mobil</label>
                   <input value={kMobil} onChange={e => setKMobil(e.target.value)} placeholder="0171 9876543"
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
+                    className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 ${scanKundeHinweis && !hatKontakt(kTelefon, kMobil) ? 'border-amber-400 ring-2 ring-amber-200' : 'border-gray-200'}`} />
                 </div>
                 <div className="col-span-2">
                   <label className="text-xs text-gray-800 mb-1 block">Straße</label>

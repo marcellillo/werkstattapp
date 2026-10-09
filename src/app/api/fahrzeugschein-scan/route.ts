@@ -67,6 +67,7 @@ Felder im deutschen Fahrzeugschein:
 - P.1 = Hubraum in cm³
 - P.2 = Leistung in kW
 - J = Fahrzeugklasse (PKW, LKW etc.)
+- C.1.1 = Name (oder Firma) des Halters, C.1.2 = Vorname des Halters, C.1.3 = Anschrift des Halters (Straße mit Hausnummer, PLZ, Ort)
 - HSN = Hersteller-Schlüssel-Nummer (meist 4 Ziffern, z.B. "0146")
 - TSN = Typ-Schlüssel-Nummer (meist 3 Ziffern, z.B. "BAA")
 - Fahrzeugtyp/Modellcode = z.B. W205 (Mercedes C-Klasse), F31 (BMW 3er), MQB (VW Plattform)
@@ -83,7 +84,8 @@ Antworte mit exakt diesem JSON:
   "erstzulassung": "15.03.2010",
   "hsn": "0146",
   "tsn": "BAA",
-  "fahrzeugtyp": "W205"
+  "fahrzeugtyp": "W205",
+  "halter": { "vorname": "Max", "nachname": "Mustermann", "firma": null, "strasse": "Musterstraße 12", "plz": "38350", "ort": "Helmstedt" }
 }
 
 Regeln:
@@ -92,6 +94,9 @@ Regeln:
 - baujahr als vierstellige Zahl aus Erstzulassungsdatum
 - fahrzeugtyp aus HSN/TSN oder Dokumentfeld extrahieren (z.B. W205 für Mercedes C-Klasse)
 - Wenn HSN/TSN bekannt sind: versuche bekannten Fahrzeugtyp zu bestimmen
+- Halter: nur Werte aus C.1.1–C.1.3, die klar lesbar sind, sonst null. Bei Privatpersonen steht in C.1.1 der Nachname und in C.1.2 der Vorname.
+- Ist C.1.1 eine Firma (z. B. GmbH, UG, AG, KG, OHG, GbR, e.K., e.V., Autohaus, Leasing), dann den Namen in "firma" eintragen und "nachname"/"vorname" auf null setzen.
+- strasse enthält Straße UND Hausnummer, plz ist fünfstellig, ort ohne PLZ
 - Wenn kein Fahrzeugdokument erkennbar: alle Felder null`,
           },
         ],
@@ -103,6 +108,14 @@ Regeln:
     if (!jsonMatch) return NextResponse.json({ error: 'Dokument konnte nicht ausgelesen werden' }, { status: 422 })
 
     const daten = JSON.parse(jsonMatch[0])
+    // Halterdaten: nur kurze Texte zulassen (wandern später in Formularfelder und die Kundendatenbank)
+    const t = (v: unknown, max: number) => (typeof v === 'string' && v.trim() ? v.replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, max) : null)
+    const h = daten.halter && typeof daten.halter === 'object' ? daten.halter : {}
+    const plz = typeof h.plz === 'string' || typeof h.plz === 'number' ? String(h.plz).replace(/\D/g, '').slice(0, 5) : ''
+    daten.halter = {
+      vorname: t(h.vorname, 80), nachname: t(h.nachname, 80), firma: t(h.firma, 120),
+      strasse: t(h.strasse, 120), plz: plz.length === 5 ? plz : null, ort: t(h.ort, 80),
+    }
     return NextResponse.json({ daten })
   } catch (e: any) {
     return serverFehler(e, 'fahrzeugschein-scan')

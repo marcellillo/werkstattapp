@@ -2,6 +2,7 @@
 // Link zur Kunden-Freigabe des Kostenvoranschlags erzeugen und verschicken (WhatsApp, E-Mail, Teilen, Kopieren).
 import { useEffect, useState } from 'react'
 import { Check, Copy, Loader2, Mail, MessageCircle, Share2, X } from 'lucide-react'
+import { waNummer } from '@/lib/kontakt'
 
 interface Props {
   kostenvoranschlagId: string
@@ -10,16 +11,6 @@ interface Props {
   firmaName: string
   onClose: () => void
   onGesendet: () => void
-}
-
-// Telefonnummer für wa.me: nur Ziffern, Landesvorwahl vorne (0151… -> 49151…)
-function wa(nummer?: string | null): string {
-  if (!nummer) return ''
-  let n = nummer.replace(/[^\d+]/g, '')
-  if (n.startsWith('+')) n = n.slice(1)
-  else if (n.startsWith('00')) n = n.slice(2)
-  else if (n.startsWith('0')) n = '49' + n.slice(1)
-  return /^\d{8,15}$/.test(n) ? n : ''
 }
 
 export function FreigabeDialog({ kostenvoranschlagId, kunde, fahrzeugName, firmaName, onClose, onGesendet }: Props) {
@@ -50,7 +41,7 @@ export function FreigabeDialog({ kostenvoranschlagId, kunde, fahrzeugName, firma
   const nachricht = url
     ? `Guten Tag${anrede ? ' ' + anrede : ''}, hier ist Ihr Kostenvoranschlag für Ihren ${fahrzeugName || 'Wagen'} von ${firmaName || 'Ihrer Werkstatt'}: ${url}\nBitte kurz ansehen und freigeben – dann legen wir direkt los. Vielen Dank!`
     : ''
-  const nummer = wa(kunde?.mobil) || wa(kunde?.telefon)
+  const nummer = waNummer(kunde?.mobil) || waNummer(kunde?.telefon)
   const waLink = url ? `https://wa.me/${nummer}?text=${encodeURIComponent(nachricht)}` : '#'
   const mailLink = url ? `mailto:${kunde?.email ?? ''}?subject=${encodeURIComponent('Ihr Kostenvoranschlag – ' + (fahrzeugName || firmaName))}&body=${encodeURIComponent(nachricht)}` : '#'
 
@@ -92,6 +83,7 @@ export function FreigabeDialog({ kostenvoranschlagId, kunde, fahrzeugName, firma
                 </button>
               )}
               {!nummer && <p className="text-xs text-slate-400">Beim Kunden ist keine Handynummer hinterlegt — in WhatsApp den Kontakt auswählen.</p>}
+              <p className="text-xs text-slate-400">Hinweis: WhatsApp öffnet sich auf diesem Gerät — der Absender ist die Nummer, mit der dieses Gerät bei WhatsApp angemeldet ist (am besten WhatsApp Business mit der Firmennummer).</p>
             </>
           )}
         </div>

@@ -4,6 +4,7 @@ import { Users, Search, Plus, Phone, MapPin, Building, Car, ClipboardList, Chevr
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { createClient } from '@/lib/supabase/client'
+import { hatKontakt, KONTAKT_FEHLER } from '@/lib/kontakt'
 import { useBetrieb } from '@/lib/betrieb-context'
 import type { Kunde } from '@/types/database'
 import { KundeEditDialog } from './kunde-edit-dialog'
@@ -257,6 +258,7 @@ export function KundenContent({
     e.preventDefault()
     setFormError('')
     if (!form.nachname) return
+    if (!hatKontakt(form.email, form.telefon, form.mobil)) { setFormError(KONTAKT_FEHLER); return }
     if (!currentBetriebId) { setFormError('Kein Betrieb geladen — bitte Seite neu laden.'); return }
     setSaving(true)
     const { data, error } = await supabase.from('kunden').insert({
@@ -406,7 +408,13 @@ export function KundenContent({
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold text-gray-900">{k.vorname} {k.nachname}</p>
                         {k.firma && <p className="text-xs text-gray-800 flex items-center gap-1 mt-0.5"><Building className="w-3 h-3" />{k.firma}</p>}
-                        {k.telefon && <p className="text-xs text-gray-800 flex items-center gap-1 mt-0.5"><Phone className="w-3 h-3" />{k.telefon}</p>}
+                        {(k.mobil || k.telefon) && <p className="text-xs text-gray-800 flex items-center gap-1 mt-0.5"><Phone className="w-3 h-3" />{[k.mobil, k.telefon].filter(Boolean).join(' · ')}</p>}
+                        {k.email && <p className="text-xs text-gray-800 mt-0.5 truncate">✉ {k.email}</p>}
+                        {!hatKontakt(k.telefon, k.mobil, k.email) && (
+                          <button onClick={() => setEditingKunde(k)} className="mt-1 text-[11px] font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5 hover:bg-amber-100">
+                            Kein Kontakt hinterlegt – ergänzen
+                          </button>
+                        )}
                         {(k.strasse || k.plz || k.ort) && (
                           <p className="text-xs text-gray-800 flex items-center gap-1 mt-0.5">
                             <MapPin className="w-3 h-3 flex-shrink-0" />

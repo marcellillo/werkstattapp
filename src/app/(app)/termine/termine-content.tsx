@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { cn, formatDate } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
+import { hatKontakt, KONTAKT_FEHLER } from '@/lib/kontakt'
 import { useEffect } from 'react'
 import { useBetrieb } from '@/lib/betrieb-context'
 import type { TerminTyp, TerminStatus } from '@/types/database'
@@ -134,6 +135,7 @@ export function TermineContent({ termine: initialTermine, kunden, fahrzeuge, heb
     setFormError('')
     if (!form.titel || !form.datum) return
     if (!currentBetriebId) { setFormError('Kein Betrieb geladen — bitte Seite neu laden.'); return }
+    if (newKunde && kNachname && !hatKontakt(kTelefon, kMobil)) { setFormError(KONTAKT_FEHLER); return }
     setSaving(true)
 
     let finalKundenId = form.kunden_id || null

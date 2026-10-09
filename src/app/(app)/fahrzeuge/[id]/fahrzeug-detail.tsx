@@ -24,6 +24,7 @@ import { VorgangLeiste } from './vorgang-leiste'
 import { LieferscheinQuickScan } from '@/components/lieferschein-quick-scan'
 import { LieferscheinGalerie } from '@/components/lieferschein-galerie'
 import { AuftragDokumente } from '@/components/auftrag-dokumente'
+import { waNummer } from '@/lib/kontakt'
 
 interface Props {
   auftrag: Auftrag
@@ -1282,6 +1283,18 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
             </div>
           )}
 
+          {/* Fertig, aber keine Möglichkeit den Kunden zu erreichen -> deutlich sagen, statt die Karte still wegzulassen */}
+          {auftrag.status === 'fertig' && !isEigenfahrzeug && (!kunde || !(kunde.mobil || kunde.telefon || kunde.email)) && (
+            <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              <p className="font-semibold">Kunde kann nicht benachrichtigt werden</p>
+              <p className="mt-0.5">
+                {kunde
+                  ? `Für ${`${kunde.vorname ?? ''} ${kunde.nachname ?? ''}`.trim() || 'den Kunden'} ist weder Handynummer noch Telefon noch E-Mail hinterlegt — bitte im Kundenprofil ergänzen.`
+                  : 'Diesem Auftrag ist noch kein Kunde zugewiesen — bitte oben einen Kunden zuweisen.'}
+              </p>
+            </div>
+          )}
+
           {/* Kunden-Benachrichtigung wenn fertig */}
           {auftrag.status === 'fertig' && kunde && (kunde.mobil || kunde.telefon || kunde.email) && (() => {
             const name = `${fahrzeug?.marke ?? ''} ${fahrzeug?.modell ?? ''}`.trim()
@@ -1289,7 +1302,7 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
             const kundenName = `${kunde.vorname} ${kunde.nachname}`.trim()
             const smsText = `Hallo ${kunde.vorname}, Ihr Fahrzeug ${name}${kz ? ` (${kz})` : ''} ist fertig und kann abgeholt werden. Herzliche Grüße, Ihre Kfz-Werkstatt`
             const tel = kunde.mobil || kunde.telefon || ''
-            const telClean = tel.replace(/\s+/g, '').replace(/^0/, '+49')
+            const telClean = waNummer(kunde.mobil) || waNummer(kunde.telefon)   // nur Ziffern, internationale Form
             return (
               <Card className="border-green-300 bg-green-50">
                 <CardHeader className="pb-2">
@@ -1315,7 +1328,7 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
                         <Phone className="w-4 h-4" /> SMS senden
                       </a>
                     )}
-                    {tel && (
+                    {telClean && (
                       <a
                         href={`https://wa.me/${telClean}?text=${encodeURIComponent(smsText)}`}
                         target="_blank"
@@ -1350,6 +1363,7 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
                       </button>
                     )}
                   </div>
+                  <p className="text-xs text-green-800/70">SMS und WhatsApp öffnen sich auf diesem Gerät — Absender ist die Nummer dieses Geräts bzw. des dort angemeldeten WhatsApp-Kontos (für die Firmennummer: WhatsApp Business verwenden). Die E-Mail geht von der Firmen-Absenderadresse aus den Einstellungen.</p>
                 </CardContent>
               </Card>
             )

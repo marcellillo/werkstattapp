@@ -20,7 +20,6 @@ export default async function DashboardPage() {
     { data: hebebuehnenRaw },
     { data: auftraegeRaw },
     { data: termineRaw },
-    { count: eigenCount },
     { data: mitarbeiterRaw },
     { data: monatWerkstattRaw },
     { data: offeneRechnungenRaw },
@@ -35,7 +34,6 @@ export default async function DashboardPage() {
       .not('status', 'eq', 'storniert')
       .order('erstellt_am', { ascending: false }),
     supabase.from('termine').select('*, kunde:kunden(vorname,nachname), fahrzeug:fahrzeuge(kennzeichen,marke,modell)').eq('betrieb_id', betriebId).gte('datum', new Date().toISOString().split('T')[0]).not('status', 'eq', 'abgesagt').order('datum').order('uhrzeit').limit(20),
-    supabase.from('fahrzeuge').select('*', { count: 'exact', head: true }).eq('betrieb_id', betriebId).eq('fahrzeug_typ', 'eigen'),
     supabase.from('profiles').select('id, full_name, role').order('full_name'),
     supabase.from('auftraege').select('einnahmen, fertiggestellt_am, fahrzeug:fahrzeuge(fahrzeug_typ)').eq('betrieb_id', betriebId).not('einnahmen', 'is', null).gte('fertiggestellt_am', monatStartDate),
     supabase.from('rechnungen').select('gesamt').eq('betrieb_id', betriebId).eq('bezahlt', false),
@@ -60,7 +58,13 @@ export default async function DashboardPage() {
   )
   const today = new Date().toISOString().split('T')[0]
 
-  const offeneAuftraege = auftraege.filter((a: any) =>
+  // Kundenaufträge und Eigenfahrzeuge getrennt zählen: die Kacheln "Offene Aufträge/Heute fertig/Überfällig" meinen
+  // Kundenfahrzeuge (Reiter "Aufträge"), "Lagerbestand" die Eigenfahrzeuge im Bestand (nicht verkauft/übergeben).
+  const istEigen = (a: any) => a.fahrzeug?.fahrzeug_typ === 'eigen'
+  const kundenAuftraege = auftraege.filter((a: any) => !istEigen(a))
+  const lagerbestand = auftraege.filter((a: any) => istEigen(a) && a.status !== 'verkauft').length
+
+  const offeneAuftraege = kundenAuftraege.filter((a: any) =>
     !['fertig', 'ausgeliefert'].includes(a.status)
   ).length
 
@@ -71,11 +75,11 @@ export default async function DashboardPage() {
     ).length
   }, 0)
 
-  const fertigeHeute = auftraege.filter((a: any) =>
+  const fertigeHeute = kundenAuftraege.filter((a: any) =>
     a.status === 'fertig' && a.aktualisiert_am?.startsWith(today)
   ).length
 
-  const ueberfaellig = auftraege.filter((a: any) =>
+  const ueberfaellig = kundenAuftraege.filter((a: any) =>
     a.geplante_fertigstellung &&
     a.geplante_fertigstellung < today &&
     !['fertig', 'ausgeliefert'].includes(a.status)
@@ -100,7 +104,7 @@ export default async function DashboardPage() {
       fertigeHeute={fertigeHeute}
       ueberfaellig={ueberfaellig}
       naechsteTermine={naechsteTermine}
-      eigenFahrzeuge={eigenCount ?? 0}
+      eigenFahrzeuge={lagerbestand}
       tuevBuehnenTermine={tuevBuehnenTermine}
       mitarbeiter={(mitarbeiterRaw ?? []) as any[]}
       monatsumsatz={monatsumsatz}
