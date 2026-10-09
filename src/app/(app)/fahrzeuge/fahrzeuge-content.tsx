@@ -216,7 +216,7 @@ export function FahrzeugeContent({
         <Link href="/fahrzeuge/neu">
           <Button className="bg-orange-600 hover:bg-orange-700 text-white">
             <Plus className="w-4 h-4 mr-2" />
-            Neues Fahrzeug
+            Neuer Auftrag
           </Button>
         </Link>
       </div>
@@ -429,7 +429,7 @@ export function FahrzeugeContent({
               <p className="text-gray-800">Keine Fahrzeuge gefunden</p>
               <Link href="/fahrzeuge/neu">
                 <Button className="mt-4 bg-orange-600 hover:bg-orange-700 text-white">
-                  <Plus className="w-4 h-4 mr-2" /> Fahrzeug anlegen
+                  <Plus className="w-4 h-4 mr-2" /> Neuen Auftrag anlegen
                 </Button>
               </Link>
             </CardContent>

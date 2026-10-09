@@ -4,7 +4,7 @@ import Link from 'next/link'
 import {
   Car, User, Wrench, Package, Calendar, Plus, X,
   ChevronRight, AlertTriangle, CheckCircle, ClipboardList,
-  ShieldCheck, Tag, Clock, TrendingUp, Euro
+  ShieldCheck, Tag, Clock, TrendingUp, Euro, ScanLine
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { cn, formatDate } from '@/lib/utils'
@@ -121,6 +121,16 @@ const auftragMap = new Map<string, Auftrag>()
 
   return (
     <div className="space-y-6">
+      {/* Schnellstart: neuer Auftrag in wenigen Sekunden (Fahrzeugschein-Foto füllt die Fahrzeugdaten) */}
+      <Link href="/fahrzeuge/neu?scan=1" className="flex items-center gap-4 rounded-2xl bg-orange-500 hover:bg-orange-600 text-white px-5 py-4 shadow-sm transition-colors">
+        <span className="w-11 h-11 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0"><ScanLine className="w-6 h-6" /></span>
+        <span className="flex-1 min-w-0">
+          <span className="block font-semibold text-lg leading-tight">Neuer Auftrag</span>
+          <span className="block text-sm text-orange-50">Fahrzeugschein fotografieren — Fahrzeugdaten werden automatisch ausgefüllt</span>
+        </span>
+        <ChevronRight className="w-6 h-6 flex-shrink-0 opacity-80" />
+      </Link>
+
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map(({ label, display, icon: Icon, color, bg, href }) => (

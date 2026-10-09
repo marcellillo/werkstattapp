@@ -962,7 +962,8 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
 
       {/* Bewertungs-WhatsApp-Modal */}
       {showBewertungModal && (() => {
-        const bewertungLink = googleBewertungUrl || `${process.env.NEXT_PUBLIC_APP_URL ?? 'https://werkstatt-app-umber.vercel.app'}/bewertung/${auftrag.id}`
+        // Ohne hinterlegten Google-Link gibt es nichts zu verschicken (die frühere interne Bewertungsseite existiert nicht)
+        const bewertungLink = googleBewertungUrl
         const kundeVorname = (auftrag.kunde as any)?.vorname ?? ''
         const kundeTelefon = ((auftrag.kunde as any)?.telefon ?? (auftrag.kunde as any)?.mobil ?? '').replace(/\D/g, '')
         const waText = encodeURIComponent(
@@ -990,7 +991,7 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
                 </div>
               ) : (
                 <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
-                  <p className="text-xs text-amber-700">Kein Google-Link hinterlegt – bitte in den Einstellungen ergänzen. Es wird ein interner Bewertungslink gesendet.</p>
+                  <p className="text-xs text-amber-700">Kein Google-Link hinterlegt – bitte unter Einstellungen den Link zur Google-Bewertung eintragen. Dann kann die Anfrage direkt verschickt werden.</p>
                 </div>
               )}
               <div className="flex gap-3">
@@ -998,9 +999,9 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
                   onClick={() => setShowBewertungModal(false)}
                   className="flex-1 py-3 rounded-xl border border-gray-200 text-gray-700 text-sm font-semibold hover:bg-gray-50"
                 >
-                  Überspringen
+                  {bewertungLink ? 'Überspringen' : 'Schließen'}
                 </button>
-                {kundeTelefon ? (
+                {!bewertungLink ? null : kundeTelefon ? (
                   <a
                     href={`https://wa.me/${kundeTelefon}?text=${waText}`}
                     target="_blank"

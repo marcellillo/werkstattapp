@@ -17,7 +17,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/': 'Sales Dashboard',
   '/dashboard': 'Dashboard',
   '/fahrzeuge': 'Fahrzeuge',
-  '/fahrzeuge/neu': 'Neues Fahrzeug',
+  '/fahrzeuge/neu': 'Neuer Auftrag',
   '/fahrzeuge/verkauft': 'Verkaufte Fahrzeuge',
   '/fahrzeuge/uebergeben': 'Übergebene Fahrzeuge',
   '/hebebuehnen': 'Hebebühnen verwalten',

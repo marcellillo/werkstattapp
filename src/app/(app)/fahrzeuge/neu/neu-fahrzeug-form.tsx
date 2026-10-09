@@ -91,6 +91,14 @@ export function NeuFahrzeugForm({ kunden, hebebuehnen }: Props) {
   const [importResult, setImportResult] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
   const scanInputRef = useRef<HTMLInputElement>(null)
+
+  // Vom Dashboard-Schnellstart (?scan=1): den Scan-Knopf ins Bild holen und hervorheben — ein Tipp öffnet die Kamera
+  const [scanHervorheben, setScanHervorheben] = useState(false)
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('scan') !== '1') return
+    setScanHervorheben(true)
+    setTimeout(() => document.getElementById('fahrzeugschein-scan-knopf')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300)
+  }, [])
   const [scanning, setScanning] = useState(false)
   const [scanFehler, setScanFehler] = useState('')
   const [scanErfolg, setScanErfolg] = useState(false)
@@ -395,7 +403,7 @@ export function NeuFahrzeugForm({ kunden, hebebuehnen }: Props) {
             <ArrowLeft className="w-4 h-4" /> Zurück
           </Button>
         </Link>
-        <h1 className="text-xl font-bold text-gray-900">Neues Fahrzeug anlegen</h1>
+        <h1 className="text-xl font-bold text-gray-900">Neuer Auftrag</h1>
       </div>
 
       {error && (
@@ -425,10 +433,11 @@ export function NeuFahrzeugForm({ kunden, hebebuehnen }: Props) {
                 onChange={handleScan}
               />
               <button
+                id="fahrzeugschein-scan-knopf"
                 type="button"
                 onClick={() => scanInputRef.current?.click()}
                 disabled={scanning}
-                className="w-full flex items-center justify-center gap-2 py-3 border-2 border-dashed border-orange-300 rounded-xl text-sm font-medium text-orange-600 hover:bg-orange-50 transition-colors disabled:opacity-60"
+                className={`w-full flex items-center justify-center gap-2 py-3 border-2 border-dashed border-orange-300 rounded-xl text-sm font-medium text-orange-600 hover:bg-orange-50 transition-colors disabled:opacity-60${scanHervorheben ? ' ring-4 ring-orange-200 bg-orange-50' : ''}`}
               >
                 {scanning
                   ? <><Loader2 className="w-4 h-4 animate-spin" /> Fahrzeugschein wird ausgelesen...</>
