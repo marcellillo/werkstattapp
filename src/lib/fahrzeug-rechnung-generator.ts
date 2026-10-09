@@ -245,7 +245,7 @@ export function generateFahrzeugRechnungHtml(
     <!-- Verkaufspreis (prominent) -->
     <div class="verkaufspreis-box">
       <div class="verkaufspreis-label">VERKAUFSPREIS</div>
-      <div class="verkaufspreis-betrag">${s.vk.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €</div>
+      <div class="verkaufspreis-betrag">${s.vk.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</div>
     </div>
 
     <!-- Steuern & Berechnung (rechtlich korrekt) -->
@@ -253,15 +253,15 @@ export function generateFahrzeugRechnungHtml(
       <div class="steuer-typ">${steuertxt}</div>
       <div class="steuer-row">
         <span class="steuer-label">Kaufpreis (Brutto):</span>
-        <span class="steuer-betrag">${s.vk.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €</span>
+        <span class="steuer-betrag">${s.vk.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</span>
       </div>
       <div class="steuer-row">
         <span class="steuer-label">davon Umsatzsteuer:</span>
-        <span class="steuer-betrag">${s.mwst.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €</span>
+        <span class="steuer-betrag">${s.mwst.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</span>
       </div>
       <div class="steuer-row" style="font-weight: bold; background: #f0fdf4; padding: 12px 0; border: none;">
         <span class="steuer-label">Nettobetrag:</span>
-        <span class="steuer-betrag">${s.netto.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €</span>
+        <span class="steuer-betrag">${s.netto.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</span>
       </div>
     </div>
 

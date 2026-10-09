@@ -420,7 +420,7 @@ function LagerbestandSection({ artikel: initialArtikel }: { artikel: any[] }) {
                           {a.artikelnummer && <span className="text-xs text-gray-400 font-mono">{a.artikelnummer}</span>}
                           <span className="text-xs text-gray-400 bg-gray-100 rounded-full px-2 py-0.5">{a.kategorie}</span>
                           {a.lieferant && <span className="text-xs text-gray-500">{a.lieferant}</span>}
-                          {a.einzelpreis != null && <span className="text-xs text-gray-500">{Number(a.einzelpreis).toLocaleString('de-DE', { minimumFractionDigits: 2 })} €/Stk.</span>}
+                          {a.einzelpreis != null && <span className="text-xs text-gray-500">{Number(a.einzelpreis).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €/Stk.</span>}
                         </div>
 
                         {/* Bestand-Balken */}
@@ -773,7 +773,7 @@ function BestellungenSection({ teile: initialTeile }: { teile: any[] }) {
                       )}
                       {teil.einzelpreis != null && (
                         <span className="text-xs text-gray-500 font-medium">
-                          {(teil.einzelpreis * teil.menge).toLocaleString('de-DE', { minimumFractionDigits: 2 })} €
+                          {(teil.einzelpreis * teil.menge).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
                         </span>
                       )}
                       {teil.bestellt_am && (

@@ -34,7 +34,7 @@ export function AnnahmeUebersicht({ auftraege }: { auftraege: any[] }) {
               {k ? ` · ${k.vorname} ${k.nachname}` : ''}
             </div>
             {hatProtokoll && a.kostenrahmen_max && (
-              <div className="text-xs text-green-600">bis max. {parseFloat(a.kostenrahmen_max).toLocaleString('de-DE', { minimumFractionDigits: 2 })} €</div>
+              <div className="text-xs text-green-600">bis max. {parseFloat(a.kostenrahmen_max).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</div>
             )}
           </div>
           <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />

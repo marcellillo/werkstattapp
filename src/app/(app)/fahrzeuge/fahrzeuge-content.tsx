@@ -624,7 +624,7 @@ export function FahrzeugeContent({
                             <span>{group.items.length} {group.items.length === 1 ? 'Fahrzeug' : 'Fahrzeuge'}</span>
                             {group.summe > 0 && (
                               <span className="font-semibold text-green-700">
-                                {group.summe.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €
+                                {group.summe.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
                               </span>
                             )}
                           </div>
@@ -651,7 +651,7 @@ export function FahrzeugeContent({
                                     </td>
                                     <td className="px-4 py-3 text-right whitespace-nowrap">
                                       {preis && preis > 0
-                                        ? <span className="font-semibold text-green-700">{preis.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €</span>
+                                        ? <span className="font-semibold text-green-700">{preis.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</span>
                                         : <span className="text-gray-300">—</span>}
                                     </td>
                                     <td className="px-4 py-3 whitespace-nowrap">
@@ -770,14 +770,14 @@ export function FahrzeugeContent({
                           {einnahmen > 0 && (
                             <div className="flex items-center gap-1 text-purple-700 font-semibold">
                               <Euro className="w-3 h-3" />
-                              <span>{einnahmen.toLocaleString('de-DE', { minimumFractionDigits: 2 })} Gesamtkosten</span>
+                              <span>{einnahmen.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Gesamtkosten</span>
                             </div>
                           )}
                           {teile.length > 0 && (
                             <div className="flex items-center gap-1 text-gray-500">
                               <Package className="w-3 h-3" />
                               <span>{teile.length} {teile.length === 1 ? 'Teil' : 'Teile'}</span>
-                              {teileKosten > 0 && <span className="text-gray-400">· {teileKosten.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €</span>}
+                              {teileKosten > 0 && <span className="text-gray-400">· {teileKosten.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</span>}
                             </div>
                           )}
                         </div>

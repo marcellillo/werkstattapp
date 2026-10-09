@@ -152,13 +152,13 @@ function FahrzeugModal({ auftrag, onClose }: { auftrag: any; onClose: () => void
                 {teileKosten > 0 && (
                   <div className="flex justify-between text-gray-700">
                     <span className="flex items-center gap-1.5"><Package className="w-3.5 h-3.5 text-gray-400" /> Materialkosten</span>
-                    <span className="font-medium">{teileKosten.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €</span>
+                    <span className="font-medium">{teileKosten.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</span>
                   </div>
                 )}
                 {einnahmen > 0 && (
                   <div className="flex justify-between text-green-800 font-semibold pt-1 border-t border-green-200">
                     <span className="flex items-center gap-1.5"><Euro className="w-3.5 h-3.5" /> Gesamtrechnung</span>
-                    <span>{einnahmen.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €</span>
+                    <span>{einnahmen.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</span>
                   </div>
                 )}
               </div>
@@ -180,7 +180,7 @@ function FahrzeugModal({ auftrag, onClose }: { auftrag: any; onClose: () => void
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0 ml-2">
                       {t.einzelpreis && (
-                        <span className="text-gray-600">{(t.einzelpreis * t.menge).toLocaleString('de-DE', { minimumFractionDigits: 2 })} €</span>
+                        <span className="text-gray-600">{(t.einzelpreis * t.menge).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</span>
                       )}
                       <span className={cn('px-2 py-0.5 rounded-full border text-[10px] font-medium', TEIL_STATUS_COLOR[t.status] ?? 'bg-gray-50 text-gray-500 border-gray-200')}>
                         {TEIL_STATUS_LABEL[t.status] ?? t.status}
@@ -470,7 +470,7 @@ export function HebebuehnenContent({
                                 {(einnahmen > 0 || teileKosten > 0) && (
                                   <span className="flex items-center gap-0.5 text-green-700 font-medium">
                                     <Euro className="w-3 h-3" />
-                                    {(einnahmen || teileKosten).toLocaleString('de-DE', { minimumFractionDigits: 2 })}
+                                    {(einnahmen || teileKosten).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                   </span>
                                 )}
                               </div>

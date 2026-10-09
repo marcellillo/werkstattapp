@@ -35,7 +35,7 @@ function pdfCount(dokumente: any[]) {
 }
 function fmtEuro(n?: number | null) {
   if (n == null) return '—'
-  return n.toLocaleString('de-DE', { minimumFractionDigits: 2 }) + ' €'
+  return n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
 }
 
 const DOKUMENT_TYP_LABEL: Record<string, string> = { lieferschein: '📦 Lieferschein', rechnung: '🧾 Rechnung' }
@@ -143,16 +143,16 @@ export function AuftragsMappe({ auftrag, fotos, rechnungen = [], firma, betriebI
       `}</style>
 
       {/* Screen Header */}
-      <div className="no-print bg-white border-b px-4 flex items-center gap-3" style={{ paddingTop: 'max(12px, env(safe-area-inset-top))', paddingBottom: '12px' }}>
+      <div className="no-print bg-white border-b px-4 flex flex-wrap items-center gap-x-3 gap-y-2" style={{ paddingTop: 'max(12px, env(safe-area-inset-top))', paddingBottom: '12px' }}>
         <Link href={`/fahrzeuge/${auftrag.id}`}>
           <Button variant="ghost" size="sm"><ArrowLeft className="w-4 h-4 mr-1" />Zurück</Button>
         </Link>
-        <h1 className="font-semibold text-gray-900 flex-1">Auftragsmappe</h1>
+        <h1 className="font-semibold text-gray-900 flex-1 min-w-[7rem]">Auftragsmappe</h1>
         <Button size="sm" onClick={komplettErstellen} disabled={komplett.laedt} className="gap-2">
-          {komplett.laedt ? <Loader2 className="w-4 h-4 animate-spin" /> : <Paperclip className="w-4 h-4" />}Komplett-PDF (alle Dateien)
+          {komplett.laedt ? <Loader2 className="w-4 h-4 animate-spin" /> : <Paperclip className="w-4 h-4" />}<span className="sm:hidden">Komplett-PDF</span><span className="hidden sm:inline">Komplett-PDF (alle Dateien)</span>
         </Button>
         <Button size="sm" variant="outline" onClick={() => window.print()} className="gap-2">
-          <Download className="w-4 h-4" />Seite drucken
+          <Download className="w-4 h-4" /><span className="hidden sm:inline">Seite drucken</span>
         </Button>
       </div>
 

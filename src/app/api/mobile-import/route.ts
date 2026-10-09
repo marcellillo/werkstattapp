@@ -123,7 +123,7 @@ export async function POST(req: Request) {
       leistung_kw: leistungRaw ? parseInt(String(leistungRaw), 10) : null,
       verkaufspreis: preis,
       bilder_urls: bilder.length > 0 ? JSON.stringify(bilder) : null,
-      notizen: preis ? `Verkaufspreis: ${preis.toLocaleString('de-DE', { minimumFractionDigits: 2 })} € (Brutto)` : null,
+      notizen: preis ? `Verkaufspreis: ${preis.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} € (Brutto)` : null,
     }
 
     // Existiert bereits? (B-Nr zuerst, dann VIN)

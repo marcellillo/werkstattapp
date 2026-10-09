@@ -704,7 +704,7 @@ export function AnnahmeProtokoll({ auftrag, firma }: Props) {
           <div className="text-gray-700">
             Die Reparaturkosten werden voraussichtlich <strong>bis max.{' '}
             {kostenrahmen
-              ? parseFloat(kostenrahmen.replace(',', '.')).toLocaleString('de-DE', { minimumFractionDigits: 2 }) + ' €'
+              ? parseFloat(kostenrahmen.replace(',', '.')).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
               : '___________'} (brutto)</strong> betragen.
             Bei absehbaren Mehrkosten wird der Auftraggeber vorab kontaktiert und um Zustimmung gebeten.
           </div>

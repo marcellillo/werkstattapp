@@ -143,7 +143,8 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const summeNetto = arbeitszeitenSumme + ersatzteileSumme + kleinteilBetrag + sonstigesBetragZahl + betriebsstoffeSumme
+    const auf2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100
+    const summeNetto = auf2(arbeitszeitenSumme + ersatzteileSumme + kleinteilBetrag + sonstigesBetragZahl + betriebsstoffeSumme)
 
     // Kleinunternehmerregelung (§19 UStG) berücksichtigen
     const { data: kleinunternehmerSetting } = await supabase
@@ -154,8 +155,8 @@ export async function POST(req: NextRequest) {
       .maybeSingle()
     const istKleinunternehmer = kleinunternehmerSetting?.wert === 'ja'
 
-    const summeMwst = istKleinunternehmer ? 0 : summeNetto * 0.19
-    const summeBrutto = summeNetto + summeMwst
+    const summeMwst = istKleinunternehmer ? 0 : auf2(summeNetto * 0.19)
+    const summeBrutto = auf2(summeNetto + summeMwst)
 
     // Generiere Nummer (diese App rechnet ausschließlich Werkstattleistungen ab)
     const rechnungsNummer = await generateRechnungsNummer(supabase, 'werkstatt', betriebId)

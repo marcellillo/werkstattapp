@@ -328,12 +328,12 @@ export function RechnungFlow({ auftrag, firma, betriebId }: Props) {
                         {kv.nummer}
                         {kv.auto && <span className="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">Ersatzteile automatisch übernommen</span>}
                       </span>
-                      <span className="font-medium text-gray-700 tabular-nums">{kv.summe.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €</span>
+                      <span className="font-medium text-gray-700 tabular-nums">{kv.summe.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</span>
                     </label>
                   ))}
                   <div className="flex items-center justify-between px-4 py-2.5 bg-gray-50 text-sm font-semibold">
                     <span className="text-gray-600">Ersatzteile ausgewählt (netto)</span>
-                    <span className="text-gray-900 tabular-nums">{ersatzteileNetto.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €</span>
+                    <span className="text-gray-900 tabular-nums">{ersatzteileNetto.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</span>
                   </div>
                 </div>
               )}
@@ -356,7 +356,7 @@ export function RechnungFlow({ auftrag, firma, betriebId }: Props) {
                           {wa.nummer}
                           {wa.auto && <span className="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">automatisch aus Auftrag übernommen</span>}
                         </span>
-                        <span className="font-medium text-gray-700 tabular-nums">{wa.summe.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €</span>
+                        <span className="font-medium text-gray-700 tabular-nums">{wa.summe.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</span>
                       </label>
                       {wa.auto && (
                         <div className="flex items-center gap-2 mt-1.5 pl-6">
@@ -375,7 +375,7 @@ export function RechnungFlow({ auftrag, firma, betriebId }: Props) {
                   ))}
                   <div className="flex items-center justify-between px-4 py-2.5 bg-gray-50 text-sm font-semibold">
                     <span className="text-gray-600">Arbeitszeit ausgewählt (netto)</span>
-                    <span className="text-gray-900 tabular-nums">{arbeitNetto.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €</span>
+                    <span className="text-gray-900 tabular-nums">{arbeitNetto.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</span>
                   </div>
                 </div>
               )}
@@ -407,7 +407,7 @@ export function RechnungFlow({ auftrag, firma, betriebId }: Props) {
                               <p className="text-xs text-amber-600">Preis fehlt — unter „Betriebsstoffe“ im Menü festlegen</p>
                             ) : (
                               <p className="text-xs text-gray-500">
-                                {b.preis_pro_einheit.toLocaleString('de-DE', { minimumFractionDigits: 2 })} € / {b.einheit} netto
+                                {b.preis_pro_einheit.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} € / {b.einheit} netto
                                 {' · '}Bestand: <span className={cn('font-medium', b.rest <= 0 ? 'text-red-600' : 'text-gray-700')}>{formatMenge(b.rest, b.einheit)}</span>
                               </p>
                             )}
@@ -430,7 +430,7 @@ export function RechnungFlow({ auftrag, firma, betriebId }: Props) {
                                 : `danach noch ${formatMenge(rundeBetrag(b.rest - menge), b.einheit)}`}
                             </span>
                             <span className="font-medium text-gray-700 tabular-nums">
-                              {rundeBetrag(menge * b.preis_pro_einheit).toLocaleString('de-DE', { minimumFractionDigits: 2 })} €
+                              {rundeBetrag(menge * b.preis_pro_einheit).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
                             </span>
                           </div>
                         )}
@@ -439,7 +439,7 @@ export function RechnungFlow({ auftrag, firma, betriebId }: Props) {
                   })}
                   <div className="flex items-center justify-between px-4 py-2.5 bg-gray-50 text-sm font-semibold">
                     <span className="text-gray-600">Betriebsstoffe (netto)</span>
-                    <span className="text-gray-900 tabular-nums">{betriebsstoffeNetto.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €</span>
+                    <span className="text-gray-900 tabular-nums">{betriebsstoffeNetto.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</span>
                   </div>
                 </div>
               )}
@@ -477,7 +477,7 @@ export function RechnungFlow({ auftrag, firma, betriebId }: Props) {
                       <div className="flex-1">
                         <label className="text-xs font-medium text-gray-600 mb-1 block">Pauschale netto</label>
                         <div className="w-full px-4 py-3 border border-teal-200 rounded-xl text-xl font-bold text-teal-700 bg-teal-50 text-center">
-                          {kleinteilNetto.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €
+                          {kleinteilNetto.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
                         </div>
                       </div>
                     </div>
@@ -542,44 +542,44 @@ export function RechnungFlow({ auftrag, firma, betriebId }: Props) {
               <div className="space-y-1.5 text-sm">
                 <div className="flex justify-between text-gray-600">
                   <span>Ersatzteile (netto)</span>
-                  <span className="tabular-nums">{ersatzteileNetto.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €</span>
+                  <span className="tabular-nums">{ersatzteileNetto.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</span>
                 </div>
                 <div className="flex justify-between text-gray-600">
                   <span>Arbeitszeit (netto)</span>
-                  <span className="tabular-nums">{arbeitNetto.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €</span>
+                  <span className="tabular-nums">{arbeitNetto.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</span>
                 </div>
                 {betriebsstoffeNetto > 0 && (
                   <div className="flex justify-between text-gray-600">
                     <span>Betriebsstoffe (netto)</span>
-                    <span className="tabular-nums">{betriebsstoffeNetto.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €</span>
+                    <span className="tabular-nums">{betriebsstoffeNetto.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</span>
                   </div>
                 )}
                 {kleinteilNetto > 0 && (
                   <div className="flex justify-between text-gray-600">
                     <span>Kleinteilpauschale (netto)</span>
-                    <span className="tabular-nums">{kleinteilNetto.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €</span>
+                    <span className="tabular-nums">{kleinteilNetto.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</span>
                   </div>
                 )}
                 {sonstigesNetto > 0 && (
                   <div className="flex justify-between text-gray-600">
                     <span>Sonstiges (netto)</span>
-                    <span className="tabular-nums">{sonstigesNetto.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €</span>
+                    <span className="tabular-nums">{sonstigesNetto.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</span>
                   </div>
                 )}
                 <div className="flex justify-between text-gray-600 border-t border-gray-200 pt-1.5">
                   <span>Gesamt netto</span>
-                  <span className="tabular-nums">{gesamtNetto.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €</span>
+                  <span className="tabular-nums">{gesamtNetto.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</span>
                 </div>
                 {!kleinunternehmer && (
                   <div className="flex justify-between text-gray-600">
                     <span>19% MwSt.</span>
-                    <span className="tabular-nums">{mwst.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €</span>
+                    <span className="tabular-nums">{mwst.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</span>
                   </div>
                 )}
                 <div className="flex justify-between font-bold text-lg text-gray-900 border-t-2 border-gray-300 pt-2">
                   <span>Gesamtbetrag {!kleinunternehmer ? '(brutto)' : ''}</span>
                   <span className={cn('tabular-nums', gesamtBrutto > 0 ? 'text-green-700' : 'text-gray-300')}>
-                    {gesamtBrutto.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €
+                    {gesamtBrutto.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
                   </span>
                 </div>
               </div>
