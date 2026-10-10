@@ -19,6 +19,8 @@ import { ServiceWeckerContent } from '@/app/(app)/service-wecker/service-wecker-
 import type { ErinnerungsStand } from '@/lib/erinnerungen-server'
 import { VehicleEditDialog } from './vehicle-edit-dialog'
 import { AuftragsBoard } from './auftrags-board'
+import { PreiseNachtragen, type PreisZeile } from './preise-nachtragen'
+import { standzeitStufe, standzeitTage, STANDZEIT_WARNUNG_TAGE } from '@/lib/standzeit'
 
 const STATUS_FILTERS: { label: string; value: FahrzeugStatus | 'alle' }[] = [
   { label: 'Alle', value: 'alle' },
@@ -72,6 +74,8 @@ export function FahrzeugeContent({
   const [loeschenLoading, setLoeschenLoading] = useState(false)
   const [eigenSubTab, setEigenSubTab] = useState<'bestand' | 'verkauft' | 'uebergeben'>('bestand')
   const [editFahrzeug, setEditFahrzeug] = useState<any | null>(null)
+  const [preiseOffen, setPreiseOffen] = useState(false)
+  const [eigenSort, setEigenSort] = useState<'standard' | 'standzeit'>('standard')
   // Ansicht der Kundenaufträge: Liste oder Board (Spalten nach Status) — wird pro Gerät gemerkt
   const [ansicht, setAnsicht] = useState<'liste' | 'board'>('liste')
   useEffect(() => {
@@ -92,6 +96,9 @@ export function FahrzeugeContent({
     if (eigenSubTabParam === 'bestand' || eigenSubTabParam === 'verkauft' || eigenSubTabParam === 'uebergeben') {
       setEigenSubTab(eigenSubTabParam)
     }
+    // Von der Startseite: "Preise nachtragen" bzw. nach Standzeit sortieren
+    if (searchParams.get('preise') === '1') { setTab('eigen'); setEigenSubTab('bestand'); setPreiseOffen(true) }
+    if (searchParams.get('sort') === 'standzeit') { setTab('eigen'); setEigenSubTab('bestand'); setEigenSort('standzeit') }
   }, [searchParams])
 
   const fremdAuftraege = auftraege.filter(a => (a.fahrzeug as any)?.fahrzeug_typ !== 'eigen')
@@ -201,7 +208,7 @@ export function FahrzeugeContent({
     ? [...filteredFremdRaw].sort((a, b) => berechnePrioritaet(b).score - berechnePrioritaet(a).score)
     : filteredFremdRaw
 
-  const filteredEigen = eigenImBestand.filter(a => {
+  const filteredEigenRaw = eigenImBestand.filter(a => {
     const q = search.toLowerCase()
     const fz = a.fahrzeug as any
     return !q ||
@@ -211,6 +218,20 @@ export function FahrzeugeContent({
       fz?.mobile_de_id?.toLowerCase().includes(q) ||
       fz?.farbe?.toLowerCase().includes(q)
   })
+  // Längste Standzeit zuerst (Auftrag angelegt = im Bestand seit)
+  const filteredEigen = eigenSort === 'standzeit'
+    ? [...filteredEigenRaw].sort((a, b) => (standzeitTage(b.erstellt_am) ?? 0) - (standzeitTage(a.erstellt_am) ?? 0))
+    : filteredEigenRaw
+
+  // Fehlende Preise im Bestand (Verkaufspreis steht bei Altdaten teils im Notiztext)
+  const hatVerkaufspreis = (fz: any) => fz?.verkaufspreis != null || /Verkaufspreis:\s*[\d.,]+\s*€/.test(fz?.notizen ?? '')
+  const ohneEinkauf = eigenImBestand.filter(a => !(a.fahrzeug as any)?.einkaufspreis).length
+  const ohneVerkauf = eigenImBestand.filter(a => !hatVerkaufspreis(a.fahrzeug)).length
+  const langeStandzeit = eigenImBestand.filter(a => (standzeitTage(a.erstellt_am) ?? 0) >= STANDZEIT_WARNUNG_TAGE).length
+  const preisZeilen: PreisZeile[] = eigenImBestand.map(a => {
+    const fz = a.fahrzeug as any
+    return { id: fz?.id, name: [fz?.marke, fz?.modell].filter(Boolean).join(' ') || 'Fahrzeug', kennzeichen: fz?.kennzeichen ?? null, mobileId: fz?.mobile_de_id ?? null, einkauf: fz?.einkaufspreis ?? null, verkauf: fz?.verkaufspreis ?? null }
+  }).filter(z => z.id)
 
   return (
     <div className="space-y-5">
@@ -744,6 +765,22 @@ export function FahrzeugeContent({
             </CardContent>
           </Card>
         ) : (
+          <>
+          {(ohneEinkauf > 0 || ohneVerkauf > 0 || langeStandzeit > 0) && (
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              {(ohneEinkauf > 0 || ohneVerkauf > 0) && (
+                <button onClick={() => setPreiseOffen(true)} className="inline-flex items-center gap-1.5 rounded-full border border-amber-300 bg-amber-50 text-amber-900 px-3 py-1.5 font-medium hover:bg-amber-100">
+                  <Euro className="w-4 h-4" /> {ohneEinkauf > 0 ? `${ohneEinkauf} ohne Einkaufspreis` : ''}{ohneEinkauf > 0 && ohneVerkauf > 0 ? ' · ' : ''}{ohneVerkauf > 0 ? `${ohneVerkauf} ohne Verkaufspreis` : ''} — nachtragen
+                </button>
+              )}
+              {langeStandzeit > 0 && (
+                <button onClick={() => setEigenSort(s => s === 'standzeit' ? 'standard' : 'standzeit')}
+                  className={cn('inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 font-medium', eigenSort === 'standzeit' ? 'bg-gray-900 border-gray-900 text-white' : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300')}>
+                  <ArrowUpDown className="w-4 h-4" /> {langeStandzeit} stehen über {STANDZEIT_WARNUNG_TAGE} Tage — {eigenSort === 'standzeit' ? 'nach Standzeit sortiert' : 'nach Standzeit sortieren'}
+                </button>
+              )}
+            </div>
+          )}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredEigen.map(auftrag => {
               const fz = auftrag.fahrzeug as any
@@ -827,6 +864,12 @@ export function FahrzeugeContent({
                       <div className="pt-3 border-t border-gray-100">
                         <div className="flex items-center justify-between mb-2">
                           <span className="text-xs font-mono text-gray-500">{fz?.kennzeichen || 'Kein KZ'}</span>
+                          {(() => {
+                            const tage = standzeitTage(auftrag.erstellt_am)
+                            if (tage === null) return null
+                            const stufe = standzeitStufe(tage)
+                            return <span className={cn('text-[11px] font-medium px-2 py-0.5 rounded-full', stufe === 'kritisch' ? 'bg-red-100 text-red-700' : stufe === 'warnung' ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-500')}>{tage} {tage === 1 ? 'Tag' : 'Tage'} im Bestand</span>
+                          })()}
                         </div>
                         <div className="grid grid-cols-2 gap-2 text-xs">
                           {fz?.einkaufspreis ? (
@@ -857,6 +900,11 @@ export function FahrzeugeContent({
                             <p className="text-[10px] text-green-600 leading-none mb-0.5">Marge</p>
                             <p className="font-bold text-green-700">
                               {Math.round(((Number(verkaufspreis.replace(/\./g, '').replace(',', '.')) - Number(fz.einkaufspreis)) / Number(fz.einkaufspreis)) * 100)}%
+                              {(() => {
+                                const vkNum = Number(verkaufspreis.replace(/\./g, '').replace(',', '.'))
+                                const marge = vkNum - Number(fz.einkaufspreis)
+                                return <span className="font-medium text-green-600"> · {marge.toLocaleString('de-DE', { maximumFractionDigits: 0 })} €{teileKosten > 0 ? ` (nach Teilen ${(marge - teileKosten).toLocaleString('de-DE', { maximumFractionDigits: 0 })} €)` : ''}</span>
+                              })()}
                             </p>
                           </div>
                         )}
@@ -904,8 +952,13 @@ export function FahrzeugeContent({
               )
             })}
           </div>
+          </>
         ))}
         </>
+      )}
+
+      {preiseOffen && (
+        <PreiseNachtragen zeilen={preisZeilen} onClose={() => setPreiseOffen(false)} onGespeichert={() => router.refresh()} />
       )}
 
       {/* TÜV-Wecker Tab */}

@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { DashboardContent } from './dashboard-content'
 import { getBetriebIdForUser } from '@/lib/server-betrieb'
 import { istUeberfaellig } from '@/lib/zahlung'
+import { standzeitTage, STANDZEIT_WARNUNG_TAGE } from '@/lib/standzeit'
 import { hatKontakt } from '@/lib/kontakt'
 
 export default async function DashboardPage() {
@@ -28,10 +29,10 @@ export default async function DashboardPage() {
     { data: kundenRechnungenOffenRaw },
     { data: kundenKontaktRaw },
     { count: fahrzeugeOhneHuAnzahl },
-    { data: bewertungenRaw },
     { data: rolleRow },
     { data: sicherungRow },
     { data: laufendRaw },
+    { count: pushGeraete },
   ] = await Promise.all([
     supabase.from('hebebuehnen').select('*').order('position').order('nummer'),
     supabase
@@ -50,15 +51,11 @@ export default async function DashboardPage() {
     supabase.from('kunden').select('email, telefon, mobil').eq('betrieb_id', betriebId),
     supabase.from('fahrzeuge').select('id', { count: 'exact', head: true }).eq('betrieb_id', betriebId)
       .is('naechste_hauptuntersuchung', null).or('fahrzeug_typ.is.null,fahrzeug_typ.neq.eigen'),
-    supabase.from('auftraege').select('bewertung_sterne, bewertung_kommentar, bewertung_datum, fahrzeug:fahrzeuge(marke, modell, kennzeichen), kunde:kunden(vorname, nachname)')
-      .eq('betrieb_id', betriebId)
-      .not('bewertung_sterne', 'is', null)
-      .order('bewertung_datum', { ascending: false })
-      .limit(10),
     supabase.from('betrieb_users').select('role').eq('betrieb_id', betriebId).eq('profile_id', user.id).maybeSingle(),
     supabase.from('betrieb_einstellungen').select('wert').eq('betrieb_id', betriebId).eq('schluessel', 'letzte_sicherung').maybeSingle(),
     supabase.from('auftrag_zeiten').select('id, user_id, start_am, auftrag_id, auftrag:auftraege(auftrag_nr, fahrzeug:fahrzeuge(kennzeichen, marke, modell))')
       .eq('betrieb_id', betriebId).is('ende_am', null).order('start_am'),
+    supabase.from('push_subscriptions').select('id', { count: 'exact', head: true }).eq('user_id', user.id),
   ])
 
   const hebebuehnen = (hebebuehnenRaw ?? []) as any[]
@@ -79,7 +76,8 @@ export default async function DashboardPage() {
   // Kundenfahrzeuge (Reiter "Aufträge"), "Lagerbestand" die Eigenfahrzeuge im Bestand (nicht verkauft/übergeben).
   const istEigen = (a: any) => a.fahrzeug?.fahrzeug_typ === 'eigen'
   const kundenAuftraege = auftraege.filter((a: any) => !istEigen(a))
-  const lagerbestand = auftraege.filter((a: any) => istEigen(a) && a.status !== 'verkauft').length
+  const eigenBestand = auftraege.filter((a: any) => istEigen(a) && a.status !== 'verkauft')
+  const lagerbestand = eigenBestand.length
 
   const offeneAuftraege = kundenAuftraege.filter((a: any) =>
     !['fertig', 'ausgeliefert'].includes(a.status)
@@ -118,6 +116,13 @@ export default async function DashboardPage() {
   const luecken = {
     kundenOhneKontakt: ((kundenKontaktRaw ?? []) as any[]).filter(k => !hatKontakt(k.email, k.telefon, k.mobil)).length,
     fahrzeugeOhneHu: fahrzeugeOhneHuAnzahl ?? 0,
+    // Eigenfahrzeuge im Bestand: fehlende Preise (ohne Einkaufspreis keine Marge/Gewinn) und lange Standzeit
+    eigenOhneEinkauf: eigenBestand.filter((a: any) => !a.fahrzeug?.einkaufspreis).length,
+    eigenOhneVerkauf: eigenBestand.filter((a: any) => a.fahrzeug?.verkaufspreis == null && !/Verkaufspreis:/.test(a.fahrzeug?.notizen ?? '')).length,
+    standzeitLang: eigenBestand.filter((a: any) => (standzeitTage(a.erstellt_am) ?? 0) >= STANDZEIT_WARNUNG_TAGE).length,
+    standzeitMax: Math.max(0, ...eigenBestand.map((a: any) => standzeitTage(a.erstellt_am) ?? 0)),
+    // Push: auf KEINEM Gerät dieses Benutzers eingeschaltet -> Online-Buchungen/Meldungen kommen nicht an (nur wenn die Abfrage klappt)
+    pushFehlt: pushGeraete === 0,
     // Erinnerung an die Datensicherung: nur Administratoren, wenn noch nie oder seit über 30 Tagen nicht gesichert
     sicherungTage: ((): number | null | undefined => {
       if (!['admin', 'superadmin'].includes(rolleRow?.role ?? '')) return undefined
@@ -133,10 +138,6 @@ export default async function DashboardPage() {
     auftragId: z.auftrag_id,
     titel: [z.auftrag?.fahrzeug?.kennzeichen, [z.auftrag?.fahrzeug?.marke, z.auftrag?.fahrzeug?.modell].filter(Boolean).join(' ')].filter(Boolean).join(' · ') || z.auftrag?.auftrag_nr || 'Auftrag',
   }))
-  const bewertungen = (bewertungenRaw ?? []) as any[]
-  const bewertungDurchschnitt = bewertungen.length
-    ? Math.round((bewertungen.reduce((s, b) => s + b.bewertung_sterne, 0) / bewertungen.length) * 10) / 10
-    : null
 
   return (
     <DashboardContent
@@ -155,8 +156,6 @@ export default async function DashboardPage() {
       forderungen={forderungen}
       luecken={luecken}
       laufendeZeiten={laufendeZeiten}
-      bewertungen={bewertungen}
-      bewertungDurchschnitt={bewertungDurchschnitt}
     />
   )
 }

@@ -1,11 +1,21 @@
 // "Zu erledigen" auf der Startseite: offene Kundenrechnungen und Datenlücken, die später Arbeit machen
 // (Kunde ohne Kontakt = nicht erreichbar, Fahrzeug ohne HU-Datum = kein TÜV-Wecker).
 import Link from 'next/link'
-import { AlertTriangle, ChevronRight, Database, Euro, PhoneOff, ShieldQuestion } from 'lucide-react'
+import { AlertTriangle, Bell, ChevronRight, Clock, Database, Euro, PhoneOff, ShieldQuestion, Tag } from 'lucide-react'
 
 export type Forderungen = { anzahl: number; summe: number; ueberfaellig: number; ueberfaelligSumme: number }
 /** sicherungTage: nur für Administratoren gesetzt, wenn die Datensicherung fällig ist (null = noch nie heruntergeladen) */
-export type Luecken = { kundenOhneKontakt: number; fahrzeugeOhneHu: number; sicherungTage?: number | null }
+export type Luecken = {
+  kundenOhneKontakt: number
+  fahrzeugeOhneHu: number
+  sicherungTage?: number | null
+  eigenOhneEinkauf?: number
+  eigenOhneVerkauf?: number
+  standzeitLang?: number
+  standzeitMax?: number
+  /** dieser Benutzer hat auf keinem Gerät Benachrichtigungen eingeschaltet */
+  pushFehlt?: boolean
+}
 
 const euro = (v: number) => `${v.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`
 
@@ -39,6 +49,32 @@ export function ZuTunKarte({ forderungen, luecken }: { forderungen: Forderungen;
       key: 'hu', href: '/tuev-wecker#ohne-hu', icon: ShieldQuestion, farbe: 'bg-slate-100 text-slate-600',
       titel: `${luecken.fahrzeugeOhneHu} ${luecken.fahrzeugeOhneHu === 1 ? 'Fahrzeug' : 'Fahrzeuge'} ohne HU-Datum`,
       text: 'Datum von der Plakette eintragen, dann erinnert der TÜV-Wecker rechtzeitig',
+    })
+  }
+  if ((luecken.standzeitLang ?? 0) > 0) {
+    zeilen.push({
+      key: 'standzeit', href: '/fahrzeuge?tab=eigen&sort=standzeit', icon: Clock, farbe: 'bg-amber-50 text-amber-600',
+      titel: `${luecken.standzeitLang} ${luecken.standzeitLang === 1 ? 'Fahrzeug steht' : 'Fahrzeuge stehen'} über 60 Tage`,
+      text: `Am längsten seit ${luecken.standzeitMax} Tagen — Preis noch passend?`,
+    })
+  }
+  if ((luecken.eigenOhneEinkauf ?? 0) > 0 || (luecken.eigenOhneVerkauf ?? 0) > 0) {
+    zeilen.push({
+      key: 'preise', href: '/fahrzeuge?tab=eigen&preise=1', icon: Tag, farbe: 'bg-slate-100 text-slate-600',
+      titel: [
+        (luecken.eigenOhneEinkauf ?? 0) > 0 ? `${luecken.eigenOhneEinkauf} Fahrzeuge ohne Einkaufspreis` : '',
+        (luecken.eigenOhneVerkauf ?? 0) > 0 ? `${luecken.eigenOhneVerkauf} ohne Verkaufspreis` : '',
+      ].filter(Boolean).join(' · '),
+      text: (luecken.eigenOhneEinkauf ?? 0) > 0
+        ? 'Ohne Einkaufspreis kann die App weder Marge noch Gewinn ausrechnen — jetzt nachtragen'
+        : 'Ohne Verkaufspreis lässt sich die Marge nicht ausrechnen — jetzt nachtragen',
+    })
+  }
+  if (luecken.pushFehlt) {
+    zeilen.push({
+      key: 'push', href: '/einstellungen', icon: Bell, farbe: 'bg-slate-100 text-slate-600',
+      titel: 'Benachrichtigungen einschalten',
+      text: 'Sonst erfährst du nicht sofort von neuen Online-Buchungen — einmal je Gerät unter Einstellungen → Benachrichtigungen',
     })
   }
   if (luecken.sicherungTage !== undefined) {

@@ -3,7 +3,7 @@
 // Berechtigungen kommen weiter über `key` (rollen-context), optionale Feature-Schalter über `feature`.
 import {
   LayoutDashboard, Car, Wrench, Layers, CalendarClock, Users, BookOpen,
-  ClipboardCheck, Package, PackagePlus, Droplets, Calendar, ShieldAlert, Receipt, Mail, Bell, BarChart2, History,
+  ClipboardCheck, Package, PackagePlus, Droplets, HelpCircle, Calendar, ShieldAlert, Receipt, Mail, Bell, BarChart2, History,
   type LucideIcon,
 } from 'lucide-react'
 import type { FeatureName } from '@/lib/feature-flags'
@@ -72,6 +72,7 @@ export const NAV_MEHR: { label: string; items: NavItem[] }[] = [
       { href: '/benachrichtigungen', label: 'Benachrichtigungen', icon: Bell, key: 'benachrichtigungen', badge: 'benachrichtigungen', aktiv: (p) => startet(p, '/benachrichtigungen') },
       { href: '/statistiken', label: 'Statistiken', icon: BarChart2, key: 'statistiken', aktiv: (p) => startet(p, '/statistiken') },
       { href: '/verlauf', label: 'Verlauf', icon: History, key: 'verlauf', aktiv: (p) => startet(p, '/verlauf') },
+      { href: '/hilfe', label: 'Anleitung', icon: HelpCircle, key: 'dashboard', aktiv: (p) => startet(p, '/hilfe') },
     ],
   },
 ]

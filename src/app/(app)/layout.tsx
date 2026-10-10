@@ -40,6 +40,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/kostenvoranschlaege': 'Kostenvoranschläge',
   '/emails': 'E-Mail-Protokoll',
   '/service-wecker': 'Service-Wecker',
+  '/hilfe': 'Anleitung',
 }
 
 function AppShell({ children }: { children: React.ReactNode }) {
