@@ -6,30 +6,13 @@ import webpush from 'web-push'
 import { initWebPush } from '@/lib/push-vapid'
 import { timingSafeEqual } from 'crypto'
 import { clientIp, rateLimit } from '@/lib/rate-limit'
+import { dauerBegrenzen, freieZeiten, ueberbucht } from '@/lib/buchung-slots'
+import { getBuchungBetriebId, ladeBelegungen, ladeBuchungKonfig } from '@/lib/buchung-server'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
-
-// Ziel-Betrieb für öffentliche Online-Buchungen (Helios Automobile GmbH).
-// Bevorzugt eine feste ID aus der Umgebungsvariable; fällt sonst auf Namenssuche
-// zurück und, falls nur ein Betrieb existiert, auf diesen.
-async function getDefaultBetriebId(): Promise<string | null> {
-  if (process.env.BOOKING_BETRIEB_ID) return process.env.BOOKING_BETRIEB_ID
-
-  const { data: byName } = await supabase
-    .from('betriebe')
-    .select('id')
-    .ilike('name', '%helios%')
-    .maybeSingle()
-  if (byName?.id) return byName.id
-
-  const { data: alle } = await supabase.from('betriebe').select('id')
-  if (alle?.length === 1) return alle[0].id
-
-  return null
-}
 
 export async function POST(req: NextRequest) {
   // CORS-Header damit die Website den Endpunkt aufrufen darf
@@ -106,6 +89,29 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Ungültige Uhrzeit' }, { status: 400, headers })
   }
 
+  // ── Verfügbarkeit: ist die gewählte Zeit noch frei? ──
+  // Die aktuelle Website fordert die Prüfung an (slot_pruefen) und bekommt bei belegter Zeit eine 409-Antwort.
+  // Ältere Versionen der Website kennen diese Antwort nicht -- damit dort keine Buchung stillschweigend verloren geht,
+  // wird sie trotzdem angenommen und im Termin als "bitte prüfen" vermerkt.
+  const defaultBetriebId = await getBuchungBetriebId()
+  if (!defaultBetriebId) {
+    return NextResponse.json({ error: 'Keine Werkstatt für Online-Buchungen konfiguriert' }, { status: 500, headers })
+  }
+  const pruefen = body.slot_pruefen === true
+  const dauer = dauerBegrenzen(body.dauer_minuten)
+  const konfig = await ladeBuchungKonfig(defaultBetriebId)
+  if (pruefen && !uhrzeit) {
+    return NextResponse.json({ error: 'Bitte eine Uhrzeit wählen' }, { status: 400, headers })
+  }
+  const belegtVorher = (await ladeBelegungen(defaultBetriebId, datum, datum))[datum] ?? []
+  const zeitFrei = !uhrzeit || freieZeiten(datum, dauer, belegtVorher, konfig).includes(uhrzeit)
+  if (pruefen && !zeitFrei) {
+    return NextResponse.json(
+      { error: 'Diese Zeit ist leider nicht mehr frei. Bitte wählen Sie eine andere Uhrzeit.', code: 'slot_belegt' },
+      { status: 409, headers },
+    )
+  }
+
   // ── Fahrzeugschein-Foto aus der Online-Anfrage dauerhaft in Supabase Storage sichern ──
   // (nutzt denselben privaten "fahrzeugbrief"-Bucket wie die manuell hochgeladenen
   // Fahrzeugbriefe; der Service-Role-Client umgeht Storage-Policies, kein Setup nötig)
@@ -142,11 +148,6 @@ export async function POST(req: NextRequest) {
     marke_modell ? `Fahrzeug: ${marke_modell}` : null,
     nachricht ? `Nachricht: ${nachricht}` : null,
   ].filter(Boolean).join('\n')
-
-  const defaultBetriebId = await getDefaultBetriebId()
-  if (!defaultBetriebId) {
-    return NextResponse.json({ error: 'Keine Werkstatt für Online-Buchungen konfiguriert' }, { status: 500, headers })
-  }
 
   // ── 1. Kunde: Duplikat per Telefon → E-Mail → neu anlegen ──────────────
   let kundeId: string | null = null
@@ -208,9 +209,8 @@ export async function POST(req: NextRequest) {
         !marke_modell && 'Fahrzeugmodell',
         !email && 'E-Mail',
       ].filter(Boolean)
-      const hinweis = fehlendeDaten.length
-        ? `\n\n⚠️ Noch zu erfragen: ${fehlendeDaten.join(', ')}`
-        : ''
+      const hinweis = (fehlendeDaten.length ? `\n\n⚠️ Noch zu erfragen: ${fehlendeDaten.join(', ')}` : '')
+        + (zeitFrei ? '' : '\n\n⚠️ Die gewählte Zeit war schon belegt bzw. außerhalb der Öffnungszeiten — bitte Termin prüfen/abstimmen.')
       const fahrzeugscheinHinweis = fahrzeugscheinPfad
         ? `\n\n📄 Fahrzeugschein-Foto vorhanden (siehe Termine → Online-Buchung)`
         : ''
@@ -232,24 +232,41 @@ export async function POST(req: NextRequest) {
     console.error('Kunde/Fahrzeug/Auftrag error:', e)
   }
 
-  const { error } = await supabase.from('termine').insert({
+  const { data: neuerTermin, error } = await supabase.from('termine').insert({
     betrieb_id: defaultBetriebId,
     titel,
-    beschreibung,
+    beschreibung: beschreibung + (zeitFrei ? '' : '\n⚠️ Gewählte Zeit war bereits belegt — bitte Termin prüfen/abstimmen.'),
     datum,
     uhrzeit: uhrzeit || null,
-    dauer_minuten: 60,
+    dauer_minuten: dauer,
     typ: 'online',
     quelle: 'website',
     status: 'offen',
     kunden_id: kundeId,
     auftrag_id: auftragId,
     notizen: `Online-Buchung von der Website${fahrzeugscheinPfad ? '\nFahrzeugschein-Pfad: ' + fahrzeugscheinPfad : ''}`,
-  })
+  }).select('id, erstellt_am').single()
 
-  if (error) {
+  if (error || !neuerTermin) {
     console.error('Termin insert error:', error)
     return NextResponse.json({ error: 'Fehler beim Speichern' }, { status: 500, headers })
+  }
+
+  // Gleichzeitige Buchung derselben Zeit abfangen: ist nach dem Eintragen mehr los als erlaubt, wird dieser Termin zurückgenommen --
+  // aber nur, wenn er nicht der ältere von beiden ist (sonst würden sich beide gegenseitig löschen). Ein Termin, der schon früher
+  // eingetragen war, behält seinen Platz.
+  if (pruefen && uhrzeit) {
+    const meine = Date.parse(neuerTermin.erstellt_am)
+    const belegtNachher = ((await ladeBelegungen(defaultBetriebId, datum, datum))[datum] ?? [])
+      .filter(b => b.id === neuerTermin.id || !b.erstellt_am || Date.parse(b.erstellt_am) <= meine)
+    if (ueberbucht(uhrzeit, dauer, belegtNachher, konfig)) {
+      await supabase.from('termine').delete().eq('id', neuerTermin.id)
+      if (auftragId) await supabase.from('auftraege').delete().eq('id', auftragId).eq('betrieb_id', defaultBetriebId)
+      return NextResponse.json(
+        { error: 'Diese Zeit wurde gerade von jemand anderem gebucht. Bitte wählen Sie eine andere Uhrzeit.', code: 'slot_belegt' },
+        { status: 409, headers },
+      )
+    }
   }
 
   // Push-Benachrichtigung an alle abonnierten Geräte senden

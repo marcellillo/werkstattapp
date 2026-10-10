@@ -39,6 +39,10 @@ interface Config {
   firma_stundensatz: string
   google_bewertung_url: string
   zahlungsziel_tage: string
+  buchung_beginn: string
+  buchung_ende: string
+  buchung_kapazitaet: string
+  buchung_geschlossen: string
   firma_kleinunternehmer: string
   firma_logo: string
   firma_paypal: string
@@ -291,6 +295,10 @@ export function EinstellungenContent({ initialConfig, graphStatus, geheimnisseGe
                   { key: 'firma_amtsgericht',    label: 'Amtsgericht',        placeholder: 'Braunschweig' },
                   { key: 'firma_stundensatz',    label: 'Stundensatz (€)',    placeholder: '95' },
                   { key: 'zahlungsziel_tage',    label: 'Zahlungsziel (Tage)', placeholder: '14' },
+                  { key: 'buchung_kapazitaet',   label: 'Online-Buchung: gleichzeitige Termine', placeholder: '2' },
+                  { key: 'buchung_beginn',       label: 'Online-Buchung: früheste Uhrzeit', placeholder: '08:00' },
+                  { key: 'buchung_ende',         label: 'Online-Buchung: Termine enden spätestens', placeholder: '16:30' },
+                  { key: 'buchung_geschlossen',  label: 'Online-Buchung: geschlossene Tage (JJJJ-MM-TT, mit Komma getrennt — z. B. Urlaub, Feiertage)', placeholder: '2026-12-24, 2026-12-25, 2026-12-31', full: true },
                   { key: 'google_bewertung_url', label: 'Google-Bewertungslink (für die Bewertungsanfrage an Kunden)', placeholder: 'https://g.page/r/…/review', full: true },
                 ] as {key: keyof Config, label: string, placeholder: string, full?: boolean}[]).map(f => (
                   <div key={f.key} className={f.full ? 'sm:col-span-2' : ''}>
