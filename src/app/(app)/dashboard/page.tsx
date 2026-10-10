@@ -31,6 +31,7 @@ export default async function DashboardPage() {
     { data: bewertungenRaw },
     { data: rolleRow },
     { data: sicherungRow },
+    { data: laufendRaw },
   ] = await Promise.all([
     supabase.from('hebebuehnen').select('*').order('position').order('nummer'),
     supabase
@@ -56,6 +57,8 @@ export default async function DashboardPage() {
       .limit(10),
     supabase.from('betrieb_users').select('role').eq('betrieb_id', betriebId).eq('profile_id', user.id).maybeSingle(),
     supabase.from('betrieb_einstellungen').select('wert').eq('betrieb_id', betriebId).eq('schluessel', 'letzte_sicherung').maybeSingle(),
+    supabase.from('auftrag_zeiten').select('id, user_id, start_am, auftrag_id, auftrag:auftraege(auftrag_nr, fahrzeug:fahrzeuge(kennzeichen, marke, modell))')
+      .eq('betrieb_id', betriebId).is('ende_am', null).order('start_am'),
   ])
 
   const hebebuehnen = (hebebuehnenRaw ?? []) as any[]
@@ -123,6 +126,13 @@ export default async function DashboardPage() {
       return tage > 30 ? tage : undefined
     })(),
   }
+  const laufendeZeiten = ((laufendRaw ?? []) as any[]).map(z => ({
+    id: z.id,
+    name: ((mitarbeiterRaw ?? []) as any[]).find(m => m.id === z.user_id)?.full_name || 'Mitarbeiter',
+    seit: z.start_am,
+    auftragId: z.auftrag_id,
+    titel: [z.auftrag?.fahrzeug?.kennzeichen, [z.auftrag?.fahrzeug?.marke, z.auftrag?.fahrzeug?.modell].filter(Boolean).join(' ')].filter(Boolean).join(' · ') || z.auftrag?.auftrag_nr || 'Auftrag',
+  }))
   const bewertungen = (bewertungenRaw ?? []) as any[]
   const bewertungDurchschnitt = bewertungen.length
     ? Math.round((bewertungen.reduce((s, b) => s + b.bewertung_sterne, 0) / bewertungen.length) * 10) / 10
@@ -144,6 +154,7 @@ export default async function DashboardPage() {
       offeneRechnungenSumme={offeneRechnungenSumme}
       forderungen={forderungen}
       luecken={luecken}
+      laufendeZeiten={laufendeZeiten}
       bewertungen={bewertungen}
       bewertungDurchschnitt={bewertungDurchschnitt}
     />

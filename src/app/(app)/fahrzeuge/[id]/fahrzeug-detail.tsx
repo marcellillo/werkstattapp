@@ -21,6 +21,7 @@ import { KostenvoranschlagSection } from './kostenvoranschlag-section'
 import { WerkstattauftragSection } from './werkstattauftrag-section'
 import { RechnungSection } from './rechnung-section'
 import { VorgangLeiste } from './vorgang-leiste'
+import { ArbeitszeitKarte } from '@/components/arbeitszeit-karte'
 import { LieferscheinQuickScan } from '@/components/lieferschein-quick-scan'
 import { LieferscheinGalerie } from '@/components/lieferschein-galerie'
 import { AuftragDokumente } from '@/components/auftrag-dokumente'
@@ -582,6 +583,9 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
         kunde={auftrag.kunde}
         fahrzeugName={`${(auftrag.fahrzeug as any)?.marke ?? ''} ${(auftrag.fahrzeug as any)?.modell ?? ''}`.trim()}
       />
+
+      {/* Arbeitszeit: starten/stoppen, Zeit nachtragen */}
+      <ArbeitszeitKarte auftragId={auftrag.id} betriebId={betriebId} gesperrt={['ausgeliefert', 'storniert', 'verkauft'].includes(auftrag.status)} />
 
       {/* Schnellaktionen */}
       <div className="flex flex-wrap gap-2">

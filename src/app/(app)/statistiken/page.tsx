@@ -118,11 +118,51 @@ export default async function StatistikenPage() {
     }
   })
 
+  // ── Arbeitszeit: gestempelte Zeiten (letzte 400 Tage) gegen abgerechnete Arbeitsstunden ──
+  const seit = new Date(Date.now() - 400 * 86_400_000).toISOString()
+  const { data: zeitenRoh } = await supabase
+    .from('auftrag_zeiten')
+    .select('id, user_id, auftrag_id, start_am, ende_am')
+    .eq('betrieb_id', betriebId).gte('start_am', seit).order('start_am', { ascending: false }).limit(5000)
+  const zeiten = (zeitenRoh ?? []) as any[]
+  const auftragIds = [...new Set(zeiten.map(z => z.auftrag_id))]
+  const userIds = [...new Set(zeiten.map(z => z.user_id).filter(Boolean))]
+  const [auftragRes, waRes, profileRes] = await Promise.all([
+    auftragIds.length ? supabase.from('auftraege').select('id, auftrag_nr, fahrzeug:fahrzeuge(kennzeichen, marke, modell)').in('id', auftragIds) : Promise.resolve({ data: [] as any[] }),
+    auftragIds.length ? supabase.from('werkstattauftraege').select('id, auftrag_id').eq('betrieb_id', betriebId).in('auftrag_id', auftragIds) : Promise.resolve({ data: [] as any[] }),
+    userIds.length ? supabase.from('profiles').select('id, full_name').in('id', userIds) : Promise.resolve({ data: [] as any[] }),
+  ])
+  const waIds = (waRes.data ?? []).map((w: any) => w.id)
+  const { data: positionen } = waIds.length
+    ? await supabase.from('werkstattauftrag_positionen').select('werkstattauftrag_id, menge').eq('betrieb_id', betriebId).in('werkstattauftrag_id', waIds)
+    : { data: [] as any[] }
+  const waZuAuftrag = new Map<string, string>((waRes.data ?? []).map((w: any) => [w.id, w.auftrag_id]))
+  const abgerechnet: Record<string, number> = {}
+  for (const p of positionen ?? []) {
+    const a = waZuAuftrag.get(p.werkstattauftrag_id)
+    if (a) abgerechnet[a] = (abgerechnet[a] ?? 0) + (Number(p.menge) || 0)
+  }
+  const arbeitszeit = {
+    zeiten: zeiten.map(z => ({
+      userId: z.user_id as string | null,
+      name: (profileRes.data ?? []).find((p: any) => p.id === z.user_id)?.full_name || 'Mitarbeiter',
+      auftragId: z.auftrag_id as string,
+      start_am: z.start_am as string,
+      ende_am: z.ende_am as string | null,
+    })),
+    auftraege: Object.fromEntries((auftragRes.data ?? []).map((a: any) => [a.id, {
+      nr: a.auftrag_nr as string | null,
+      fahrzeug: [a.fahrzeug?.kennzeichen, [a.fahrzeug?.marke, a.fahrzeug?.modell].filter(Boolean).join(' ')].filter(Boolean).join(' · '),
+      abgerechnetStunden: abgerechnet[a.id] ?? 0,
+    }])),
+  }
+
   return (
     <StatistikenContent
       verkauft={verkauft.data ?? []}
       werkstatt={werkstatt}
       lager={lager.data ?? []}
+      arbeitszeit={arbeitszeit}
     />
   )
 }

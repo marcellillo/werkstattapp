@@ -3,15 +3,23 @@
 import { useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
+import Link from 'next/link'
+import { dauerMinuten, stundenText } from '@/lib/arbeitszeit'
+
+interface ArbeitszeitDaten {
+  zeiten: { userId: string | null; name: string; auftragId: string; start_am: string; ende_am: string | null }[]
+  auftraege: Record<string, { nr: string | null; fahrzeug: string; abgerechnetStunden: number }>
+}
 
 interface StatistikenProps {
   verkauft: any[]
   werkstatt?: any[]
   lager?: any[]
+  arbeitszeit?: ArbeitszeitDaten
 }
 
-export function StatistikenContent({ verkauft, werkstatt = [], lager = [] }: StatistikenProps) {
-  const [tab, setTab] = useState<'verkauf' | 'werkstatt' | 'lager'>('verkauf')
+export function StatistikenContent({ verkauft, werkstatt = [], lager = [], arbeitszeit = { zeiten: [], auftraege: {} } }: StatistikenProps) {
+  const [tab, setTab] = useState<'verkauf' | 'werkstatt' | 'lager' | 'zeit'>('verkauf')
   const [period, setPeriod] = useState<'week' | 'month' | 'year' | 'all'>('year')
 
   const formatCurrency = (val: number) => {
@@ -165,6 +173,92 @@ export function StatistikenContent({ verkauft, werkstatt = [], lager = [] }: Sta
     </div>
   )
 
+  // ===== ARBEITSZEIT TAB =====
+  const renderZeitTab = () => {
+    const zeiten = filterByPeriod(arbeitszeit.zeiten, 'start_am')
+    const jetzt = Date.now()
+    const minuten = (z: any) => dauerMinuten(z, jetzt)
+    const gesamtMin = zeiten.reduce((s, z) => s + minuten(z), 0)
+    // Je Auftrag: gestempelt vs. abgerechnet (abgerechnet nur für Aufträge mit Zeiten im Zeitraum, je Auftrag einmal)
+    const jeAuftrag = new Map<string, number>()
+    for (const z of zeiten) jeAuftrag.set(z.auftragId, (jeAuftrag.get(z.auftragId) ?? 0) + minuten(z))
+    const auftragZeilen = [...jeAuftrag.entries()].map(([id, min]) => {
+      const a = arbeitszeit.auftraege[id]
+      const abgerechnet = a?.abgerechnetStunden ?? 0
+      return { id, nr: a?.nr ?? '—', fahrzeug: a?.fahrzeug ?? '', min, abgerechnet, effizienz: min > 0 && abgerechnet > 0 ? (abgerechnet * 60 / min) * 100 : null }
+    }).sort((a, b) => b.min - a.min)
+    const abgerechnetGesamt = auftragZeilen.reduce((s, a) => s + a.abgerechnet, 0)
+    const stempelMitAbrechnung = auftragZeilen.filter(a => a.abgerechnet > 0).reduce((s, a) => s + a.min, 0)
+    const effizienz = stempelMitAbrechnung > 0 ? ((auftragZeilen.filter(a => a.abgerechnet > 0).reduce((s, a) => s + a.abgerechnet, 0) * 60) / stempelMitAbrechnung) * 100 : null
+    const jeMitarbeiter = new Map<string, { name: string; min: number; auftraege: Set<string> }>()
+    for (const z of zeiten) {
+      const key = z.userId ?? 'unbekannt'
+      const e = jeMitarbeiter.get(key) ?? { name: z.name, min: 0, auftraege: new Set<string>() }
+      e.min += minuten(z); e.auftraege.add(z.auftragId); jeMitarbeiter.set(key, e)
+    }
+    const farbe = (e: number | null) => e === null ? 'text-slate-400' : e >= 100 ? 'text-green-700' : e >= 80 ? 'text-amber-600' : 'text-red-600'
+
+    if (arbeitszeit.zeiten.length === 0) return (
+      <Card><CardContent className="py-12 text-center text-slate-500">
+        <p className="text-lg font-medium text-slate-700">Noch keine Arbeitszeiten erfasst</p>
+        <p className="text-sm mt-1">Im Auftrag auf „Arbeit starten“ tippen — beim Stoppen wird die Zeit gespeichert und hier ausgewertet.</p>
+      </CardContent></Card>
+    )
+    return (
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card className="border-2 border-blue-200 bg-blue-50"><CardContent className="p-6">
+            <p className="text-sm text-blue-600 font-medium">Gestempelte Stunden</p>
+            <p className="text-3xl font-bold text-blue-900 mt-2">{stundenText(gesamtMin)} h</p>
+            <p className="text-xs text-blue-600 mt-2">{zeiten.length} Einträge · {jeAuftrag.size} Aufträge</p>
+          </CardContent></Card>
+          <Card className="border-2 border-purple-200 bg-purple-50"><CardContent className="p-6">
+            <p className="text-sm text-purple-600 font-medium">Abgerechnete Arbeitsstunden</p>
+            <p className="text-3xl font-bold text-purple-900 mt-2">{abgerechnetGesamt.toLocaleString('de-DE', { maximumFractionDigits: 2 })} h</p>
+            <p className="text-xs text-purple-600 mt-2">aus den Werkstattaufträgen dieser Aufträge</p>
+          </CardContent></Card>
+          <Card className={`border-2 ${effizienz === null ? 'border-slate-200 bg-slate-50' : effizienz >= 100 ? 'border-green-200 bg-green-50' : effizienz >= 80 ? 'border-amber-200 bg-amber-50' : 'border-red-200 bg-red-50'}`}><CardContent className="p-6">
+            <p className="text-sm text-slate-600 font-medium">Effizienz</p>
+            <p className={`text-3xl font-bold mt-2 ${farbe(effizienz)}`}>{effizienz === null ? '—' : `${effizienz.toFixed(0)} %`}</p>
+            <p className="text-xs text-slate-500 mt-2">abgerechnet ÷ gestempelt (nur Aufträge mit Abrechnung)</p>
+          </CardContent></Card>
+        </div>
+
+        <Card><CardContent className="p-6">
+          <h3 className="font-semibold text-slate-900 mb-3">Mitarbeiter</h3>
+          <div className="divide-y divide-slate-100">
+            {[...jeMitarbeiter.values()].sort((a, b) => b.min - a.min).map(m => (
+              <div key={m.name} className="flex items-center justify-between py-2 text-sm">
+                <span className="text-slate-800">{m.name}</span>
+                <span className="text-slate-500">{m.auftraege.size} Aufträge · <strong className="text-slate-900">{stundenText(m.min)} h</strong></span>
+              </div>
+            ))}
+          </div>
+        </CardContent></Card>
+
+        <Card><CardContent className="p-6">
+          <h3 className="font-semibold text-slate-900 mb-3">Aufträge mit den meisten Stunden</h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead><tr className="text-left text-xs uppercase tracking-wide text-slate-400"><th className="py-2 pr-3">Auftrag</th><th className="py-2 pr-3 text-right">Gestempelt</th><th className="py-2 pr-3 text-right">Abgerechnet</th><th className="py-2 text-right">Effizienz</th></tr></thead>
+              <tbody className="divide-y divide-slate-100">
+                {auftragZeilen.slice(0, 20).map(a => (
+                  <tr key={a.id}>
+                    <td className="py-2 pr-3"><Link href={`/fahrzeuge/${a.id}#arbeitszeit`} className="text-slate-900 hover:text-orange-600 font-medium">{a.nr}</Link><span className="block text-xs text-slate-400">{a.fahrzeug}</span></td>
+                    <td className="py-2 pr-3 text-right tabular-nums">{stundenText(a.min)} h</td>
+                    <td className="py-2 pr-3 text-right tabular-nums">{a.abgerechnet > 0 ? `${a.abgerechnet.toLocaleString('de-DE', { maximumFractionDigits: 2 })} h` : '—'}</td>
+                    <td className={`py-2 text-right font-semibold tabular-nums ${farbe(a.effizienz)}`}>{a.effizienz === null ? '—' : `${a.effizienz.toFixed(0)} %`}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="text-xs text-slate-400 mt-3">100 % oder mehr heißt: schneller gearbeitet, als verkauft. Unter 80 % lohnt ein Blick, ob Arbeit nicht mit abgerechnet wurde.</p>
+        </CardContent></Card>
+      </div>
+    )
+  }
+
   const renderWerkstattTab = () => (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -264,13 +358,13 @@ export function StatistikenContent({ verkauft, werkstatt = [], lager = [] }: Sta
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-4xl font-bold text-slate-900">Statistiken</h1>
-          <p className="text-slate-600 mt-1">Verkauf • Werkstatt • Lager</p>
+          <p className="text-slate-600 mt-1">Verkauf • Werkstatt • Lager • Arbeitszeit</p>
         </div>
       </div>
 
       {/* Tabs */}
       <div className="flex gap-2 border-b border-slate-200">
-        {(['verkauf', 'werkstatt', 'lager'] as const).map((t) => (
+        {(['verkauf', 'werkstatt', 'lager', 'zeit'] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -280,7 +374,7 @@ export function StatistikenContent({ verkauft, werkstatt = [], lager = [] }: Sta
                 : 'border-transparent text-slate-600 hover:text-slate-900'
             }`}
           >
-            {t === 'verkauf' ? '🚗 Verkauf' : t === 'werkstatt' ? '🔧 Werkstatt' : '📦 Lager'}
+            {t === 'verkauf' ? '🚗 Verkauf' : t === 'werkstatt' ? '🔧 Werkstatt' : t === 'lager' ? '📦 Lager' : '⏱ Arbeitszeit'}
           </button>
         ))}
       </div>
@@ -304,6 +398,7 @@ export function StatistikenContent({ verkauft, werkstatt = [], lager = [] }: Sta
       {tab === 'verkauf' && renderVerkauftTab()}
       {tab === 'werkstatt' && renderWerkstattTab()}
       {tab === 'lager' && renderLagerTab()}
+      {tab === 'zeit' && renderZeitTab()}
 
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
         <h3 className="font-semibold text-blue-900 mb-2">💡 Zeitraum-Filter aktiv</h3>

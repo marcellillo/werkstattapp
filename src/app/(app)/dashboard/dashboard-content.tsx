@@ -15,6 +15,7 @@ import {
 } from '@/types/database'
 import { createClient } from '@/lib/supabase/client'
 import { ZuTunKarte, type Forderungen, type Luecken } from './zu-tun-karte'
+import { LaeuftGerade, type LaufendeZeit } from './laeuft-gerade'
 
 interface BuehneExt extends Hebebuehne {
   position: number
@@ -36,6 +37,7 @@ interface Props {
   offeneRechnungenSumme: number
   forderungen: Forderungen
   luecken: Luecken
+  laufendeZeiten: LaufendeZeit[]
   bewertungen: any[]
   bewertungDurchschnitt: number | null
 }
@@ -55,7 +57,7 @@ function isDialog(b: BuehneExt) {
 export function DashboardContent({
   hebebuehnen: initBuehnen, auftraege: initAuftraege,
   offeneAuftraege, wartendeTeile, fertigeHeute, ueberfaellig, naechsteTermine, eigenFahrzeuge, tuevBuehnenTermine, mitarbeiter,
-  monatsumsatz, offeneRechnungenSumme, forderungen, luecken, bewertungen, bewertungDurchschnitt
+  monatsumsatz, offeneRechnungenSumme, forderungen, luecken, laufendeZeiten, bewertungen, bewertungDurchschnitt
 }: Props) {
   const [buehnen, setBuehnen] = useState<BuehneExt[]>(initBuehnen)
   const [auftraege, setAuftraege] = useState<Auftrag[]>(initAuftraege)
@@ -134,6 +136,7 @@ const auftragMap = new Map<string, Auftrag>()
         <ChevronRight className="w-6 h-6 flex-shrink-0 opacity-80" />
       </Link>
 
+      <LaeuftGerade zeiten={laufendeZeiten} />
       <ZuTunKarte forderungen={forderungen} luecken={luecken} />
 
       {/* Stats */}
