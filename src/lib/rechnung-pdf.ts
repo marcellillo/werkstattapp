@@ -2,6 +2,7 @@
 // vom Komplett-PDF der Auftragsmappe benutzt. Alle Texte werden maskiert (esc), siehe pdf-generator.ts.
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { generatePDF } from '@/lib/pdf-generator'
+import { zahlungszielDatum } from '@/lib/zahlung'
 import { resolveRechnungDetail, type RechnungPosition, type BetriebsstoffPosition } from '@/lib/rechnung-detail'
 
 function fmt(n: number) {
@@ -155,7 +156,7 @@ export async function rechnungPdfErzeugen(
     firma.firma_ust_id ? `USt-IdNr.: ${firma.firma_ust_id}` : null,
   ].filter(Boolean).join(' · ')
 
-  const zahlungsziel = new Date(new Date(rechnung.erstellt_am).getTime() + 14 * 86_400_000).toLocaleDateString('de-DE')
+  const zahlungsziel = zahlungszielDatum(rechnung).toLocaleDateString('de-DE')
 
   const pdfBuffer = await generatePDF('rechnung', {
     logoBase64: firma.firma_logo || '',

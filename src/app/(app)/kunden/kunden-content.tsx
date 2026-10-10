@@ -223,13 +223,16 @@ function AuftragsUebersicht({ kunden }: { kunden: KundeMitAuftraegen[] }) {
 export function KundenContent({
   kunden: initialKunden,
   kundenMitAuftraegen,
+  startOhneKontakt = false,
 }: {
   kunden: Kunde[]
   kundenMitAuftraegen: KundeMitAuftraegen[]
+  startOhneKontakt?: boolean
 }) {
   const [kunden, setKunden] = useState(initialKunden)
   const [activeTab, setActiveTab] = useState<'kunden' | 'auftraege'>('kunden')
   const [search, setSearch] = useState('')
+  const [nurOhneKontakt, setNurOhneKontakt] = useState(startOhneKontakt)
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
@@ -242,13 +245,17 @@ export function KundenContent({
   const supabase = createClient()
   const { currentBetriebId } = useBetrieb()
 
+  const ohneKontaktAnzahl = kunden.filter(k => !hatKontakt(k.telefon, k.mobil, k.email)).length
   const filtered = kunden.filter(k => {
+    if (nurOhneKontakt && hatKontakt(k.telefon, k.mobil, k.email)) return false
     const q = search.toLowerCase()
     return !q ||
       k.vorname?.toLowerCase().includes(q) ||
       k.nachname?.toLowerCase().includes(q) ||
       k.firma?.toLowerCase().includes(q) ||
       k.telefon?.includes(q) ||
+      k.mobil?.includes(q) ||
+      k.email?.toLowerCase().includes(q) ||
       k.strasse?.toLowerCase().includes(q) ||
       k.plz?.toLowerCase().includes(q) ||
       k.ort?.toLowerCase().includes(q)
@@ -384,6 +391,13 @@ export function KundenContent({
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Name, Firma, Anschrift..."
               className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
           </div>
+
+          {(ohneKontaktAnzahl > 0 || nurOhneKontakt) && (
+            <button onClick={() => setNurOhneKontakt(v => !v)}
+              className={`text-xs font-medium rounded-full px-3 py-1.5 border transition-colors ${nurOhneKontakt ? 'bg-amber-500 border-amber-500 text-white' : 'bg-amber-50 border-amber-200 text-amber-800 hover:bg-amber-100'}`}>
+              {nurOhneKontakt ? '✓ ' : ''}Nur Kunden ohne Kontakt ({ohneKontaktAnzahl})
+            </button>
+          )}
 
           {deleteError && (
             <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{deleteError}</div>

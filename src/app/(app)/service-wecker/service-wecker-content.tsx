@@ -9,6 +9,10 @@ import {
 import { cn, formatDate } from '@/lib/utils'
 import { Card, CardContent } from '@/components/ui/card'
 import { createClient } from '@/lib/supabase/client'
+import { waNummer } from '@/lib/kontakt'
+import { ErinnertChip } from '@/components/erinnert-chip'
+import type { ErinnerungsStand } from '@/lib/erinnerungen-server'
+import { vorTagen } from '@/lib/zahlung'
 
 type Filter = 'alle' | 'ueberfaellig' | 'kritisch' | 'bald' | 'kein_termin' | 'ok'
 
@@ -48,17 +52,24 @@ function formatDays(days: number): string {
   return `in ca. ${months} Monat${months > 1 ? 'en' : ''}`
 }
 
-function waService(telefon: string, kennzeichen: string): string {
-  const clean = telefon.replace(/\s+/g, '').replace(/^0/, '49')
-  const text = encodeURIComponent(
-    `Guten Tag,\n\nfür Ihr Fahrzeug (${kennzeichen}) steht der nächste Service an.\n\nGerne vereinbaren wir einen Termin für Sie. Wann passt es Ihnen?\n\nMit freundlichen Grüßen\nIhre Kfz-Werkstatt`
-  )
-  return `https://wa.me/${clean}?text=${text}`
+function serviceText(kennzeichen: string, firmaName: string): string {
+  return `Guten Tag,\n\nfür Ihr Fahrzeug (${kennzeichen}) steht der nächste Service an.\n\nGerne vereinbaren wir einen Termin für Sie. Wann passt es Ihnen?\n\nMit freundlichen Grüßen\n${firmaName || 'Ihre Kfz-Werkstatt'}`
 }
 
-export function ServiceWeckerContent({ fahrzeuge: initialFahrzeuge }: { fahrzeuge: any[] }) {
+export function ServiceWeckerContent({ fahrzeuge: initialFahrzeuge, erinnerungen: initialErinnerungen, firmaName }: {
+  fahrzeuge: any[]
+  erinnerungen: ErinnerungsStand
+  firmaName: string
+}) {
   const supabase = createClient()
   const [fahrzeuge, setFahrzeuge] = useState(initialFahrzeuge)
+  const [erinnerungen, setErinnerungen] = useState<ErinnerungsStand>(initialErinnerungen)
+
+  // Erinnerung im Protokoll vermerken (beim Antippen von WhatsApp/Anrufen), damit niemand doppelt angeschrieben wird
+  async function erinnern(f: any, kanal: 'whatsapp' | 'telefon') {
+    setErinnerungen(prev => ({ ...prev, [f.id]: { anzahl: (prev[f.id]?.anzahl ?? 0) + 1, letzte: new Date().toISOString(), kanal } }))
+    await supabase.from('kunden_erinnerungen').insert({ betrieb_id: f.betrieb_id, art: 'service', bezug_id: f.id, kunde_id: f.kunden_id ?? null, kanal })
+  }
   const [filter, setFilter] = useState<Filter>('alle')
   const [search, setSearch] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -218,7 +229,7 @@ export function ServiceWeckerContent({ fahrzeuge: initialFahrzeuge }: { fahrzeug
               </p>
             </div>
           </div>
-          <BatchBenachrichtigung fahrzeuge={[...ueberfaellig, ...kritisch]} />
+          <BatchBenachrichtigung fahrzeuge={[...ueberfaellig, ...kritisch]} firmaName={firmaName} erinnerungen={erinnerungen} onErinnert={f => erinnern(f, 'whatsapp')} />
         </div>
       )}
 
@@ -300,9 +311,9 @@ export function ServiceWeckerContent({ fahrzeuge: initialFahrzeuge }: { fahrzeug
                     {f.kunde && (
                       <div className="flex items-center gap-3 mt-1.5 flex-wrap">
                         <span className="text-sm text-gray-700 font-medium">{f.kunde.vorname} {f.kunde.nachname}</span>
-                        {f.kunde.telefon && (
-                          <a href={`tel:${f.kunde.telefon}`} className="flex items-center gap-1 text-xs text-gray-500 hover:text-orange-600">
-                            <Phone className="w-3 h-3" /> {f.kunde.telefon}
+                        {(f.kunde.mobil || f.kunde.telefon) && (
+                          <a href={`tel:${f.kunde.mobil || f.kunde.telefon}`} className="flex items-center gap-1 text-xs text-gray-500 hover:text-orange-600">
+                            <Phone className="w-3 h-3" /> {f.kunde.mobil || f.kunde.telefon}
                           </a>
                         )}
                         {f.kunde.email && (
@@ -310,6 +321,7 @@ export function ServiceWeckerContent({ fahrzeuge: initialFahrzeuge }: { fahrzeug
                             <Mail className="w-3 h-3" /> {f.kunde.email}
                           </a>
                         )}
+                        <ErinnertChip eintrag={erinnerungen[f.id]} />
                       </div>
                     )}
 
@@ -374,19 +386,20 @@ export function ServiceWeckerContent({ fahrzeuge: initialFahrzeuge }: { fahrzeug
                         <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-2">
                           <p className="text-xs font-semibold text-amber-800">Kunde kontaktieren &amp; Zustimmung einholen:</p>
                           <div className="flex flex-wrap gap-2">
-                            {f.kunde?.telefon && (
-                              <a href={waService(f.kunde.telefon, f.kennzeichen)} target="_blank" rel="noopener noreferrer"
+                            {waNummer(f.kunde?.mobil) || waNummer(f.kunde?.telefon) ? (
+                              <a href={`https://wa.me/${waNummer(f.kunde?.mobil) || waNummer(f.kunde?.telefon)}?text=${encodeURIComponent(serviceText(f.kennzeichen, firmaName))}`}
+                                target="_blank" rel="noopener noreferrer" onClick={() => erinnern(f, 'whatsapp')}
                                 className="flex items-center gap-1.5 text-xs bg-green-50 hover:bg-green-100 border border-green-200 text-green-700 font-medium px-3 py-1.5 rounded-lg transition-colors">
                                 <MessageCircle className="w-3.5 h-3.5" /> WhatsApp
                               </a>
-                            )}
-                            {f.kunde?.telefon && (
-                              <a href={`tel:${f.kunde.telefon}`}
+                            ) : null}
+                            {(f.kunde?.mobil || f.kunde?.telefon) && (
+                              <a href={`tel:${f.kunde.mobil || f.kunde.telefon}`} onClick={() => erinnern(f, 'telefon')}
                                 className="flex items-center gap-1.5 text-xs bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 font-medium px-3 py-1.5 rounded-lg transition-colors">
                                 <Phone className="w-3.5 h-3.5" /> Anrufen
                               </a>
                             )}
-                            {!f.kunde?.telefon && <span className="text-xs text-amber-700">Kein Telefon hinterlegt</span>}
+                            {!f.kunde?.mobil && !f.kunde?.telefon && <span className="text-xs text-amber-700">Kein Telefon hinterlegt</span>}
                           </div>
                           <div className="flex items-center gap-2 pt-1 border-t border-amber-200">
                             {zugestimmtIds.has(f.id) ? (
@@ -429,9 +442,14 @@ export function ServiceWeckerContent({ fahrzeuge: initialFahrzeuge }: { fahrzeug
   )
 }
 
-function BatchBenachrichtigung({ fahrzeuge }: { fahrzeuge: any[] }) {
+function BatchBenachrichtigung({ fahrzeuge, firmaName, erinnerungen, onErinnert }: {
+  fahrzeuge: any[]
+  firmaName: string
+  erinnerungen: ErinnerungsStand
+  onErinnert: (f: any) => void
+}) {
   const [open, setOpen] = useState(false)
-  const mitTelefon = fahrzeuge.filter(f => f.kunde?.telefon)
+  const mitTelefon = fahrzeuge.filter(f => waNummer(f.kunde?.mobil) || waNummer(f.kunde?.telefon))
   const [gesendet, setGesendet] = useState<Set<string>>(new Set())
 
   if (mitTelefon.length === 0) return null
@@ -457,17 +475,18 @@ function BatchBenachrichtigung({ fahrzeuge }: { fahrzeuge: any[] }) {
             </div>
             <div className="overflow-y-auto flex-1 p-4 space-y-2">
               {mitTelefon.map(f => {
-                const clean = f.kunde.telefon.replace(/\s+/g, '').replace(/^0/, '49')
+                const clean = waNummer(f.kunde.mobil) || waNummer(f.kunde.telefon)
                 const text = encodeURIComponent(
-                  `Guten Tag ${f.kunde.vorname ?? ''},\n\nfür Ihr Fahrzeug ${f.kennzeichen} (${f.marke} ${f.modell}) steht der nächste Service an.\n\nGerne vereinbaren wir einen Termin. Wann passt es Ihnen?\n\nMit freundlichen Grüßen\nHelios Automobile GmbH`
+                  `Guten Tag ${f.kunde.vorname ?? ''},\n\nfür Ihr Fahrzeug ${f.kennzeichen} (${f.marke} ${f.modell}) steht der nächste Service an.\n\nGerne vereinbaren wir einen Termin. Wann passt es Ihnen?\n\nMit freundlichen Grüßen\n${firmaName || 'Ihre Kfz-Werkstatt'}`
                 )
                 const done = gesendet.has(f.id)
+                const frueher = erinnerungen[f.id]
                 return (
                   <a
                     key={f.id}
                     href={`https://wa.me/${clean}?text=${text}`}
                     target="_blank" rel="noopener noreferrer"
-                    onClick={() => setGesendet(p => new Set([...p, f.id]))}
+                    onClick={() => { setGesendet(p => new Set([...p, f.id])); onErinnert(f) }}
                     className={cn(
                       'flex items-center gap-3 p-3 rounded-xl border transition-colors',
                       done ? 'bg-green-50 border-green-200' : 'bg-white border-gray-200 hover:border-green-300 hover:bg-green-50'
@@ -475,7 +494,8 @@ function BatchBenachrichtigung({ fahrzeuge }: { fahrzeuge: any[] }) {
                   >
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-900">{f.kennzeichen} · {f.marke} {f.modell}</p>
-                      <p className="text-xs text-gray-500">{f.kunde.vorname} {f.kunde.nachname} · {f.kunde.telefon}</p>
+                      <p className="text-xs text-gray-500">{f.kunde.vorname} {f.kunde.nachname} · {f.kunde.mobil || f.kunde.telefon}</p>
+                      {frueher && !done && <p className="text-xs text-amber-700">Schon erinnert {vorTagen(frueher.letzte)}</p>}
                     </div>
                     {done
                       ? <Check className="w-4 h-4 text-green-600 flex-shrink-0" />

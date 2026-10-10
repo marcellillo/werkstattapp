@@ -38,6 +38,7 @@ interface Config {
   firma_amtsgericht: string
   firma_stundensatz: string
   google_bewertung_url: string
+  zahlungsziel_tage: string
   firma_kleinunternehmer: string
   firma_logo: string
   firma_paypal: string
@@ -289,6 +290,7 @@ export function EinstellungenContent({ initialConfig, graphStatus, geheimnisseGe
                   { key: 'firma_hrb',            label: 'HRB-Nummer',         placeholder: '212562' },
                   { key: 'firma_amtsgericht',    label: 'Amtsgericht',        placeholder: 'Braunschweig' },
                   { key: 'firma_stundensatz',    label: 'Stundensatz (€)',    placeholder: '95' },
+                  { key: 'zahlungsziel_tage',    label: 'Zahlungsziel (Tage)', placeholder: '14' },
                   { key: 'google_bewertung_url', label: 'Google-Bewertungslink (für die Bewertungsanfrage an Kunden)', placeholder: 'https://g.page/r/…/review', full: true },
                 ] as {key: keyof Config, label: string, placeholder: string, full?: boolean}[]).map(f => (
                   <div key={f.key} className={f.full ? 'sm:col-span-2' : ''}>

@@ -68,6 +68,7 @@ export default async function EinstellungenPage() {
     firma_amtsgericht: settings?.firma_amtsgericht ?? '',
     firma_stundensatz: settings?.firma_stundensatz ?? '',
     google_bewertung_url: settings?.google_bewertung_url ?? '',
+    zahlungsziel_tage: settings?.zahlungsziel_tage ?? '',
     firma_kleinunternehmer: settings?.firma_kleinunternehmer ?? '',
     firma_logo: settings?.firma_logo ?? '',
     firma_paypal: settings?.firma_paypal ?? '',

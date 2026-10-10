@@ -2,6 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { ServiceWeckerContent } from './service-wecker-content'
 import { getBetriebIdForUser } from '@/lib/server-betrieb'
+import { ladeErinnerungen } from '@/lib/erinnerungen-server'
+import { resolveFirmaSettings } from '@/lib/firma-settings'
 
 export default async function ServiceWeckerPage() {
   const supabase = await createClient()
@@ -17,7 +19,7 @@ export default async function ServiceWeckerPage() {
       id, betrieb_id, kennzeichen, marke, modell, baujahr, kilometerstand,
       naechster_service_datum,
       kunden_id,
-      kunde:kunden(id, vorname, nachname, telefon, email)
+      kunde:kunden(id, vorname, nachname, telefon, mobil, email)
     `)
     .eq('betrieb_id', betriebId)
     .eq('fahrzeug_typ', 'fremd')
@@ -48,7 +50,12 @@ export default async function ServiceWeckerPage() {
     letzter_service: letzterServiceMap[f.id] ?? null,
   }))
 
+  const [erinnerungen, firma] = await Promise.all([
+    ladeErinnerungen(supabase, betriebId, 'service'),
+    resolveFirmaSettings(supabase, betriebId),
+  ])
+
   return (
-    <ServiceWeckerContent fahrzeuge={fahrzeuge as any[]} />
+    <ServiceWeckerContent fahrzeuge={fahrzeuge as any[]} erinnerungen={erinnerungen} firmaName={firma.firma_name ?? ''} />
   )
 }

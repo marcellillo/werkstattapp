@@ -8,6 +8,7 @@ import { resolveRechnungDetail, type RechnungDetail } from '@/lib/rechnung-detai
 import { resolveFirmaSettings } from '@/lib/firma-settings'
 import { esc, escObjekt, sichereBildQuelle, kopfzeilenText } from '@/lib/html-escape'
 import { rateLimit } from '@/lib/rate-limit'
+import { zahlungszielDatum } from '@/lib/zahlung'
 
 function fmt(d?: string | null) {
   if (!d) return '—'
@@ -36,7 +37,7 @@ async function buildRechnungHtml(detail: RechnungDetail): Promise<string> {
   const arbeitswertePositionen = detail.arbeitswertePositionen.map(p => ({ ...p, beschreibung: esc(p.beschreibung) }))
   const istPauschal = rechnung.anzeige_modus === 'pauschal'
 
-  const zahlungsziel = new Date(new Date(rechnung.erstellt_am).getTime() + 14 * 86_400_000)
+  const zahlungsziel = zahlungszielDatum(rechnung)
 
   const giroCode = rohFirma.firma_iban
     ? buildGiroCode({

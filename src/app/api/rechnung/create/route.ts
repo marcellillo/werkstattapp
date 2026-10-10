@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { generateRechnungsNummer } from '@/lib/nummernvergabe'
 import { syncAuftragEinnahmen } from '@/lib/auftrag-einnahmen'
 import { serverFehler } from '@/lib/api-fehler'
+import { plusTage, tagBerlin, zahlungszielTage } from '@/lib/zahlung'
 
 export async function POST(req: NextRequest) {
   try {
@@ -155,6 +156,15 @@ export async function POST(req: NextRequest) {
       .maybeSingle()
     const istKleinunternehmer = kleinunternehmerSetting?.wert === 'ja'
 
+    // Zahlungsziel (Einstellungen, Standard 14 Tage): als Fälligkeitstag gespeichert, damit "überfällig" erkannt wird
+    const { data: zielSetting } = await supabase
+      .from('betrieb_einstellungen')
+      .select('wert')
+      .eq('betrieb_id', betriebId)
+      .eq('schluessel', 'zahlungsziel_tage')
+      .maybeSingle()
+    const faelligAm = plusTage(tagBerlin(), zahlungszielTage(zielSetting?.wert))
+
     const summeMwst = istKleinunternehmer ? 0 : auf2(summeNetto * 0.19)
     const summeBrutto = auf2(summeNetto + summeMwst)
 
@@ -184,6 +194,7 @@ export async function POST(req: NextRequest) {
         sonstiges_beschreibung: sonstigesBetragZahl > 0 ? (sonstigesBeschreibung || 'Sonstige Leistungen') : null,
         sonstiges_betrag: sonstigesBetragZahl > 0 ? sonstigesBetragZahl : null,
         anzeige_modus: anzeigeModusWert,
+        faellig_am: faelligAm,
         status: 'offen',
       })
       .select()
@@ -220,6 +231,9 @@ export async function POST(req: NextRequest) {
     if (validWaIds.length > 0) {
       await supabase.from('werkstattauftraege').update({ rechnung_id: rechnung.id }).in('id', validWaIds)
     }
+
+    // Betriebsstoff-Vorschläge aus Leistungspaketen sind mit dieser Rechnung erledigt (im Assistenten wurden sie angezeigt und bestätigt/angepasst)
+    await supabase.from('auftrag_betriebsstoffe').delete().eq('auftrag_id', auftragId).eq('betrieb_id', betriebId)
 
     await syncAuftragEinnahmen(supabase, auftragId, betriebId)
 

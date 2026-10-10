@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useQrDataUrl } from '@/components/ui/qr-code'
 import { buildGiroCode } from '@/lib/girocode'
 import type { RechnungDetail } from '@/lib/rechnung-detail'
+import { zahlungszielDatum } from '@/lib/zahlung'
 
 function fmt(date?: string | null) {
   if (!date) return '—'
@@ -179,7 +180,7 @@ export function RechnungDruck({ rechnungId, betriebId, firma: firmaHint }: { rec
   const mwstSatz = kleinunternehmer ? 0 : 19
   const istPauschal = rechnung.anzeige_modus === 'pauschal'
 
-  const zahlungsziel = new Date(new Date(rechnung.erstellt_am).getTime() + 14 * 86_400_000)
+  const zahlungsziel = zahlungszielDatum(rechnung)
 
   return (
     <>

@@ -16,6 +16,7 @@ import {
 import { berechnePrioritaet, PRIORITAET_LABEL, PRIORITAET_COLOR, PRIORITAET_DOT } from '@/lib/prioritaet'
 import { TuevWeckerContent } from '@/app/(app)/tuev-wecker/tuev-wecker-content'
 import { ServiceWeckerContent } from '@/app/(app)/service-wecker/service-wecker-content'
+import type { ErinnerungsStand } from '@/lib/erinnerungen-server'
 import { VehicleEditDialog } from './vehicle-edit-dialog'
 import { AuftragsBoard } from './auftrags-board'
 
@@ -33,11 +34,19 @@ export function FahrzeugeContent({
   auftraege,
   tuevFahrzeuge,
   serviceFahrzeuge,
+  tuevOhneHu,
+  tuevErinnerungen,
+  serviceErinnerungen,
+  firmaName,
   standardSteuerart = 'differenz',
 }: {
   auftraege: Auftrag[]
   tuevFahrzeuge: any[]
   serviceFahrzeuge: any[]
+  tuevOhneHu: any[]
+  tuevErinnerungen: ErinnerungsStand
+  serviceErinnerungen: ErinnerungsStand
+  firmaName: string
   standardSteuerart?: 'differenz' | 'regel' | 'ausfuhr'
 }) {
   // NEW BUTTONS VERSION - GUARANTEED VISIBLE
@@ -901,12 +910,12 @@ export function FahrzeugeContent({
 
       {/* TÜV-Wecker Tab */}
       {tab === 'tuev' && (
-        <TuevWeckerContent fahrzeuge={tuevFahrzeuge} />
+        <TuevWeckerContent fahrzeuge={tuevFahrzeuge} ohneHu={tuevOhneHu} erinnerungen={tuevErinnerungen} firmaName={firmaName} />
       )}
 
       {/* Service-Wecker Tab */}
       {tab === 'service' && (
-        <ServiceWeckerContent fahrzeuge={serviceFahrzeuge} />
+        <ServiceWeckerContent fahrzeuge={serviceFahrzeuge} erinnerungen={serviceErinnerungen} firmaName={firmaName} />
       )}
 
       {/* Übergabe-Modal */}

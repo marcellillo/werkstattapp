@@ -3,7 +3,8 @@ import { redirect } from 'next/navigation'
 import { KundenContent } from './kunden-content'
 import { getBetriebIdForUser } from '@/lib/server-betrieb'
 
-export default async function KundenPage() {
+export default async function KundenPage({ searchParams }: { searchParams: Promise<{ ohne?: string }> }) {
+  const { ohne } = await searchParams
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
@@ -36,6 +37,7 @@ export default async function KundenPage() {
     <KundenContent
       kunden={(kunden ?? []) as any[]}
       kundenMitAuftraegen={(kundenMitAuftraegen ?? []) as any[]}
+      startOhneKontakt={ohne === 'kontakt'}
     />
   )
 }

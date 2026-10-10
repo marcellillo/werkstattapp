@@ -32,7 +32,7 @@ export function LeistungspaketDialog({ auftragId, betriebId, onClose, onUebernom
   async function laden() {
     const [p, c] = await Promise.all([
       supabase.from('leistungspakete')
-        .select('id, name, beschreibung, positionen:leistungspaket_positionen(art, beschreibung, menge, einzelpreis, sortierung)')
+        .select('id, name, beschreibung, positionen:leistungspaket_positionen(art, beschreibung, menge, einzelpreis, sortierung), betriebsstoffe:leistungspaket_betriebsstoffe(menge, stoff:betriebsstoffe(name, einheit))')
         .eq('betrieb_id', betriebId).order('name'),
       supabase.from('betrieb_einstellungen').select('wert').eq('betrieb_id', betriebId).eq('schluessel', 'firma_stundensatz').maybeSingle(),
     ])
@@ -51,7 +51,8 @@ export function LeistungspaketDialog({ auftragId, betriebId, onClose, onUebernom
       arbeit.reduce((s: number, x: any) => s + Number(x.menge) * Number(x.einzelpreis ?? stundensatz ?? 0), 0)
     const teileText = teile.length ? `${teile.length} Teil${teile.length > 1 ? 'e' : ''}` : ''
     const arbeitText = arbeit.length ? `${stunden.toLocaleString('de-DE', { maximumFractionDigits: 2 })} Std. Arbeit` : ''
-    return { text: [teileText, arbeitText].filter(Boolean).join(' · '), summe }
+    const stoffText = (p.betriebsstoffe ?? []).map((b: any) => `${Number(b.menge).toLocaleString('de-DE', { maximumFractionDigits: 2 })} ${b.stoff?.einheit ?? 'L'} ${b.stoff?.name ?? ''}`.trim()).join(', ')
+    return { text: [teileText, arbeitText, stoffText].filter(Boolean).join(' · '), summe }
   }
 
   async function uebernehmen(p: any) {
@@ -64,7 +65,7 @@ export function LeistungspaketDialog({ auftragId, betriebId, onClose, onUebernom
       const d = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(d.error || 'Das Paket konnte nicht übernommen werden.')
       setErgebnis({
-        text: `„${d.paket}“ wurde übernommen${d.teile ? ` — ${d.teile} Teil${d.teile > 1 ? 'e im Kostenvoranschlag' : ' im Kostenvoranschlag'}` : ''}${d.arbeiten ? `${d.teile ? ',' : ' —'} ${d.arbeiten} Arbeitsposition${d.arbeiten > 1 ? 'en' : ''} im Werkstattauftrag` : ''}.`,
+        text: `„${d.paket}“ wurde übernommen${d.teile ? ` — ${d.teile} Teil${d.teile > 1 ? 'e im Kostenvoranschlag' : ' im Kostenvoranschlag'}` : ''}${d.arbeiten ? `${d.teile ? ',' : ' —'} ${d.arbeiten} Arbeitsposition${d.arbeiten > 1 ? 'en' : ''} im Werkstattauftrag` : ''}${d.betriebsstoffe ? `${d.teile || d.arbeiten ? ',' : ' —'} ${d.betriebsstoffe} Betriebsstoff${d.betriebsstoffe > 1 ? 'e' : ''} (wird beim Rechnungschreiben vorbelegt)` : ''}.`,
         hinweise: d.hinweise ?? [],
       })
       onUebernommen()

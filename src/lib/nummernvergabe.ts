@@ -1,4 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 /**
  * Generiert eine Nummer basierend auf FIN (letzte 6 Ziffern)
@@ -41,7 +42,15 @@ export async function generateKostenvoranschlagNummer(
     if (match) nextNum = parseInt(match[1]) + 1
   }
 
-  return `KV-${finTail}${year}${String(nextNum).padStart(4, '0')}`
+  // Die Nummer ist in der Datenbank betriebsübergreifend eindeutig, gezählt wird aber je Betrieb:
+  // hat ein anderer Betrieb die Nummer schon, wird weitergezählt (der Prüfer sieht nur "vergeben ja/nein", keine Daten).
+  const admin = createAdminClient()
+  for (let versuch = 0; versuch < 200; versuch++, nextNum++) {
+    const nummer = `KV-${finTail}${year}${String(nextNum).padStart(4, '0')}`
+    const { data: belegt } = await admin.from('kostenvoranschlaege').select('id').eq('nummer', nummer).limit(1)
+    if (!belegt?.length) return nummer
+  }
+  throw new Error('Keine freie Kostenvoranschlag-Nummer gefunden')
 }
 
 /**

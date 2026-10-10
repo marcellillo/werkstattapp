@@ -29,28 +29,8 @@ export async function POST(req: NextRequest) {
     }
 
     // Generiere Nummer
-    let nummer: string
-    if (fahrzeugId) {
-      nummer = await generateKostenvoranschlagNummer(supabase, fahrzeugId, betriebId)
-    } else {
-      // Fallback: einfache Nummer ohne FIN
-      const year = new Date().getFullYear().toString().slice(-2)
-      const { data: lastKv } = await supabase
-        .from('kostenvoranschlaege')
-        .select('nummer')
-        .eq('betrieb_id', betriebId)
-        .ilike('nummer', `KV-${year}%`)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
-
-      let nextNum = 1
-      if (lastKv?.nummer) {
-        const match = lastKv.nummer.match(/(\d{4})$/)
-        if (match) nextNum = parseInt(match[1]) + 1
-      }
-      nummer = `KV-${year}${String(nextNum).padStart(4, '0')}`
-    }
+    // (ohne Fahrzeug entsteht eine einfache Nummer ohne FIN-Teil)
+    const nummer = await generateKostenvoranschlagNummer(supabase, fahrzeugId || '', betriebId)
     console.log('[KV Create] Generated nummer:', nummer)
 
     const { data: kostenvoranschlag, error } = await supabase

@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { FahrzeugeContent } from './fahrzeuge-content'
+import { ladeErinnerungen } from '@/lib/erinnerungen-server'
+import { resolveFirmaSettings } from '@/lib/firma-settings'
 
 export default async function FahrzeugePage() {
   const supabase = await createClient()
@@ -23,6 +25,10 @@ export default async function FahrzeugePage() {
     { data: hebebuehnenRaw },
     { data: tuevFahrzeugeRaw },
     { data: serviceFahrzeugeRaw },
+    { data: tuevOhneHuRaw },
+    tuevErinnerungen,
+    serviceErinnerungen,
+    firma,
   ] = await Promise.all([
     supabase
       .from('auftraege')
@@ -33,17 +39,27 @@ export default async function FahrzeugePage() {
     supabase.from('hebebuehnen').select('*').order('nummer'),
     supabase
       .from('fahrzeuge')
-      .select('id, kennzeichen, marke, modell, naechste_hauptuntersuchung, tuev_erinnerung, kunden_id, kunde:kunden(id, vorname, nachname, telefon, email)')
+      .select('id, betrieb_id, kennzeichen, marke, modell, naechste_hauptuntersuchung, tuev_erinnerung, kunden_id, kunde:kunden(id, vorname, nachname, telefon, mobil, email)')
       .eq('betrieb_id', betriebId)
       .not('naechste_hauptuntersuchung', 'is', null)
       .neq('tuev_erinnerung', false)
       .order('naechste_hauptuntersuchung', { ascending: true }),
     supabase
       .from('fahrzeuge')
-      .select('id, kennzeichen, marke, modell, baujahr, kilometerstand, naechster_service_datum, kunden_id, kunde:kunden(id, vorname, nachname, telefon, email)')
+      .select('id, betrieb_id, kennzeichen, marke, modell, baujahr, kilometerstand, naechster_service_datum, kunden_id, kunde:kunden(id, vorname, nachname, telefon, mobil, email)')
       .eq('betrieb_id', betriebId)
       .eq('fahrzeug_typ', 'fremd')
       .order('kennzeichen'),
+    supabase
+      .from('fahrzeuge')
+      .select('id, betrieb_id, kennzeichen, marke, modell, baujahr, kunden_id, kunde:kunden(id, vorname, nachname, telefon, mobil, email)')
+      .eq('betrieb_id', betriebId)
+      .is('naechste_hauptuntersuchung', null)
+      .or('fahrzeug_typ.is.null,fahrzeug_typ.neq.eigen')
+      .order('kennzeichen'),
+    ladeErinnerungen(supabase, betriebId, 'hu'),
+    ladeErinnerungen(supabase, betriebId, 'service'),
+    resolveFirmaSettings(supabase, betriebId),
   ])
 
   const hebebuehnen = (hebebuehnenRaw ?? []) as any[]
@@ -84,6 +100,10 @@ export default async function FahrzeugePage() {
       auftraege={auftraege}
       tuevFahrzeuge={(tuevFahrzeugeRaw ?? []) as any[]}
       serviceFahrzeuge={serviceFahrzeuge as any[]}
+      tuevOhneHu={(tuevOhneHuRaw ?? []) as any[]}
+      tuevErinnerungen={tuevErinnerungen}
+      serviceErinnerungen={serviceErinnerungen}
+      firmaName={firma.firma_name ?? ''}
       standardSteuerart={standardSteuerart}
     />
   )

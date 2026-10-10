@@ -9,6 +9,9 @@ import {
 import { cn, formatDate } from '@/lib/utils'
 import { Card, CardContent } from '@/components/ui/card'
 import { createClient } from '@/lib/supabase/client'
+import { waNummer } from '@/lib/kontakt'
+import { ErinnertChip } from '@/components/erinnert-chip'
+import type { ErinnerungsStand } from '@/lib/erinnerungen-server'
 
 type Filter = 'alle' | 'ueberfaellig' | 'kritisch' | 'bald' | 'ok'
 
@@ -36,17 +39,49 @@ function formatDays(days: number): string {
   return `in ca. ${months} Monat${months > 1 ? 'en' : ''}`
 }
 
-function waPhone(telefon: string, kennzeichen: string, hu: string): string {
-  const clean = telefon.replace(/\s+/g, '').replace(/^0/, '49')
-  const text = encodeURIComponent(
-    `Guten Tag,\n\nIhr Fahrzeug (${kennzeichen}) hat am ${formatDate(hu)} den TÜV/HU-Termin.\n\nGerne kümmern wir uns um die Vorbereitung. Sollen wir einen Termin vereinbaren?\n\nMit freundlichen Grüßen\nIhre Kfz-Werkstatt`
-  )
-  return `https://wa.me/${clean}?text=${text}`
+function huText(kennzeichen: string, hu: string, firmaName: string): string {
+  return `Guten Tag,\n\nIhr Fahrzeug (${kennzeichen}) hat am ${formatDate(hu)} den TÜV/HU-Termin.\n\nGerne kümmern wir uns um die Vorbereitung. Sollen wir einen Termin vereinbaren?\n\nMit freundlichen Grüßen\n${firmaName || 'Ihre Kfz-Werkstatt'}`
 }
 
-export function TuevWeckerContent({ fahrzeuge: initialFahrzeuge }: { fahrzeuge: any[] }) {
+// Plakette zeigt nur Monat/Jahr: die HU gilt bis zum Ende dieses Monats
+function letzterTagImMonat(monat: string): string {
+  const [j, m] = monat.split('-').map(Number)
+  return new Date(Date.UTC(j, m, 0)).toISOString().slice(0, 10)
+}
+
+export function TuevWeckerContent({ fahrzeuge: initialFahrzeuge, ohneHu: initialOhneHu, erinnerungen: initialErinnerungen, firmaName }: {
+  fahrzeuge: any[]
+  ohneHu: any[]
+  erinnerungen: ErinnerungsStand
+  firmaName: string
+}) {
   const supabase = createClient()
   const [fahrzeuge, setFahrzeuge] = useState(initialFahrzeuge)
+  const [ohneHu, setOhneHu] = useState(initialOhneHu)
+  const [huMonat, setHuMonat] = useState<Record<string, string>>({})
+  const [huSpeichert, setHuSpeichert] = useState<string | null>(null)
+  const [huFehler, setHuFehler] = useState('')
+  const [erinnerungen, setErinnerungen] = useState<ErinnerungsStand>(initialErinnerungen)
+
+  // Erinnerung im Protokoll vermerken (beim Antippen von WhatsApp/Anrufen/E-Mail)
+  async function erinnern(f: any, kanal: 'whatsapp' | 'telefon' | 'email') {
+    setErinnerungen(prev => ({ ...prev, [f.id]: { anzahl: (prev[f.id]?.anzahl ?? 0) + 1, letzte: new Date().toISOString(), kanal } }))
+    await supabase.from('kunden_erinnerungen').insert({ betrieb_id: f.betrieb_id, art: 'hu', bezug_id: f.id, kunde_id: f.kunden_id ?? null, kanal })
+  }
+
+  async function huSpeichern(f: any) {
+    const monat = huMonat[f.id]
+    if (!monat) return
+    setHuSpeichert(f.id)
+    setHuFehler('')
+    const datum = letzterTagImMonat(monat)
+    const { error } = await supabase.from('fahrzeuge').update({ naechste_hauptuntersuchung: datum, tuev_erinnerung: true }).eq('id', f.id)
+    setHuSpeichert(null)
+    if (error) { setHuFehler(`„${f.kennzeichen}“ konnte nicht gespeichert werden: ${error.message}`); return }
+    setOhneHu(prev => prev.filter(x => x.id !== f.id))
+    setFahrzeuge(prev => [...prev, { ...f, naechste_hauptuntersuchung: datum, tuev_erinnerung: true }]
+      .sort((a, b) => a.naechste_hauptuntersuchung.localeCompare(b.naechste_hauptuntersuchung)))
+  }
   const [filter, setFilter] = useState<Filter>('alle')
   const [search, setSearch] = useState('')
   const [anfragenId, setAnfragenId] = useState<string | null>(null)
@@ -263,9 +298,9 @@ export function TuevWeckerContent({ fahrzeuge: initialFahrzeuge }: { fahrzeuge: 
                             <span className="text-sm text-gray-700 font-medium">
                               {f.kunde.vorname} {f.kunde.nachname}
                             </span>
-                            {f.kunde.telefon && (
-                              <a href={`tel:${f.kunde.telefon}`} className="flex items-center gap-1 text-xs text-gray-500 hover:text-orange-600 transition-colors">
-                                <Phone className="w-3 h-3" /> {f.kunde.telefon}
+                            {(f.kunde.mobil || f.kunde.telefon) && (
+                              <a href={`tel:${f.kunde.mobil || f.kunde.telefon}`} className="flex items-center gap-1 text-xs text-gray-500 hover:text-orange-600 transition-colors">
+                                <Phone className="w-3 h-3" /> {f.kunde.mobil || f.kunde.telefon}
                               </a>
                             )}
                             {f.kunde.email && (
@@ -273,6 +308,7 @@ export function TuevWeckerContent({ fahrzeuge: initialFahrzeuge }: { fahrzeuge: 
                                 <Mail className="w-3 h-3" /> {f.kunde.email}
                               </a>
                             )}
+                            <ErinnertChip eintrag={erinnerungen[f.id]} />
                           </div>
                         ) : (
                           <p className="text-xs text-gray-400 mt-1">Kein Kunde hinterlegt</p>
@@ -296,20 +332,28 @@ export function TuevWeckerContent({ fahrzeuge: initialFahrzeuge }: { fahrzeuge: 
                         <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-2">
                           <p className="text-xs font-semibold text-amber-800">Kunde kontaktieren &amp; Zustimmung einholen:</p>
                           <div className="flex flex-wrap gap-2">
-                            {f.kunde?.telefon && (
-                              <a href={waPhone(f.kunde.telefon, f.kennzeichen, f.naechste_hauptuntersuchung)} target="_blank" rel="noopener noreferrer"
+                            {waNummer(f.kunde?.mobil) || waNummer(f.kunde?.telefon) ? (
+                              <a href={`https://wa.me/${waNummer(f.kunde?.mobil) || waNummer(f.kunde?.telefon)}?text=${encodeURIComponent(huText(f.kennzeichen, f.naechste_hauptuntersuchung, firmaName))}`}
+                                target="_blank" rel="noopener noreferrer" onClick={() => erinnern(f, 'whatsapp')}
                                 className="flex items-center gap-1.5 text-xs bg-green-50 hover:bg-green-100 border border-green-200 text-green-700 font-medium px-3 py-1.5 rounded-lg transition-colors">
                                 <MessageCircle className="w-3.5 h-3.5" /> WhatsApp
                               </a>
-                            )}
-                            {f.kunde?.telefon && (
-                              <a href={`tel:${f.kunde.telefon}`}
+                            ) : null}
+                            {(f.kunde?.mobil || f.kunde?.telefon) && (
+                              <a href={`tel:${f.kunde.mobil || f.kunde.telefon}`} onClick={() => erinnern(f, 'telefon')}
                                 className="flex items-center gap-1.5 text-xs bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 font-medium px-3 py-1.5 rounded-lg transition-colors">
                                 <Phone className="w-3.5 h-3.5" /> Anrufen
                               </a>
                             )}
-                            {!f.kunde?.telefon && (
-                              <span className="text-xs text-amber-700">Kein Telefon hinterlegt</span>
+                            {f.kunde?.email && !waNummer(f.kunde?.mobil) && !waNummer(f.kunde?.telefon) && (
+                              <a href={`mailto:${f.kunde.email}?subject=${encodeURIComponent('Ihre Hauptuntersuchung (' + f.kennzeichen + ')')}&body=${encodeURIComponent(huText(f.kennzeichen, f.naechste_hauptuntersuchung, firmaName))}`}
+                                onClick={() => erinnern(f, 'email')}
+                                className="flex items-center gap-1.5 text-xs bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 font-medium px-3 py-1.5 rounded-lg transition-colors">
+                                <Mail className="w-3.5 h-3.5" /> E-Mail
+                              </a>
+                            )}
+                            {!f.kunde?.mobil && !f.kunde?.telefon && !f.kunde?.email && (
+                              <span className="text-xs text-amber-700">Kein Kontakt hinterlegt</span>
                             )}
                           </div>
                           <div className="flex items-center gap-2 pt-1 border-t border-amber-200">
@@ -348,6 +392,36 @@ export function TuevWeckerContent({ fahrzeuge: initialFahrzeuge }: { fahrzeuge: 
               </div>
             )
           })}
+        </div>
+      )}
+
+      {/* Fahrzeuge ohne HU-Datum: ohne Datum kann der Wecker niemanden erinnern */}
+      {ohneHu.length > 0 && (
+        <div id="ohne-hu" className="bg-white border border-gray-200 rounded-xl overflow-hidden scroll-mt-20">
+          <div className="px-4 py-3 border-b border-gray-100">
+            <p className="font-semibold text-sm text-gray-900">{ohneHu.length} {ohneHu.length === 1 ? 'Fahrzeug' : 'Fahrzeuge'} ohne HU-Datum</p>
+            <p className="text-xs text-gray-500 mt-0.5">Monat von der Prüfplakette auswählen und speichern – dann erinnert der Wecker rechtzeitig.</p>
+          </div>
+          {huFehler && <p className="px-4 py-2 text-sm text-red-600 bg-red-50 border-b border-red-100">{huFehler}</p>}
+          <div className="divide-y divide-gray-50">
+            {ohneHu.map(f => (
+              <div key={f.id} className="flex items-center gap-3 px-4 py-3 flex-wrap">
+                <div className="flex-1 min-w-[10rem]">
+                  <Link href={`/fahrzeuge/${f.id}`} className="text-sm font-medium text-gray-900 hover:text-orange-600">{f.marke} {f.modell}</Link>
+                  <p className="text-xs text-gray-500">
+                    <span className="font-mono">{f.kennzeichen}</span>{f.kunde ? ` · ${f.kunde.vorname ?? ''} ${f.kunde.nachname ?? ''}`.trimEnd() : ''}
+                  </p>
+                </div>
+                <input type="month" value={huMonat[f.id] ?? ''} onChange={e => setHuMonat(prev => ({ ...prev, [f.id]: e.target.value }))}
+                  aria-label={`HU-Monat für ${f.kennzeichen}`}
+                  className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
+                <button onClick={() => huSpeichern(f)} disabled={!huMonat[f.id] || huSpeichert === f.id}
+                  className="text-xs font-medium bg-orange-500 hover:bg-orange-600 text-white px-3 py-2 rounded-lg disabled:opacity-40 transition-colors">
+                  {huSpeichert === f.id ? 'Speichert …' : 'Speichern'}
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>

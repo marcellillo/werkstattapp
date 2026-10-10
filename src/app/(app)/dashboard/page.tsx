@@ -2,6 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { DashboardContent } from './dashboard-content'
 import { getBetriebIdForUser } from '@/lib/server-betrieb'
+import { istUeberfaellig } from '@/lib/zahlung'
+import { hatKontakt } from '@/lib/kontakt'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -23,6 +25,9 @@ export default async function DashboardPage() {
     { data: mitarbeiterRaw },
     { data: monatWerkstattRaw },
     { data: offeneRechnungenRaw },
+    { data: kundenRechnungenOffenRaw },
+    { data: kundenKontaktRaw },
+    { count: fahrzeugeOhneHuAnzahl },
     { data: bewertungenRaw },
   ] = await Promise.all([
     supabase.from('hebebuehnen').select('*').order('position').order('nummer'),
@@ -37,6 +42,11 @@ export default async function DashboardPage() {
     supabase.from('profiles').select('id, full_name, role').order('full_name'),
     supabase.from('auftraege').select('einnahmen, fertiggestellt_am, fahrzeug:fahrzeuge(fahrzeug_typ)').eq('betrieb_id', betriebId).not('einnahmen', 'is', null).gte('fertiggestellt_am', monatStartDate),
     supabase.from('rechnungen').select('gesamt').eq('betrieb_id', betriebId).eq('bezahlt', false),
+    // Kundenrechnungen (nur Finanzrollen sehen sie -- für alle anderen liefert die Datenbank nichts)
+    supabase.from('kunden_rechnungen').select('betrag_brutto, faellig_am, erstellt_am, status').eq('betrieb_id', betriebId).eq('status', 'offen'),
+    supabase.from('kunden').select('email, telefon, mobil').eq('betrieb_id', betriebId),
+    supabase.from('fahrzeuge').select('id', { count: 'exact', head: true }).eq('betrieb_id', betriebId)
+      .is('naechste_hauptuntersuchung', null).or('fahrzeug_typ.is.null,fahrzeug_typ.neq.eigen'),
     supabase.from('auftraege').select('bewertung_sterne, bewertung_kommentar, bewertung_datum, fahrzeug:fahrzeuge(marke, modell, kennzeichen), kunde:kunden(vorname, nachname)')
       .eq('betrieb_id', betriebId)
       .not('bewertung_sterne', 'is', null)
@@ -90,6 +100,18 @@ export default async function DashboardPage() {
     .filter((a: any) => a.fahrzeug?.fahrzeug_typ !== 'eigen')
     .reduce((s: number, a: any) => s + (a.einnahmen ?? 0), 0)
   const offeneRechnungenSumme = (offeneRechnungenRaw ?? []).reduce((s: number, r: any) => s + (r.gesamt ?? 0), 0)
+  const offeneKR = (kundenRechnungenOffenRaw ?? []) as any[]
+  const ueberfaelligKR = offeneKR.filter(r => istUeberfaellig(r))
+  const forderungen = {
+    anzahl: offeneKR.length,
+    summe: offeneKR.reduce((s, r) => s + (r.betrag_brutto ?? 0), 0),
+    ueberfaellig: ueberfaelligKR.length,
+    ueberfaelligSumme: ueberfaelligKR.reduce((s, r) => s + (r.betrag_brutto ?? 0), 0),
+  }
+  const luecken = {
+    kundenOhneKontakt: ((kundenKontaktRaw ?? []) as any[]).filter(k => !hatKontakt(k.email, k.telefon, k.mobil)).length,
+    fahrzeugeOhneHu: fahrzeugeOhneHuAnzahl ?? 0,
+  }
   const bewertungen = (bewertungenRaw ?? []) as any[]
   const bewertungDurchschnitt = bewertungen.length
     ? Math.round((bewertungen.reduce((s, b) => s + b.bewertung_sterne, 0) / bewertungen.length) * 10) / 10
@@ -109,6 +131,8 @@ export default async function DashboardPage() {
       mitarbeiter={(mitarbeiterRaw ?? []) as any[]}
       monatsumsatz={monatsumsatz}
       offeneRechnungenSumme={offeneRechnungenSumme}
+      forderungen={forderungen}
+      luecken={luecken}
       bewertungen={bewertungen}
       bewertungDurchschnitt={bewertungDurchschnitt}
     />

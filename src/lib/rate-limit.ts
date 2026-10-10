@@ -12,7 +12,7 @@ export function clientIp(req: Request): string {
 
 /**
  * Zählt einen Aufruf. Gibt eine fertige 429-Antwort zurück, wenn das Limit überschritten ist, sonst null.
- * Nutzung:  const limit = await rateLimit(`ki-teile:${user.id}`, 30, 600); if (limit) return limit
+ * Nutzung:  const limit = await rateLimit(`beispiel:${user.id}`, 30, 600); if (limit) return limit
  */
 export async function rateLimit(schluessel: string, max: number, fensterSekunden: number): Promise<NextResponse | null> {
   try {

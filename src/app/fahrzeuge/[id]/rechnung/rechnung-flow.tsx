@@ -48,6 +48,7 @@ export function RechnungFlow({ auftrag, firma, betriebId }: Props) {
 
   const [betriebsstoffe, setBetriebsstoffe] = useState<BetriebsstoffMitBestand[]>([])
   const [bsMengen, setBsMengen] = useState<Record<string, number>>({})
+  const [bsHinweis, setBsHinweis] = useState('')
 
   const [erstellenLaeuft, setErstellenLaeuft] = useState(false)
   const [rechnungId, setRechnungId] = useState<string | null>(null)
@@ -194,7 +195,21 @@ export function RechnungFlow({ auftrag, firma, betriebId }: Props) {
       }
 
       try {
-        setBetriebsstoffe(await ladeBetriebsstoffeMitBestand(supabase, betriebId, { nurAktive: true }))
+        const geladen = await ladeBetriebsstoffeMitBestand(supabase, betriebId, { nurAktive: true })
+        setBetriebsstoffe(geladen)
+        // Mengen aus Leistungspaketen vorbelegen (liegen als Vorschlag am Auftrag; berechnet wird mit dem aktuellen Preis)
+        const { data: vorschlaege } = await supabase.from('auftrag_betriebsstoffe')
+          .select('betriebsstoff_id, menge, quelle').eq('auftrag_id', auftrag.id).eq('betrieb_id', betriebId)
+        const vor: Record<string, number> = {}
+        const quellen = new Set<string>()
+        for (const v of vorschlaege ?? []) {
+          const stoff = geladen.find(b => b.id === v.betriebsstoff_id)
+          if (stoff && stoff.preis_pro_einheit > 0) { vor[v.betriebsstoff_id] = Number(v.menge); if (v.quelle) quellen.add(v.quelle) }
+        }
+        if (Object.keys(vor).length > 0) {
+          setBsMengen(vor)
+          setBsHinweis(`Aus Leistungspaket vorbelegt: ${[...quellen].join(', ')} — bitte Menge prüfen.`)
+        }
       } catch (bsError) {
         console.error('[RechnungFlow] Betriebsstoffe konnten nicht geladen werden:', bsError)
       }
@@ -388,6 +403,7 @@ export function RechnungFlow({ auftrag, firma, betriebId }: Props) {
                 <span className="text-sm font-semibold text-gray-700">Betriebsstoffe (eingefüllt)</span>
                 <span className="ml-auto text-xs text-gray-400">Liter eintragen</span>
               </div>
+              {bsHinweis && <p className="px-4 py-2 text-xs text-sky-800 bg-sky-50 border-b border-sky-100">{bsHinweis}</p>}
               {betriebsstoffe.length === 0 ? (
                 <p className="px-4 py-4 text-sm text-gray-400 italic">
                   Noch keine Betriebsstoffe angelegt — unter „Betriebsstoffe“ im Menü Motoröl, Wischwasser usw. mit Literpreis anlegen.

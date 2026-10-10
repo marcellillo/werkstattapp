@@ -34,7 +34,12 @@ export async function POST(req: NextRequest) {
     const { data: positionen } = await supabase.from('leistungspaket_positionen').select('*').eq('paket_id', paketId).eq('betrieb_id', betriebId).order('sortierung')
     const teile = (positionen ?? []).filter(p => p.art === 'teil')
     const arbeiten = (positionen ?? []).filter(p => p.art === 'arbeit')
-    if (!teile.length && !arbeiten.length) return NextResponse.json({ error: 'Das Paket enthält keine Positionen.' }, { status: 400 })
+    // Betriebsstoffe (Öl, Kühlmittel …) des Pakets: nur aktive Stoffe dieses Betriebs
+    const { data: paketStoffe } = await supabase.from('leistungspaket_betriebsstoffe')
+      .select('betriebsstoff_id, menge, stoff:betriebsstoffe(name, einheit, aktiv, preis_pro_einheit)')
+      .eq('paket_id', paketId).eq('betrieb_id', betriebId)
+    const stoffe = (paketStoffe ?? []) as any[]
+    if (!teile.length && !arbeiten.length && !stoffe.length) return NextResponse.json({ error: 'Das Paket enthält keine Positionen.' }, { status: 400 })
 
     const hinweise: string[] = []
     let kostenvoranschlagId: string | null = null
@@ -103,7 +108,25 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({ erfolg: true, paket: paket.name, teile: teile.length, arbeiten: arbeiten.length, kostenvoranschlagId, werkstattauftragId, hinweise })
+    // ── Betriebsstoffe -> Vorschlag am Auftrag (der Rechnungs-Assistent belegt die Mengen damit vor) ──
+    let betriebsstoffeAnzahl = 0
+    const aktive = stoffe.filter(s => s.stoff?.aktiv)
+    if (aktive.length) {
+      const { data: vorhanden } = await supabase.from('auftrag_betriebsstoffe').select('betriebsstoff_id, menge')
+        .eq('auftrag_id', auftragId).eq('betrieb_id', betriebId)
+      const bisher = new Map<string, number>((vorhanden ?? []).map((v: any) => [v.betriebsstoff_id, Number(v.menge)]))
+      const { error } = await supabase.from('auftrag_betriebsstoffe').upsert(aktive.map(s => ({
+        auftrag_id: auftragId, betrieb_id: betriebId, betriebsstoff_id: s.betriebsstoff_id,
+        menge: Math.round((Number(s.menge) + (bisher.get(s.betriebsstoff_id) ?? 0)) * 100) / 100,
+        quelle: paket.name.slice(0, 120),
+      })), { onConflict: 'auftrag_id,betriebsstoff_id' })
+      if (error) throw error
+      betriebsstoffeAnzahl = aktive.length
+      if (aktive.some(s => !(Number(s.stoff?.preis_pro_einheit) > 0))) hinweise.push('Bei einem Betriebsstoff fehlt noch der Preis — bitte unter „Betriebsstoffe“ im Menü eintragen, sonst kann er nicht berechnet werden.')
+    }
+    if (stoffe.length > aktive.length) hinweise.push('Ein Betriebsstoff des Pakets ist deaktiviert und wurde nicht übernommen.')
+
+    return NextResponse.json({ erfolg: true, paket: paket.name, teile: teile.length, arbeiten: arbeiten.length, betriebsstoffe: betriebsstoffeAnzahl, kostenvoranschlagId, werkstattauftragId, hinweise })
   } catch (e) {
     return serverFehler(e, 'leistungspaket/anwenden')
   }

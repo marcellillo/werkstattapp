@@ -14,6 +14,7 @@ import {
   TEIL_STATUS_LABEL, TEIL_STATUS_COLOR, type TeilStatus
 } from '@/types/database'
 import { createClient } from '@/lib/supabase/client'
+import { ZuTunKarte, type Forderungen, type Luecken } from './zu-tun-karte'
 
 interface BuehneExt extends Hebebuehne {
   position: number
@@ -33,6 +34,8 @@ interface Props {
   mitarbeiter: any[]
   monatsumsatz: number
   offeneRechnungenSumme: number
+  forderungen: Forderungen
+  luecken: Luecken
   bewertungen: any[]
   bewertungDurchschnitt: number | null
 }
@@ -52,7 +55,7 @@ function isDialog(b: BuehneExt) {
 export function DashboardContent({
   hebebuehnen: initBuehnen, auftraege: initAuftraege,
   offeneAuftraege, wartendeTeile, fertigeHeute, ueberfaellig, naechsteTermine, eigenFahrzeuge, tuevBuehnenTermine, mitarbeiter,
-  monatsumsatz, offeneRechnungenSumme, bewertungen, bewertungDurchschnitt
+  monatsumsatz, offeneRechnungenSumme, forderungen, luecken, bewertungen, bewertungDurchschnitt
 }: Props) {
   const [buehnen, setBuehnen] = useState<BuehneExt[]>(initBuehnen)
   const [auftraege, setAuftraege] = useState<Auftrag[]>(initAuftraege)
@@ -130,6 +133,8 @@ const auftragMap = new Map<string, Auftrag>()
         </span>
         <ChevronRight className="w-6 h-6 flex-shrink-0 opacity-80" />
       </Link>
+
+      <ZuTunKarte forderungen={forderungen} luecken={luecken} />
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

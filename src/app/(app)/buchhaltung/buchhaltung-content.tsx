@@ -10,6 +10,8 @@ import { Card, CardContent } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { berechneFahrzeugSteuer, STEUERART_KURZ, STEUERART_COLOR, type Steuerart } from '@/lib/fahrzeug-steuer'
+import { faelligkeit, istUeberfaellig, tagBerlin, vorTagen } from '@/lib/zahlung'
+import { waNummer } from '@/lib/kontakt'
 
 type Auftrag = {
   id: string
@@ -55,27 +57,55 @@ type KundenRechnung = {
   bezahlt_am: string | null
   faellig_am: string | null
   erstellt_am: string
-  kunde: { vorname: string | null; nachname: string | null; telefon: string | null } | null
+  betrieb_id: string
+  kunde_id: string | null
+  kunde: { vorname: string | null; nachname: string | null; telefon: string | null; mobil: string | null; email: string | null } | null
   fahrzeug: { kennzeichen: string; marke: string | null; modell: string | null } | null
 }
 
 type Tab = 'uebersicht' | 'fahrzeuge' | 'rechnungen'
+type RechnungFilter = 'alle' | 'offen' | 'bezahlt' | 'ueberfaellig'
+type Erinnerungen = Record<string, { anzahl: number; letzte: string; kanal: string }>
 
-export function BuchhaltungContent({ auftraege, ausgaben, kundenRechnungen: initialKundenRechnungen, kleinunternehmer, firmaName }: {
+const KANAL_NAME: Record<string, string> = { whatsapp: 'WhatsApp', email: 'E-Mail', telefon: 'Telefon', sms: 'SMS' }
+
+/** Freundlicher Erinnerungstext; ab der 2. Erinnerung etwas bestimmter */
+function erinnerungsText(r: KundenRechnung, anzahl: number, firmaName: string, ueberfaellig: boolean) {
+  const name = [r.kunde?.vorname, r.kunde?.nachname].filter(Boolean).join(' ')
+  const grund = ueberfaellig
+    ? `unsere Rechnung Nr. ${r.rechnungs_nr} über ${fmtEuro(r.betrag_brutto)} war am ${fmt(faelligkeit(r))} fällig und ist bei uns noch offen.`
+    : `zur Erinnerung: Unsere Rechnung Nr. ${r.rechnungs_nr} über ${fmtEuro(r.betrag_brutto)} ist am ${fmt(faelligkeit(r))} fällig.`
+  const bitte = anzahl >= 1
+    ? 'Bitte überweisen Sie den Betrag in den nächsten Tagen. Falls Sie bereits bezahlt haben, ist diese Nachricht hinfällig.'
+    : 'Falls Sie bereits bezahlt haben, ist diese Nachricht hinfällig – ansonsten freuen wir uns über Ihre Überweisung.'
+  return `Guten Tag${name ? ' ' + name : ''},\n\n${grund}\n${bitte}\n\nVielen Dank und freundliche Grüße\n${firmaName || 'Ihre Werkstatt'}`
+}
+
+export function BuchhaltungContent({ auftraege, ausgaben, kundenRechnungen: initialKundenRechnungen, kleinunternehmer, firmaName, erinnerungen: initialErinnerungen, startTab, startFilter }: {
   auftraege: Auftrag[]
   ausgaben: Ausgabe[]
   kundenRechnungen: KundenRechnung[]
   kleinunternehmer: boolean
   firmaName: string
+  erinnerungen: Erinnerungen
+  startTab?: Tab
+  startFilter?: RechnungFilter
 }) {
   const supabase = createClient()
-  const [tab, setTab] = useState<Tab>('uebersicht')
+  const [tab, setTab] = useState<Tab>(startTab ?? 'uebersicht')
+  const [erinnerungen, setErinnerungen] = useState<Erinnerungen>(initialErinnerungen)
   const [jahr, setJahr] = useState(new Date().getFullYear())
   const [expandedMonat, setExpandedMonat] = useState<number | null>(null)
   const [leereMonate, setLeereMonate] = useState(false)
   const [kundenRechnungen, setKundenRechnungen] = useState<KundenRechnung[]>(initialKundenRechnungen)
-  const [rechnungFilter, setRechnungFilter] = useState<'alle' | 'offen' | 'bezahlt' | 'ueberfaellig'>('alle')
-  const heute = new Date().toISOString().split('T')[0]
+  const [rechnungFilter, setRechnungFilter] = useState<RechnungFilter>(startFilter ?? 'alle')
+  const heute = tagBerlin()
+
+  // Erinnerung im Protokoll vermerken (beim Antippen von WhatsApp/E-Mail), damit niemand doppelt angeschrieben wird
+  async function erinnern(r: KundenRechnung, kanal: 'whatsapp' | 'email') {
+    setErinnerungen(prev => ({ ...prev, [r.id]: { anzahl: (prev[r.id]?.anzahl ?? 0) + 1, letzte: new Date().toISOString(), kanal } }))
+    await supabase.from('kunden_erinnerungen').insert({ betrieb_id: r.betrieb_id, art: 'zahlung', bezug_id: r.id, kunde_id: r.kunde_id, kanal })
+  }
 
   async function toggleBezahlt(r: KundenRechnung) {
     const neuerStatus = r.status === 'bezahlt' ? 'offen' : 'bezahlt'
@@ -184,12 +214,12 @@ export function BuchhaltungContent({ auftraege, ausgaben, kundenRechnungen: init
     : jahresDaten.filter(m => m.hatDaten)
 
   const offeneRechnungen = kundenRechnungen.filter(r => r.status === 'offen')
-  const ueberfaelligeRechnungen = offeneRechnungen.filter(r => r.faellig_am && r.faellig_am < heute)
+  const ueberfaelligeRechnungen = offeneRechnungen.filter(r => istUeberfaellig(r, heute))
   const offenSumme = offeneRechnungen.reduce((s, r) => s + r.betrag_brutto, 0)
 
   const gefilterteRechnungen = kundenRechnungen.filter(r => {
-    if (rechnungFilter === 'offen') return r.status === 'offen' && (!r.faellig_am || r.faellig_am >= heute)
-    if (rechnungFilter === 'ueberfaellig') return r.status === 'offen' && r.faellig_am && r.faellig_am < heute
+    if (rechnungFilter === 'offen') return r.status === 'offen' && !istUeberfaellig(r, heute)
+    if (rechnungFilter === 'ueberfaellig') return istUeberfaellig(r, heute)
     if (rechnungFilter === 'bezahlt') return r.status === 'bezahlt'
     return true
   })
@@ -288,7 +318,7 @@ export function BuchhaltungContent({ auftraege, ausgaben, kundenRechnungen: init
           <div className="flex gap-2 flex-wrap">
             {([
               { value: 'alle',         label: 'Alle',         count: kundenRechnungen.length },
-              { value: 'offen',        label: 'Offen',        count: offeneRechnungen.filter(r => !r.faellig_am || r.faellig_am >= heute).length },
+              { value: 'offen',        label: 'Offen',        count: offeneRechnungen.filter(r => !istUeberfaellig(r, heute)).length },
               { value: 'ueberfaellig', label: 'Überfällig',   count: ueberfaelligeRechnungen.length },
               { value: 'bezahlt',      label: 'Bezahlt',      count: kundenRechnungen.filter(r => r.status === 'bezahlt').length },
             ] as const).map(f => (
@@ -315,7 +345,13 @@ export function BuchhaltungContent({ auftraege, ausgaben, kundenRechnungen: init
             <div className="space-y-2">
               {gefilterteRechnungen.map(r => {
                 const bezahlt = r.status === 'bezahlt'
-                const ueberfaellig = !bezahlt && r.faellig_am && r.faellig_am < heute
+                const ueberfaellig = istUeberfaellig(r, heute)
+                const tageUeber = ueberfaellig
+                  ? Math.round((Date.parse(heute + 'T12:00:00Z') - Date.parse(faelligkeit(r) + 'T12:00:00Z')) / 86_400_000)
+                  : 0
+                const erinnert = erinnerungen[r.id]
+                const waNr = waNummer(r.kunde?.mobil) || waNummer(r.kunde?.telefon)
+                const nachricht = erinnerungsText(r, erinnert?.anzahl ?? 0, firmaName, ueberfaellig)
                 return (
                   <div key={r.id} className={cn(
                     'bg-white border rounded-xl px-4 py-3 flex items-center gap-4',
@@ -338,13 +374,21 @@ export function BuchhaltungContent({ auftraege, ausgaben, kundenRechnungen: init
                         )}
                         <span className="text-xs text-slate-400">
                           Erstellt: {fmt(r.erstellt_am)}
-                          {r.faellig_am && ` · Fällig: ${fmt(r.faellig_am)}`}
+                          {` · Fällig: ${fmt(faelligkeit(r))}`}
                           {bezahlt && r.bezahlt_am && ` · Bezahlt: ${fmt(r.bezahlt_am)}`}
                         </span>
                         {ueberfaellig && (
                           <span className="flex items-center gap-1 text-xs text-red-600 font-semibold">
-                            <AlertTriangle className="w-3 h-3" /> Überfällig
+                            <AlertTriangle className="w-3 h-3" /> Überfällig seit {tageUeber} {tageUeber === 1 ? 'Tag' : 'Tagen'}
                           </span>
+                        )}
+                        {!bezahlt && erinnert && (
+                          <span className="text-xs text-slate-500 bg-slate-100 rounded-full px-2 py-0.5">
+                            Erinnert {vorTagen(erinnert.letzte, heute)} ({KANAL_NAME[erinnert.kanal] ?? erinnert.kanal}{erinnert.anzahl > 1 ? `, ${erinnert.anzahl}×` : ''})
+                          </span>
+                        )}
+                        {!bezahlt && !waNr && !r.kunde?.email && (
+                          <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">Kein Kontakt hinterlegt</span>
                         )}
                       </div>
                     </div>
@@ -379,11 +423,12 @@ export function BuchhaltungContent({ auftraege, ausgaben, kundenRechnungen: init
                           ? <><CheckCircle className="w-3.5 h-3.5" /> Bezahlt</>
                           : <><Clock className="w-3.5 h-3.5" /> Als bezahlt</>}
                       </button>
-                      {!bezahlt && r.kunde?.telefon && (
+                      {!bezahlt && waNr && (
                         <a
-                          href={`https://wa.me/${r.kunde.telefon.replace(/\D/g, '')}?text=${encodeURIComponent(`Guten Tag ${r.kunde.vorname ?? ''} ${r.kunde.nachname ?? ''},\n\nwir möchten Sie freundlich an die offene Rechnung Nr. ${r.rechnungs_nr} über ${fmtEuro(r.betrag_brutto)} erinnern.${r.faellig_am ? `\nZahlungsziel war der ${new Date(r.faellig_am).toLocaleDateString('de-DE')}.` : ''}\n\nVielen Dank!`)}`}
+                          href={`https://wa.me/${waNr}?text=${encodeURIComponent(nachricht)}`}
                           target="_blank"
                           rel="noopener noreferrer"
+                          onClick={() => erinnern(r, 'whatsapp')}
                           title="Zahlungserinnerung per WhatsApp"
                           className={cn(
                             'p-1.5 rounded-lg border transition-colors',
@@ -393,6 +438,21 @@ export function BuchhaltungContent({ auftraege, ausgaben, kundenRechnungen: init
                           )}
                         >
                           <MessageCircle className="w-3.5 h-3.5" />
+                        </a>
+                      )}
+                      {!bezahlt && !waNr && r.kunde?.email && (
+                        <a
+                          href={`mailto:${r.kunde.email}?subject=${encodeURIComponent(`Zahlungserinnerung Rechnung ${r.rechnungs_nr}`)}&body=${encodeURIComponent(nachricht)}`}
+                          onClick={() => erinnern(r, 'email')}
+                          title="Zahlungserinnerung per E-Mail"
+                          className={cn(
+                            'p-1.5 rounded-lg border transition-colors',
+                            ueberfaellig
+                              ? 'border-red-200 bg-red-50 text-red-600 hover:bg-red-100'
+                              : 'border-slate-200 text-slate-400 hover:text-blue-600 hover:border-blue-200'
+                          )}
+                        >
+                          <Mail className="w-3.5 h-3.5" />
                         </a>
                       )}
                     </div>
