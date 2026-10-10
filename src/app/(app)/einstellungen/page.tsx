@@ -94,6 +94,7 @@ export default async function EinstellungenPage() {
         letzterSync: settings.letzter_email_sync ?? null,
         fehler: settings.graph_fehler ?? '',
       }}
+      letzteSicherung={settings.letzte_sicherung ?? null}
       betriebName={betrieb?.name ?? 'Werkstatt'}
       betriebId={betriebId}
     />

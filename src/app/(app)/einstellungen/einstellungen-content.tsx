@@ -10,6 +10,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRollen } from '@/lib/rollen-context'
 import { PushSettings } from '@/components/push-settings'
 import { MicrosoftPostfachCard, type GraphStatus } from './microsoft-postfach'
+import { SicherungCard } from './sicherung-card'
 
 interface Config {
   imap_email: string
@@ -50,12 +51,13 @@ interface Config {
   firma_stripe: string
 }
 
-export function EinstellungenContent({ initialConfig, graphStatus, geheimnisseGesetzt, betriebName, betriebId }: {
+export function EinstellungenContent({ initialConfig, graphStatus, geheimnisseGesetzt, betriebName, betriebId, letzteSicherung }: {
   initialConfig: Config
   graphStatus: GraphStatus
   geheimnisseGesetzt: { anthropic_api_key: boolean; resend_api_key: boolean }
   betriebName: string
   betriebId: string
+  letzteSicherung: string | null
 }) {
   const [config, setConfig] = useState<Config>(initialConfig)
   const [logoUploading, setLogoUploading] = useState(false)
@@ -506,6 +508,9 @@ export function EinstellungenContent({ initialConfig, graphStatus, geheimnisseGe
               <PushSettings />
             </CardContent>
           </Card>
+
+          {/* Datensicherung */}
+          {isAdmin && <SicherungCard letzteSicherung={letzteSicherung} />}
         </div>
       )}
 

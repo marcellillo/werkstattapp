@@ -12,6 +12,7 @@ import { createClient } from '@/lib/supabase/client'
 import { berechneFahrzeugSteuer, STEUERART_KURZ, STEUERART_COLOR, type Steuerart } from '@/lib/fahrzeug-steuer'
 import { faelligkeit, istUeberfaellig, tagBerlin, vorTagen } from '@/lib/zahlung'
 import { waNummer } from '@/lib/kontakt'
+import { SteuerberaterExport } from './steuerberater-export'
 
 type Auftrag = {
   id: string
@@ -94,6 +95,7 @@ export function BuchhaltungContent({ auftraege, ausgaben, kundenRechnungen: init
   const supabase = createClient()
   const [tab, setTab] = useState<Tab>(startTab ?? 'uebersicht')
   const [erinnerungen, setErinnerungen] = useState<Erinnerungen>(initialErinnerungen)
+  const [zeigeExport, setZeigeExport] = useState(false)
   const [jahr, setJahr] = useState(new Date().getFullYear())
   const [expandedMonat, setExpandedMonat] = useState<number | null>(null)
   const [leereMonate, setLeereMonate] = useState(false)
@@ -241,8 +243,14 @@ export function BuchhaltungContent({ auftraege, ausgaben, kundenRechnungen: init
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-sm text-slate-700 hover:border-slate-400 transition-colors">
             <Download className="w-4 h-4" /> CSV
           </button>
+          <button onClick={() => setZeigeExport(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-sm text-slate-700 hover:border-slate-400 transition-colors">
+            <Mail className="w-4 h-4" /> Steuerberater
+          </button>
         </div>
       </div>
+
+      {zeigeExport && <SteuerberaterExport onClose={() => setZeigeExport(false)} />}
 
       {/* Tabs */}
       <div className="flex gap-2 border-b border-slate-200 pb-0">

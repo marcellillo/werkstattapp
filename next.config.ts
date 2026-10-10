@@ -85,6 +85,7 @@ const nextConfig: NextConfig = {
     '/api/pdf/generate': ['./node_modules/@sparticuz/chromium/bin/**'],
     '/api/werkstattauftrag/pdf': ['./node_modules/@sparticuz/chromium/bin/**'],
     '/api/mappe/komplett-pdf': ['./node_modules/@sparticuz/chromium/bin/**'],
+    '/api/buchhaltung/export': ['./node_modules/@sparticuz/chromium/bin/**'],
   },
 }
 

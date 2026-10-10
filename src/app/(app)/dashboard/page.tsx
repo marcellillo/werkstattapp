@@ -29,6 +29,8 @@ export default async function DashboardPage() {
     { data: kundenKontaktRaw },
     { count: fahrzeugeOhneHuAnzahl },
     { data: bewertungenRaw },
+    { data: rolleRow },
+    { data: sicherungRow },
   ] = await Promise.all([
     supabase.from('hebebuehnen').select('*').order('position').order('nummer'),
     supabase
@@ -52,6 +54,8 @@ export default async function DashboardPage() {
       .not('bewertung_sterne', 'is', null)
       .order('bewertung_datum', { ascending: false })
       .limit(10),
+    supabase.from('betrieb_users').select('role').eq('betrieb_id', betriebId).eq('profile_id', user.id).maybeSingle(),
+    supabase.from('betrieb_einstellungen').select('wert').eq('betrieb_id', betriebId).eq('schluessel', 'letzte_sicherung').maybeSingle(),
   ])
 
   const hebebuehnen = (hebebuehnenRaw ?? []) as any[]
@@ -111,6 +115,13 @@ export default async function DashboardPage() {
   const luecken = {
     kundenOhneKontakt: ((kundenKontaktRaw ?? []) as any[]).filter(k => !hatKontakt(k.email, k.telefon, k.mobil)).length,
     fahrzeugeOhneHu: fahrzeugeOhneHuAnzahl ?? 0,
+    // Erinnerung an die Datensicherung: nur Administratoren, wenn noch nie oder seit über 30 Tagen nicht gesichert
+    sicherungTage: ((): number | null | undefined => {
+      if (!['admin', 'superadmin'].includes(rolleRow?.role ?? '')) return undefined
+      if (!sicherungRow?.wert) return null
+      const tage = Math.floor((Date.now() - Date.parse(sicherungRow.wert)) / 86_400_000)
+      return tage > 30 ? tage : undefined
+    })(),
   }
   const bewertungen = (bewertungenRaw ?? []) as any[]
   const bewertungDurchschnitt = bewertungen.length

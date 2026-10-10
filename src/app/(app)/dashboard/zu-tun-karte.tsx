@@ -1,10 +1,11 @@
 // "Zu erledigen" auf der Startseite: offene Kundenrechnungen und Datenlücken, die später Arbeit machen
 // (Kunde ohne Kontakt = nicht erreichbar, Fahrzeug ohne HU-Datum = kein TÜV-Wecker).
 import Link from 'next/link'
-import { AlertTriangle, ChevronRight, Euro, PhoneOff, ShieldQuestion } from 'lucide-react'
+import { AlertTriangle, ChevronRight, Database, Euro, PhoneOff, ShieldQuestion } from 'lucide-react'
 
 export type Forderungen = { anzahl: number; summe: number; ueberfaellig: number; ueberfaelligSumme: number }
-export type Luecken = { kundenOhneKontakt: number; fahrzeugeOhneHu: number }
+/** sicherungTage: nur für Administratoren gesetzt, wenn die Datensicherung fällig ist (null = noch nie heruntergeladen) */
+export type Luecken = { kundenOhneKontakt: number; fahrzeugeOhneHu: number; sicherungTage?: number | null }
 
 const euro = (v: number) => `${v.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`
 
@@ -38,6 +39,13 @@ export function ZuTunKarte({ forderungen, luecken }: { forderungen: Forderungen;
       key: 'hu', href: '/tuev-wecker#ohne-hu', icon: ShieldQuestion, farbe: 'bg-slate-100 text-slate-600',
       titel: `${luecken.fahrzeugeOhneHu} ${luecken.fahrzeugeOhneHu === 1 ? 'Fahrzeug' : 'Fahrzeuge'} ohne HU-Datum`,
       text: 'Datum von der Plakette eintragen, dann erinnert der TÜV-Wecker rechtzeitig',
+    })
+  }
+  if (luecken.sicherungTage !== undefined) {
+    zeilen.push({
+      key: 'sicherung', href: '/einstellungen#sicherung', icon: Database, farbe: 'bg-slate-100 text-slate-600',
+      titel: luecken.sicherungTage === null ? 'Datensicherung: noch nie heruntergeladen' : `Datensicherung: zuletzt vor ${luecken.sicherungTage} Tagen`,
+      text: 'Ein Klick sichert alle Kunden-, Auftrags- und Rechnungsdaten auf Ihren Rechner',
     })
   }
   if (zeilen.length === 0) return null
