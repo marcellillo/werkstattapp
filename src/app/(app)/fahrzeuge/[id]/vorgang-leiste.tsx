@@ -5,7 +5,7 @@
 // Rechnungs-Assistent) — es kommt nichts Neues dazu, nur der Weg ist sichtbar und kürzer.
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { Check, ChevronRight, Loader2, FolderOpen, PackagePlus, Send } from 'lucide-react'
+import { Camera, Check, ChevronRight, Loader2, FolderOpen, PackagePlus, Send } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import type { FahrzeugStatus } from '@/types/database'
@@ -28,6 +28,9 @@ interface Props {
   onPaketUebernommen: () => void
   kunde?: any
   fahrzeugName?: string
+  /** Schnell-Annahme (km, Tank, Fotos, Unterschrift): Zustand der Erfassung + Knopf zum Öffnen */
+  annahme?: { erfasst: boolean; text: string }
+  onAnnahme?: () => void
 }
 
 type SchrittZustand = 'erledigt' | 'aktuell' | 'offen'
@@ -50,7 +53,7 @@ const SCHRITTE_EIGEN: Schritt[] = [
 
 const euro = (n: number) => n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
 
-export function VorgangLeiste({ auftragId, fahrzeugId, betriebId, status, istEigenfahrzeug, aktualisierung, onStatus, onVerkaufen, onKostenvoranschlagErstellt, onPaketUebernommen, kunde, fahrzeugName = '' }: Props) {
+export function VorgangLeiste({ auftragId, fahrzeugId, betriebId, status, istEigenfahrzeug, aktualisierung, onStatus, onVerkaufen, onKostenvoranschlagErstellt, onPaketUebernommen, kunde, fahrzeugName = '', annahme, onAnnahme }: Props) {
   const { currentBetrieb } = useBetrieb()
   const supabase = useMemo(() => createClient(), [])
   const [kva, setKva] = useState<{ anzahl: number; offen: number }>({ anzahl: 0, offen: 0 })
@@ -269,6 +272,19 @@ export function VorgangLeiste({ auftragId, fahrzeugId, betriebId, status, istEig
                 </Link>
               )}
             </div>
+          </div>
+        )}
+        {!istEigenfahrzeug && onAnnahme && !['ausgeliefert', 'verkauft', 'storniert'].includes(status) && (
+          <div className="mt-3 text-sm">
+            {annahme?.erfasst ? (
+              <button type="button" onClick={onAnnahme} className="inline-flex items-center gap-1.5 text-emerald-700 font-medium">
+                <Check className="w-4 h-4" /> {annahme.text} <span className="text-slate-400 font-normal underline underline-offset-2">ändern</span>
+              </button>
+            ) : (
+              <button type="button" onClick={onAnnahme} className="inline-flex items-center gap-1.5 font-semibold text-orange-700 hover:text-orange-800">
+                <Camera className="w-4 h-4" /> Annahme erfassen <span className="text-slate-400 font-normal">(Kilometer, Tank, Fotos, Unterschrift)</span>
+              </button>
+            )}
           </div>
         )}
         {!istEigenfahrzeug && geladen && kvaOffen && !['ausgeliefert', 'verkauft'].includes(status) && (

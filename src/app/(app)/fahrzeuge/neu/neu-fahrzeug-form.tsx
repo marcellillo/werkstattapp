@@ -431,7 +431,8 @@ export function NeuFahrzeugForm({ kunden, hebebuehnen }: Props) {
       }).select().single()
 
       if (auftrag) {
-        router.push('/dashboard')
+        // Kundenauftrag: gleich zur Annahme (km, Tank, Fotos, Unterschrift); Eigenfahrzeuge zurück zur Startseite
+        router.push(fahrzeugTyp === 'fremd' ? `/fahrzeuge/${auftrag.id}?aktion=annahme` : '/dashboard')
       }
     } catch (err: any) {
       setError(err.message ?? 'Fehler beim Speichern')

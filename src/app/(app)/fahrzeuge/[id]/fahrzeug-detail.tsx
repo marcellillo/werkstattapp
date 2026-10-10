@@ -22,6 +22,7 @@ import { WerkstattauftragSection } from './werkstattauftrag-section'
 import { RechnungSection } from './rechnung-section'
 import { VorgangLeiste } from './vorgang-leiste'
 import { ArbeitszeitKarte } from '@/components/arbeitszeit-karte'
+import { AnnahmeDialog, type AnnahmeDaten } from './annahme-dialog'
 import { LieferscheinQuickScan } from '@/components/lieferschein-quick-scan'
 import { LieferscheinGalerie } from '@/components/lieferschein-galerie'
 import { AuftragDokumente } from '@/components/auftrag-dokumente'
@@ -78,6 +79,7 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
   const [buehneWarnung, setBuehneWarnung] = useState<FahrzeugStatus | null>(null)
   const [buehneWahl, setBuehneWahl] = useState('')
   const [kvRefreshSignal, setKvRefreshSignal] = useState(0)
+  const [zeigeAnnahme, setZeigeAnnahme] = useState(false)
   const [dokumenteBlockKey, setDokumenteBlockKey] = useState(0)   // erzwingt Neuladen von Kostenvoranschlag/Werkstattauftrag/Rechnungen
   const [fertigEmailStatus, setFertigEmailStatus] = useState<'idle' | 'senden' | 'ok' | 'fehler'>('idle')
   const [storniereBestaetigung, setStorniereBestaetigung] = useState(false)
@@ -119,6 +121,8 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
     aktionGestartet.current = true
     window.history.replaceState(null, '', window.location.pathname)
     if (['reparatur', 'fertig', 'ausgeliefert'].includes(aktion) && auftrag.status !== aktion) handleStatusChange(aktion as FahrzeugStatus)
+    // Nach dem Anlegen eines Kundenauftrags: gleich die Annahme (km, Tank, Fotos, Unterschrift) erfassen, falls noch nicht geschehen
+    if (aktion === 'annahme' && !isEigenfahrzeug && !(auftrag as any).annahme_datum) setZeigeAnnahme(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -582,7 +586,24 @@ export function FahrzeugDetail({ auftrag: initialAuftrag, hebebuehnen, historie,
         onPaketUebernommen={() => { setKvRefreshSignal(n => n + 1); setDokumenteBlockKey(n => n + 1) }}
         kunde={auftrag.kunde}
         fahrzeugName={`${(auftrag.fahrzeug as any)?.marke ?? ''} ${(auftrag.fahrzeug as any)?.modell ?? ''}`.trim()}
+        annahme={{
+          erfasst: !!(auftrag as any).annahme_datum,
+          text: `Annahme erfasst am ${(auftrag as any).annahme_datum ? new Date((auftrag as any).annahme_datum).toLocaleDateString('de-DE') : ''}${(auftrag as any).annahme_km != null ? ` · ${Number((auftrag as any).annahme_km).toLocaleString('de-DE')} km` : ''}${(auftrag as any).annahme_unterschrift_kunde ? ' · unterschrieben' : ''}`,
+        }}
+        onAnnahme={() => setZeigeAnnahme(true)}
       />
+      {zeigeAnnahme && (
+        <AnnahmeDialog
+          auftragId={auftrag.id}
+          betriebId={betriebId}
+          fahrzeugId={(auftrag.fahrzeug as any)?.id}
+          kundeName={[auftrag.kunde?.vorname, auftrag.kunde?.nachname].filter(Boolean).join(' ')}
+          fahrzeugName={`${(auftrag.fahrzeug as any)?.marke ?? ''} ${(auftrag.fahrzeug as any)?.modell ?? ''}`.trim()}
+          start={{ km: (auftrag as any).annahme_km ?? (auftrag.fahrzeug as any)?.kilometerstand ?? null, tank: (auftrag as any).annahme_tank ?? null, schaeden: (auftrag as any).annahme_schaeden ?? null, hatUnterschrift: !!(auftrag as any).annahme_unterschrift_kunde }}
+          onClose={() => setZeigeAnnahme(false)}
+          onGespeichert={(d: AnnahmeDaten) => setAuftrag(a => ({ ...a, ...d, annahme_unterschrift_kunde: d.annahme_unterschrift_kunde ?? (a as any).annahme_unterschrift_kunde } as any))}
+        />
+      )}
 
       {/* Arbeitszeit: starten/stoppen, Zeit nachtragen */}
       <ArbeitszeitKarte auftragId={auftrag.id} betriebId={betriebId} gesperrt={['ausgeliefert', 'storniert', 'verkauft'].includes(auftrag.status)} />

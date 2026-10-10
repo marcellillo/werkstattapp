@@ -1,7 +1,7 @@
 'use client'
 import { useState, useRef } from 'react'
 import { fotoUrl } from '@/lib/datei-urls'
-import { Camera, Upload, Trash2, X, ZoomIn, Plus, ImageIcon } from 'lucide-react'
+import { Camera, Upload, Trash2, X, ZoomIn, Plus, ImageIcon, Eye, EyeOff } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useBetrieb } from '@/lib/betrieb-context'
 import { Button } from '@/components/ui/button'
@@ -14,6 +14,7 @@ type Foto = {
   kategorie: 'annahme' | 'reparatur' | 'fertig' | 'allgemein' | 'fahrzeugschein' | 'tuev'
   beschreibung: string | null
   erstellt_am: string
+  fuer_kunde?: boolean
 }
 
 const KATEGORIEN = [
@@ -73,6 +74,14 @@ export function FotosContent({ auftragId, initialFotos }: Props) {
     await supabase.from('auftrag_fotos').delete().eq('id', foto.id)
     setFotos(prev => prev.filter(f => f.id !== foto.id))
     if (lightbox?.id === foto.id) setLightbox(null)
+  }
+
+  // Foto für den Kunden in der Freigabe-Seite des Kostenvoranschlags sichtbar machen / wieder verbergen
+  async function kundeUmschalten(foto: Foto) {
+    const neu = !foto.fuer_kunde
+    setFotos(prev => prev.map(f => f.id === foto.id ? { ...f, fuer_kunde: neu } : f))
+    const { error } = await supabase.from('auftrag_fotos').update({ fuer_kunde: neu }).eq('id', foto.id)
+    if (error) setFotos(prev => prev.map(f => f.id === foto.id ? { ...f, fuer_kunde: !neu } : f))
   }
 
   const fotosByKat = (kat: Foto['kategorie']) => fotos.filter(f => f.kategorie === kat)
@@ -151,6 +160,13 @@ export function FotosContent({ auftragId, initialFotos }: Props) {
                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
                       <ZoomIn className="w-5 h-5 text-white" />
                     </div>
+                    <button
+                      onClick={e => { e.stopPropagation(); kundeUmschalten(foto) }}
+                      title={foto.fuer_kunde ? 'Der Kunde sieht dieses Foto in der Freigabe — antippen zum Verbergen' : 'Für den Kunden in der Freigabe sichtbar machen'}
+                      className={`absolute top-1 left-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium flex items-center gap-1 shadow ${foto.fuer_kunde ? 'bg-emerald-600 text-white' : 'bg-white/90 text-gray-600'}`}
+                    >
+                      {foto.fuer_kunde ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}{foto.fuer_kunde ? 'Kunde sieht' : 'Für Kunde'}
+                    </button>
                     <button
                       onClick={e => { e.stopPropagation(); loeschen(foto) }}
                       className="absolute top-1 right-1 bg-red-600 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"

@@ -29,6 +29,11 @@ export default async function FreigabePage({ params }: { params: Promise<{ token
     .eq('id', t.kva_id).maybeSingle()
   if (!kva) notFound()
 
+  // Fotos, die die Werkstatt ausdrücklich für den Kunden freigegeben hat ("Das haben wir gefunden")
+  const { data: kundenFotos } = kva.auftrag_id
+    ? await admin.from('auftrag_fotos').select('id, beschreibung').eq('auftrag_id', kva.auftrag_id).eq('betrieb_id', kva.betrieb_id).eq('fuer_kunde', true).order('erstellt_am')
+    : { data: [] as any[] }
+
   const [firma, summen, fz] = await Promise.all([
     resolveFirmaSettings(admin, kva.betrieb_id),
     ladeKvaSummen(admin, kva as any),
@@ -61,6 +66,22 @@ export default async function FreigabePage({ params }: { params: Promise<{ token
             {fahrzeug?.kennzeichen ? ' · ' : ''}Nr. {kva.nummer || kva.id.slice(0, 8)} · {datum(kva.created_at)}
           </p>
         </section>
+
+        {(kundenFotos ?? []).length > 0 && (
+          <section className="bg-white rounded-2xl border border-slate-200 p-5">
+            <h2 className="text-sm font-semibold text-slate-700 mb-3">Fotos zu Ihrem Fahrzeug</h2>
+            <div className="grid grid-cols-2 gap-2">
+              {(kundenFotos ?? []).map((f: any) => (
+                <a key={f.id} href={`/api/freigabe/${token}/foto?id=${f.id}`} target="_blank" rel="noopener noreferrer" className="block">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={`/api/freigabe/${token}/foto?id=${f.id}`} alt={f.beschreibung ?? 'Foto'} loading="lazy" className="w-full aspect-[4/3] object-cover rounded-xl border border-slate-200" />
+                  {f.beschreibung && <span className="block text-xs text-slate-500 mt-1">{f.beschreibung}</span>}
+                </a>
+              ))}
+            </div>
+            <p className="text-xs text-slate-400 mt-2">Zum Vergrößern antippen.</p>
+          </section>
+        )}
 
         <section className="bg-white rounded-2xl border border-slate-200 p-5 space-y-5">
           {(summen.teile.length > 0 || summen.teilePauschal != null) && (
